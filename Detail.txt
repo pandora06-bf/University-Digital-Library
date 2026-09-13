@@ -1,0 +1,23 @@
+Roadmap
+1. Tailwind ✅
+2. React Router
+3. Layout component
+4. Login page
+5. JWT Authentication
+6. API service Axios
+7. Dashboard realtime
+8. Docker build
+9. CI/CD
+
+Chạy Server
+cd libmanager-frontend
+npm run dev
+
+React Router
+npm install react-router-dom
+
+Icon
+npm install lucide-react
+
+API Client
+npm install axios
