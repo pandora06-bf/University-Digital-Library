@@ -1,2 +1,6 @@
 libmanager-frontend/node_modules/
 libmanager-frontend/dist/
+.env
+.env.local
+.env.*.local
+*.env
