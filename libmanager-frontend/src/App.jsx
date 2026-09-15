@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import Login from './pages/auth/Login';
-import { Search, BookOpen, Filter, BookMarked, LogOut } from 'lucide-react';
+import { Search, BookOpen, Filter, BookMarked, LogOut, Mail, Lock } from 'lucide-react';
+import { Button } from './components/Button';
+import { Input } from './components/Input';
+import { Table } from './components/Table';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -83,6 +86,55 @@ export default function App() {
 
         {/* Book Cards Grid */}
         <main className="flex-1">
+          {/* Test Component Button */}
+          <div className="mb-8 p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+            <h2 className="text-lg font-bold mb-4 text-slate-800">Kiểm tra Button Component</h2>
+            <div className="flex flex-wrap gap-4 items-center">
+              <Button variant="primary">Nút Primary</Button>
+              <Button variant="outline">Nút Outline</Button>
+              <Button variant="ghost">Nút Ghost</Button>
+              <Button variant="danger">Nút Danger</Button>
+              <div className="w-px h-8 bg-slate-200 mx-2"></div>
+              <Button size="sm" variant="primary">Size SM</Button>
+              <Button size="lg" variant="outline">Size LG</Button>
+            </div>
+          </div>
+
+          {/* Test Component Input */}
+          <div className="mb-8 p-6 bg-white border border-slate-200 rounded-xl shadow-sm">
+            <h2 className="text-lg font-bold mb-4 text-slate-800">Kiểm tra Input Component</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input 
+                label="Tiêu đề sách" 
+                placeholder="Nhập tiêu đề sách..." 
+                required 
+              />
+              <Input 
+                label="Email" 
+                type="email" 
+                placeholder="Nhập email..." 
+                leftIcon={<Mail className="w-4 h-4" />}
+                helperText="Email dùng để nhận thông báo mượn sách"
+              />
+              <Input 
+                label="Trạng thái lỗi" 
+                placeholder="Dữ liệu không hợp lệ..." 
+                error="Vui lòng nhập thông tin hợp lệ" 
+                leftIcon={<Lock className="w-4 h-4" />}
+              />
+              <Input 
+                label="Bị vô hiệu hóa" 
+                placeholder="Không thể chỉnh sửa" 
+                disabled 
+              />
+            </div>
+          </div>
+
+          {/* Test Component Table */}
+          <div className="mb-8">
+            <Table title="Kiểm tra Table Component" subtitle="Hiển thị Mock Data có sẵn từ Table.jsx" />
+          </div>
+
           <h2 className="text-xl font-bold mb-6 text-slate-800">Danh mục sách nổi bật</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {books.map((book) => (
