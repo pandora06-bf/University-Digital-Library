@@ -1,0 +1,11 @@
+from fastapi import APIRouter
+
+router = APIRouter(
+    prefix="/api/auth",
+    tags=["Authentication"],
+)
+
+
+@router.get("/test")
+def test_auth():
+    return {"message": "Auth router is working"}
