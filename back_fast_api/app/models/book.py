@@ -20,7 +20,10 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from loan import Loan, Waitlist
 
-
+"""
+Quản lý thông tin sách (Book), 
+sách điện tử (Ebook) và bản sao sách (BookCopy)
+"""
 class Subject(Base):
     __tablename__ = "subjects"
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from fine import Fine
     from user import User
 
-
+"""Quản lý mượn trả sách (Loan) và danh sách chờ mượn (Waitlist)"""
 class Loan(Base):
     __tablename__ = "loans"
 

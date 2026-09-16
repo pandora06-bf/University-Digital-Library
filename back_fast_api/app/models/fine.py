@@ -18,7 +18,7 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from loan import Loan
     from user import User
-
+"""Quản lý phạt vi phạm (Fine) và thanh toán phạt (FinePayment)"""
 
 class Fine(Base):
     __tablename__ = "fines"

@@ -19,7 +19,8 @@ from app.models.base import Base
 if TYPE_CHECKING:
     from fine import Fine, FinePayment
     from loan import Loan, Waitlist
-
+"""
+Quản lý thông tin người dùng (User) và tài khoản (Account)"""
 
 class Account(Base):
     __tablename__ = "accounts"
