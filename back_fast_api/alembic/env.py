@@ -15,7 +15,7 @@ from app.models import Base
 try:
     from app.core.database import DATABASE_URL
 except ImportError:
-    DATABASE_URL = None
+    DATABASE_URL = "postgresql://neondb_owner:npg_hZw7X9qJxyaQ@ep-lively-dust-az52zyiq-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
