@@ -1,0 +1,47 @@
+[
+  {
+    "user_code": "SV20210001",
+    "account_id": 1,
+    "full_name": "Nguyen Van A",
+    "email": "nva.2021@university.edu.vn",
+    "phone_number": "0901234567",
+    "department": "Computer Science",
+    "academic_title": null,
+    "user_type": "STUDENT",
+    "max_borrow_limit": 3,
+    "max_borrow_days": 14,
+    "is_borrowing_blocked": false,
+    "total_fines": 0.00,
+    "updated_at": "2023-11-01T08:00:00Z"
+  },
+  {
+    "user_code": "GV19980012",
+    "account_id": 2,
+    "full_name": "Tran Thi B",
+    "email": "ttb@university.edu.vn",
+    "phone_number": "0912345678",
+    "department": "Information Technology",
+    "academic_title": "PhD",
+    "user_type": "LECTURER",
+    "max_borrow_limit": 10,
+    "max_borrow_days": 30,
+    "is_borrowing_blocked": false,
+    "total_fines": 0.00,
+    "updated_at": "2023-11-02T09:15:00Z"
+  },
+  {
+    "user_code": "SV20220105",
+    "account_id": 3,
+    "full_name": "Le Van C",
+    "email": "lvc.2022@university.edu.vn",
+    "phone_number": "0987654321",
+    "department": "Software Engineering",
+    "academic_title": null,
+    "user_type": "STUDENT",
+    "max_borrow_limit": 3,
+    "max_borrow_days": 14,
+    "is_borrowing_blocked": true,
+    "total_fines": 50000.00,
+    "updated_at": "2023-11-03T10:30:00Z"
+  }
+]

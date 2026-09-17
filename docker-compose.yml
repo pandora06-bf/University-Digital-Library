@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: libmanager_db
+    environment:
+      POSTGRES_USER: lib_user
+      POSTGRES_PASSWORD: lib_password
+      POSTGRES_DB: libmanager_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./back_fast_api
+    container_name: libmanager_api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://lib_user:lib_password@db:5432/libmanager_db
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=lib_user
+      - DB_PASSWORD=lib_password
+      - DB_NAME=libmanager_db
+    depends_on:
+      - db
+    volumes:
+      - ./back_fast_api:/app
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./libmanager-frontend
+    container_name: libmanager_web
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ./libmanager-frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
