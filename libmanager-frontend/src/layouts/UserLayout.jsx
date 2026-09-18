@@ -115,7 +115,7 @@ export default function UserLayout() {
                   className="text-rose-600 hover:bg-rose-50"
                   title="Đăng xuất"
                 >
-                  <span className="hidden sm:inline">Thoát</span>
+                  <span className="hidden sm:inline">Đăng xuất</span>
                 </Button>
               </div>
             ) : (
