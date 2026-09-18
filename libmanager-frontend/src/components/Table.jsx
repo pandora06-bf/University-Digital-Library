@@ -1,4 +1,6 @@
+import React, { useState } from 'react';
 import { DEFAULT_MOCK_DATA } from '../mocks/tableMock';
+import { Button } from './Button';
 
 /**
  * Component hiển thị Status Badge theo chuẩn thiết kế LibManager
@@ -55,10 +57,15 @@ export const Table = ({
   emptyMessage = 'Không tìm thấy bản ghi nào',
   rowKey,
   footerNote,
+  pagination = false,
+  itemsPerPage = 5,
 }) => {
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Xác định dữ liệu an toàn
   const isCustomColumns = Array.isArray(columns) && columns.length > 0;
-  
+
   // Nếu không truyền columns và data là undefined -> dùng mock data mặc định
   let safeData = [];
   if (data === undefined && !isCustomColumns) {
@@ -66,6 +73,17 @@ export const Table = ({
   } else if (Array.isArray(data)) {
     safeData = data;
   }
+
+  // Pagination Logic
+  const totalPages = Math.ceil(safeData.length / itemsPerPage);
+  const displayData = pagination 
+    ? safeData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+    : safeData;
+
+  // Reset trang về 1 nếu dữ liệu thay đổi
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [data]);
 
   // Số lượng cột đang hiển thị
   const totalColumns = isCustomColumns ? columns.length : 7;
@@ -155,7 +173,7 @@ export const Table = ({
                 </td>
               </tr>
             ) : safeData.length > 0 ? (
-              safeData.map((row, rowIndex) => {
+              displayData.map((row, rowIndex) => {
                 const key = getRowKey(row, rowIndex);
 
                 if (isCustomColumns) {
@@ -265,10 +283,51 @@ export const Table = ({
       </div>
 
       {/* Table Footer */}
-      <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-        <span>Hiển thị <strong>{safeData.length}</strong> trên <strong>{safeData.length}</strong> bản ghi</span>
-        {footerNote && <span className="font-medium text-slate-400">{footerNote}</span>}
-      </div>
+      {pagination && totalPages > 1 ? (
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
+          <span className="text-sm text-slate-500">
+            Trang <strong className="font-semibold text-slate-700">{currentPage}</strong> / {totalPages}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Trước
+            </Button>
+            <div className="flex items-center px-2 gap-1">
+              {Array.from({ length: totalPages }).map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentPage(idx + 1)}
+                  className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
+                    currentPage === idx + 1 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Sau
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span>Hiển thị <strong>{displayData.length}</strong> trên <strong>{safeData.length}</strong> bản ghi</span>
+          {footerNote && <span className="font-medium text-slate-400">{footerNote}</span>}
+        </div>
+      )}
     </div>
   );
 };

@@ -60,7 +60,7 @@ export default function Login({ onLogin }) {
 
       setCurrentUser(loggedInUser);
       if (onLogin) onLogin(loggedInUser);
-      navigate('/');
+      navigate(loggedInUser.role === 'admin' ? '/admin' : '/');
     }, 500);
   };
 

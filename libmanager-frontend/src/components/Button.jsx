@@ -29,7 +29,7 @@ export const Button = ({
 
     // Base classes
     const baseClasses = [
-        'inline-flex items-center justify-center font-semibold select-none',
+        'inline-flex items-center justify-center font-semibold select-none whitespace-nowrap',
         'rounded-xl transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         'active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100'
     ];

@@ -180,6 +180,8 @@ export default function UiKitPage() {
             data={customLoanData}
             loading={tableLoading}
             footerNote="Dữ liệu mượn trả thời gian thực"
+            pagination={true}
+            itemsPerPage={1}
           />
         </div>
 
@@ -192,6 +194,8 @@ export default function UiKitPage() {
             onEdit={(row) => alert(`Sửa sách: ${row.title}`)}
             onDelete={(row) => alert(`Xóa sách: ${row.title}`)}
             footerNote="Dữ liệu thử nghiệm cục bộ"
+            pagination={true}
+            itemsPerPage={2}
           />
         </div>
 

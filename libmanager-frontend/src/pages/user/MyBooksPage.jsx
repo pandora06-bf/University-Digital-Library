@@ -173,6 +173,8 @@ export default function MyBooksPage() {
           data={loans}
           emptyMessage="Bạn chưa có phiếu mượn tài liệu nào trong thư viện"
           footerNote="Hạn mượn tối đa 14 ngày kể từ ngày tạo phiếu"
+          pagination={true}
+          itemsPerPage={5}
         />
       </div>
 
