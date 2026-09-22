@@ -25,6 +25,7 @@ services:
       - DB_USER=lib_user
       - DB_PASSWORD=lib_password
       - DB_NAME=libmanager_db
+      - WATCHFILES_FORCE_POLLING=true
     depends_on:
       - db
     volumes:
