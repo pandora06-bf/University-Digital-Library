@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { DEFAULT_MOCK_DATA } from '../mocks/tableMock';
 import { Button } from './Button';
 
@@ -61,7 +61,9 @@ export const Table = ({
   itemsPerPage = 5,
 }) => {
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
+  const [pageState, setPageState] = useState({ data, page: 1 });
+  const currentPage = pageState.data === data ? pageState.page : 1;
+  const changePage = (page) => setPageState({ data, page });
 
   // Xác định dữ liệu an toàn
   const isCustomColumns = Array.isArray(columns) && columns.length > 0;
@@ -79,11 +81,6 @@ export const Table = ({
   const displayData = pagination 
     ? safeData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     : safeData;
-
-  // Reset trang về 1 nếu dữ liệu thay đổi
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [data]);
 
   // Số lượng cột đang hiển thị
   const totalColumns = isCustomColumns ? columns.length : 7;
@@ -292,7 +289,7 @@ export const Table = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => changePage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
             >
               Trước
@@ -301,7 +298,7 @@ export const Table = ({
               {Array.from({ length: totalPages }).map((_, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setCurrentPage(idx + 1)}
+                  onClick={() => changePage(idx + 1)}
                   className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
                     currentPage === idx + 1 
                       ? 'bg-indigo-600 text-white' 
@@ -315,7 +312,7 @@ export const Table = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(p => Math.max(totalPages, p + 1))}
+              onClick={() => changePage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
             >
               Sau

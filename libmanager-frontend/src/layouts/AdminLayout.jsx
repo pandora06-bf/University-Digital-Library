@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -8,16 +8,10 @@ import {
   FileWarning, 
   FileText, 
   Search, 
-  Bell, 
   LogOut,
   BookOpen,
   ChevronRight,
   X,
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  BookMarked,
-  PanelLeft,
   Menu
 } from 'lucide-react';
 
@@ -101,13 +95,6 @@ export default function AdminLayout() {
     { path: '/admin/loans', icon: <ArrowLeftRight size={20} />, label: 'Quản lý Mượn / Trả' },
     { path: '/admin/fines', icon: <FileWarning size={20} />, label: 'Thu phạt & Công nợ' },
   ];
-
-  const notifColors = {
-    danger: 'bg-rose-100 text-rose-600',
-    warning: 'bg-amber-100 text-amber-600',
-    success: 'bg-emerald-100 text-emerald-600',
-    info: 'bg-blue-100 text-blue-600',
-  };
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-800 overflow-hidden relative">

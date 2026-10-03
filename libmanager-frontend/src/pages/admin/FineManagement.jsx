@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  Plus, Search, Filter, ChevronLeft, ChevronRight, 
+  Search,
   Wallet, Receipt, AlertCircle, Banknote, ShieldAlert,
-  CheckCircle2, Eye, X
+  CheckCircle2, Eye
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
@@ -79,38 +79,12 @@ export default function FineManagement() {
   const [finesData, setFinesData] = useState(initialFinesData);
   const [collectingRow, setCollectingRow] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
-  const [showNewFineModal, setShowNewFineModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('Loại vi phạm (Tất cả)');
   const [statusFilter, setStatusFilter] = useState('Trạng thái (Tất cả)');
   const [successToast, setSuccessToast] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Add Fine Form State
-  const [fineForm, setFineForm] = useState({ mssv: '', type: 'Trễ hạn trả sách', book: '', days: '', amount: '', note: '' });
-  const [fineErrors, setFineErrors] = useState({});
-
-  const handleOpenNewFine = () => {
-    setFineForm({ mssv: '', type: 'Trễ hạn trả sách', book: '', days: '', amount: '', note: '' });
-    setFineErrors({});
-    setShowNewFineModal(true);
-  };
-
-  const handleCreateFine = () => {
-    const errors = {};
-    if (!fineForm.mssv.trim()) errors.mssv = 'MSSV không được để trống';
-    if (!fineForm.book.trim()) errors.book = 'Tên sách vi phạm không được để trống';
-    if (!fineForm.amount.trim()) errors.amount = 'Số tiền phạt không được để trống';
-
-    if (Object.keys(errors).length > 0) {
-      setFineErrors(errors);
-      return;
-    }
-
-    setShowNewFineModal(false);
-    showToast('Đã lập phiếu phạt mới thành công!');
-  };
-
   const showToast = (msg) => {
     setSuccessToast(msg);
     setTimeout(() => setSuccessToast(''), 3000);
