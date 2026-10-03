@@ -73,11 +73,13 @@ Hệ thống mô phỏng cổng định danh sinh viên SSO của trường:
 
 ## 5. Ranh giới Tích hợp & Kế hoạch Sprint sau
 
-1. **Hiện trạng Backend FastAPI (`back_fast_api/`):**
-   - Đã có cấu trúc router mẫu: `auth.py`, `books.py`, `loans.py`, `users.py`.
-   - Các API `GET /api/books`, `GET /api/loans` hiện trả về danh sách rỗng; endpoint đăng nhập thực tế chưa triển khai.
+1. **Backend FastAPI (`back_fast_api/`):**
+   - `POST /api/auth/login` xác thực tài khoản bằng mật khẩu bcrypt và trả JWT; `GET /api/auth/me` yêu cầu Bearer token.
+   - `GET /api/users` yêu cầu token của role `ADMIN`. Các dependency phân quyền nằm trong `app/core/dependencies.py`.
+   - Chạy migration bằng `python -m alembic upgrade head`, sau đó tạo tài khoản qua `python -m app.cli create-account --username admin --role ADMIN` (nhập mật khẩu tương tác).
+   - `GET /api/books` và `GET /api/loans` vẫn là API mẫu trả về danh sách rỗng.
 2. **Mock Store thời gian thực (`src/mocks/`):**
    - Frontend hiện sử dụng `sessionStorage` đồng bộ các thao tác mượn sách, trả sách và tìm kiếm.
 3. **Kế hoạch Sprint sau:**
-   - Hoàn thiện endpoint `POST /api/auth/login` và `POST /api/loans` ở Backend.
+   - Hoàn thiện endpoint `POST /api/loans` và kết nối luồng đăng nhập Frontend với Backend.
    - Nối thư viện `react-pdf` đọc file PDF thật từ server bảo mật.

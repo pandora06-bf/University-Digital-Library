@@ -1,5 +1,7 @@
 libmanager-frontend/node_modules/
 libmanager-frontend/dist/
+__pycache__/
+*.py[cod]
 .env
 .env.local
 .env.*.local

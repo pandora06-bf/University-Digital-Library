@@ -19,7 +19,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://lib_user:lib_password@db:5432/libmanager_db
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://lib_user:lib_password@db:5432/libmanager_db}
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=lib_user
@@ -30,6 +30,7 @@ services:
       - db
     volumes:
       - ./back_fast_api:/app
+      - ./mocks:/data/mocks:ro
     restart: unless-stopped
 
   web:
