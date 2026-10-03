@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  ArrowDownToLine, ArrowUpFromLine, AlertCircle, Search, 
-  Book, User, CheckCircle2, AlertTriangle, ScanLine, X, FileDown, Circle
+  ArrowDownToLine, ArrowUpFromLine, AlertCircle,
+  Book, User, CheckCircle2, ScanLine, X, Circle
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';

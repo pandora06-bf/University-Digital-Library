@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Library Management System"
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/library_db"
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/library_db"
     SECRET_KEY: str = "change-this-secret-key"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120

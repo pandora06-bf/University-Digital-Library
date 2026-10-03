@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
-  Plus, Search, Filter, ChevronLeft, ChevronRight, 
-  FileDown, BookType, LayoutGrid, Clock, MoreVertical, Edit2, Trash2,
+  Plus, Search, BookType, LayoutGrid, Clock, Edit2, Trash2,
   RotateCcw, Circle, LayoutList, BookCopy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
