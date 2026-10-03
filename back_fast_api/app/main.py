@@ -39,3 +39,5 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+app.include_router(books.router)
