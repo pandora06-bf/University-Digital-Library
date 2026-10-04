@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
-from app.models.user import Account
+from app.models.user import Account, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -47,3 +47,19 @@ def require_roles(*allowed_roles: str) -> Callable:
         return account
 
     return check_role
+
+def get_current_user(
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> User:
+    # Truy xuất User từ relationship của Account
+    user = account.user
+    if user is None:
+        user = db.query(User).filter(User.account_id == account.id).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản chưa được liên kết với thông tin người dùng",
+        )
+    return user
