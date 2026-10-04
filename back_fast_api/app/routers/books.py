@@ -31,7 +31,7 @@ def get_books(
 def search_books(
     q: Optional[str] = Query(None, description="Từ khóa tìm kiếm (nhan đề, tác giả, mô tả)"),
     category_id: Optional[int] = Query(None, description="Lọc theo mã danh mục"),
-    subject_id: Optional[int] = Query(None, description="Lọc theo mã chủ đề"),
+    subject_code: Optional[str] = Query(None, description="Lọc theo mã môn học"),
     page: int = Query(1, ge=1, description="Số trang hiển thị"),
     page_size: int = Query(10, ge=1, le=100, description="Số lượng mục mỗi trang"),
     db: Session = Depends(get_db),
@@ -39,14 +39,14 @@ def search_books(
     """
     Thực hiện tìm kiếm sách bằng cấu trúc chỉ mục toàn văn PostgreSQL:
     - **q**: Từ khóa tra cứu tự do (plain text query).
-    - **category_id** & **subject_id**: Bộ lọc phân loại.
+    - **category_id** & **subject_code**: Bộ lọc phân loại.
     - **page** & **page_size**: Điều khiển phân trang.
     """
     result = search_books_fts(
         db=db,
         query_text=q,
         category_id=category_id,
-        subject_id=subject_id,
+        subject_code=subject_code,
         page=page,
         page_size=page_size,
     )

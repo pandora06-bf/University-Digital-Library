@@ -10,7 +10,7 @@ def search_books_fts(
     db: Session,
     query_text: Optional[str] = None,
     category_id: Optional[int] = None,
-    subject_id: Optional[int] = None,
+    subject_code: Optional[str] = None,
     page: int = 1,
     page_size: int = 10,
 ) -> Dict[str, Any]:
@@ -29,31 +29,46 @@ def search_books_fts(
     stmt = (
         select(Book)
         .outerjoin(Category, Book.category_id == Category.id)
-        .outerjoin(Subject, Book.subject_id == Subject.id)
+        .outerjoin(Subject, Book.subject_code == Subject.subject_code)
     )
 
     # 1. Áp dụng Full-Text Search nếu có từ khóa
+    # if query_text and query_text.strip():
+    #     search_terms = query_text.strip()
+    #     # Chuyển đổi text thành tsquery an toàn (tránh lỗi cú pháp của to_tsquery)
+    #     ts_query = func.plainto_tsquery("simple", search_terms)
+
+    #     # Toán tử PostgreSQL: Book.search_vector @@ plainto_tsquery('simple', :query)
+    #     fts_filter = Book.search_vector.bool_op("@@")(ts_query)
+    #     stmt = stmt.where(fts_filter)
+
+    #     # Sắp xếp theo độ phù hợp (Rank score giảm dần)
+    #     rank_score = func.ts_rank_cd(Book.search_vector, ts_query).desc()
+    #     stmt = stmt.order_by(rank_score, Book.id.desc())
+    # else:
+    #     # Nếu không có từ khóa, sắp xếp theo ID sách mới nhất
+    #     stmt = stmt.order_by(Book.id.desc())
     if query_text and query_text.strip():
         search_terms = query_text.strip()
-        # Chuyển đổi text thành tsquery an toàn (tránh lỗi cú pháp của to_tsquery)
+        ts_vector = func.to_tsvector(
+            "simple",
+            func.coalesce(Book.title, "") + " " + func.coalesce(Book.author, ""),
+        )
         ts_query = func.plainto_tsquery("simple", search_terms)
 
-        # Toán tử PostgreSQL: Book.search_vector @@ plainto_tsquery('simple', :query)
-        fts_filter = Book.search_vector.bool_op("@@")(ts_query)
-        stmt = stmt.where(fts_filter)
-
-        # Sắp xếp theo độ phù hợp (Rank score giảm dần)
-        rank_score = func.ts_rank_cd(Book.search_vector, ts_query).desc()
-        stmt = stmt.order_by(rank_score, Book.id.desc())
+        stmt = stmt.where(ts_vector.bool_op("@@")(ts_query))
+        stmt = stmt.order_by(
+            func.ts_rank_cd(ts_vector, ts_query).desc(),
+            Book.id.desc(),
+        )
     else:
-        # Nếu không có từ khóa, sắp xếp theo ID sách mới nhất
         stmt = stmt.order_by(Book.id.desc())
 
     # 2. Bộ lọc danh mục & chủ đề
     if category_id:
         stmt = stmt.where(Book.category_id == category_id)
-    if subject_id:
-        stmt = stmt.where(Book.subject_id == subject_id)
+    if subject_code:
+        stmt = stmt.where(Book.subject_code == subject_code)
 
     # 3. Tính tổng số bản ghi (Total Count)
     count_subquery = stmt.with_only_columns(func.count(Book.id)).order_by(None).subquery()
