@@ -1,0 +1,104 @@
+:root {
+  /* ==========================================================================
+     LibManager Design Tokens — TDTU Digital Library System
+     Đồng bộ thiết kế giữa Đạt (Frontend User) và Vân (Frontend Admin)
+     Tham chiếu Figma node: 19:2
+     ========================================================================== */
+
+  /* Background Colors */
+  --color-bg-canvas: #F6F8FC;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-subtle: #EEF2F7;
+  --color-bg-brand: #4F46E5;
+  --color-bg-brand-hover: #3730A3;
+  --color-bg-brand-soft: #EEF2FF;
+
+  /* Text Colors */
+  --color-text-primary: #172033;
+  --color-text-secondary: #5B6B82;
+  --color-text-muted: #667085;
+  --color-text-brand: #3730A3;
+  --color-text-on-brand: #FFFFFF;
+
+  /* Border Colors */
+  --color-border-default: #D9E2EE;
+  --color-border-focus: #3B82F6;
+  --color-border-danger: #BE123C;
+
+  /* Feedback / Semantic Colors */
+  --color-text-success: #047857;
+  --color-bg-success-soft: #ECFDF5;
+  --color-border-success: #A7F3D0;
+
+  --color-text-warning: #B45309;
+  --color-bg-warning-soft: #FFF7E6;
+  --color-border-warning: #FDE68A;
+
+  --color-text-danger: #BE123C;
+  --color-bg-danger-soft: #FFF1F2;
+
+  /* Brand Gradient: Chàm - Tím - Cyan */
+  --gradient-brand: linear-gradient(135deg, #312E81 0%, #4F46E5 52%, #0E7490 100%);
+  --gradient-brand-subtle: linear-gradient(135deg, rgba(49, 46, 129, 0.04) 0%, rgba(79, 70, 229, 0.08) 50%, rgba(14, 116, 144, 0.05) 100%);
+
+  /* Radius Tokens */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 28px;
+  --radius-full: 9999px;
+}
+
+/* ==========================================================================
+   Typography Utility Classes theo chuẩn Figma
+   ========================================================================== */
+.text-display-lg {
+  font-size: 48px;
+  line-height: 56px;
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+
+.text-headline-lg {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+
+.text-title-lg {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.text-title-md {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.text-body-lg {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.text-body-md {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.text-label-md {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}

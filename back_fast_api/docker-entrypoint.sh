@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+echo "[startup] Waiting for PostgreSQL..."
+python - <<'PY'
+import time
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from app.core.database import engine
+
+last_error = None
+for attempt in range(1, 31):
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        print("[startup] PostgreSQL is ready")
+        break
+    except SQLAlchemyError as exc:
+        last_error = exc
+        print(f"[startup] DB not ready ({attempt}/30), retrying in 2s...")
+        time.sleep(2)
+else:
+    raise SystemExit(f"Database is not ready after 60s: {last_error}")
+PY
+
+echo "[startup] Applying Alembic migrations..."
+python -m alembic upgrade head
+
+echo "[startup] Ensuring ADMIN account..."
+python -m app.bootstrap_admin
+
+echo "[startup] Starting FastAPI on container port 8000..."
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
