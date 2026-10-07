@@ -25,6 +25,8 @@ const SEARCH_SUGGESTIONS = [
 ];
 
 
+import { logout } from '../services/authService';
+
 // Breadcrumb map theo route
 const BREADCRUMB_MAP = {
   '/admin': [{ label: 'Tổng quan' }],
@@ -38,6 +40,11 @@ const BREADCRUMB_MAP = {
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
@@ -159,7 +166,7 @@ export default function AdminLayout() {
         {/* User Info & Logout (Bottom) */}
         <div className="p-4 border-t border-white/10">
           <div 
-            onClick={() => navigate('/login')}
+            onClick={handleLogout}
             className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-colors group"
           >
             <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-sm shrink-0 text-indigo-600">
