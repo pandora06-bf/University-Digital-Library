@@ -22,7 +22,7 @@ def search_books_fts(
       - Áp dụng LIMIT / OFFSET phân trang chuẩn xác
     """
     page = max(1, page)
-    page_size = max(1, min(page_size, 100))  # Giới hạn tối đa 100 kết quả/trang
+    page_size = max(1, min(page_size, 50))  # Giới hạn tối đa 50 kết quả/trang
     offset = (page - 1) * page_size
 
     # Khởi tạo câu truy vấn cơ sở
