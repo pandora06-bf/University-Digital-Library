@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Plus, Search, Filter, 
   CheckCircle2, ArrowLeftRight, AlertOctagon, BookCopy, RotateCcw, Trash2, Edit2
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import axiosInstance from '../../services/axios_instance';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -11,8 +12,11 @@ import { Modal } from '../../components/Modal';
 import { DEFAULT_MOCK_DATA } from '../../mocks/tableMock';
 
 export default function BookManagement() {
+  const { bookId } = useParams();
   const navigate = useNavigate();
-  const [tableData, setTableData] = useState(DEFAULT_MOCK_DATA);
+  const [tableData, setTableData] = useState([]);
+  const [bookInfo, setBookInfo] = useState(null);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState('Vị trí kho / Tầng (Tất cả)');
   const [statusFilter, setStatusFilter] = useState('Tình trạng (Tất cả)');
@@ -20,6 +24,120 @@ export default function BookManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingRow, setDeletingRow] = useState(null);
   const [editingRow, setEditingRow] = useState(null);
+
+  const [addForm, setAddForm] = useState({
+    barcode: '',
+    zone: 'Khu A',
+    floor: 'Tầng 1',
+    shelf: 'Kệ 1',
+    status: 'AVAILABLE',
+    condition: ''
+  });
+
+  const [editForm, setEditForm] = useState({
+    zone: '', floor: '', shelf: '', status: '', condition: ''
+  });
+
+  const handleOpenEdit = (row) => {
+    setEditingRow(row);
+    setEditForm({
+      zone: row.rawZone || '',
+      floor: row.rawFloor || '',
+      shelf: row.rawShelf || '',
+      status: row.rawStatus || 'AVAILABLE',
+      condition: row.rawCondition || ''
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await axiosInstance.patch(`/api/admin/copies/${editingRow.barcode}/condition`, {
+        zone: editForm.zone,
+        floor: editForm.floor,
+        shelf: editForm.shelf,
+        status: editForm.status,
+        damage_notes: editForm.condition || null
+      });
+      alert('Cập nhật bản sao thành công!');
+      setEditingRow(null);
+      fetchInventory(bookInfo);
+    } catch (error) {
+      console.error(error);
+      alert(`Lỗi: ${error.response?.data?.detail || 'Không xác định'}`);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await axiosInstance.delete(`/api/admin/copies/${deletingRow.barcode}`);
+      alert('Đã xóa bản sao thành công!');
+      setDeletingRow(null);
+      fetchInventory(bookInfo);
+    } catch (error) {
+      console.error(error);
+      alert(`Lỗi: ${error.response?.data?.detail || 'Không xác định'}`);
+    }
+  };
+
+  const handleSaveCopy = async () => {
+    if (!bookId || !addForm.barcode.trim()) {
+      alert("Vui lòng nhập Mã Barcode!");
+      return;
+    }
+    try {
+      await axiosInstance.post(`/api/admin/books/${bookId}/copies`, {
+        copy_barcode: addForm.barcode,
+        zone: addForm.zone,
+        floor: addForm.floor,
+        shelf: addForm.shelf,
+        status: addForm.status,
+        damage_notes: addForm.condition || null
+      });
+      alert('Thêm bản sao thành công!');
+      setShowAddModal(false);
+      setAddForm({ ...addForm, barcode: '' });
+      fetchInventory(bookInfo); // Refresh bảng
+    } catch (error) {
+      console.error(error);
+      alert(`Lỗi: ${error.response?.data?.detail || 'Không xác định'}`);
+    }
+  };
+
+  const fetchInventory = async (currentBookInfo) => {
+    if (!bookId) return;
+    try {
+      const res = await axiosInstance.get(`/api/admin/books/${bookId}/copies`);
+      const copies = res.data.map(c => ({
+        id: c.copy_barcode,
+        barcode: c.copy_barcode,
+        location: `${c.zone} - ${c.floor} - ${c.shelf}`,
+        status: c.status === 'AVAILABLE' ? 'Sẵn sàng' : c.status === 'BORROWED' ? 'Đang cho mượn' : c.status === 'LOST' ? 'Báo mất' : 'Cần sửa chữa',
+        statusType: c.status === 'AVAILABLE' ? 'success' : c.status === 'BORROWED' ? 'warning' : 'danger',
+        condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
+        title: currentBookInfo?.title || '...',
+        author: currentBookInfo?.author || '',
+        isbn: currentBookInfo?.isbn || '',
+        rawZone: c.zone,
+        rawFloor: c.floor,
+        rawShelf: c.shelf,
+        rawStatus: c.status,
+        rawCondition: c.damage_notes
+      }));
+      setTableData(copies);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    if (!bookId) return;
+    // Dùng trick fetch list book để lấy title (do chưa có API GET book by id)
+    axiosInstance.get('/api/books/search?page_size=100').then(res => {
+      const b = res.data.items?.find(x => x.id.toString() === bookId);
+      if (b) setBookInfo(b);
+      fetchInventory(b);
+    }).catch(console.error);
+  }, [bookId]);
 
   // Filter Data
   const filteredData = tableData.filter(item => {
@@ -109,7 +227,7 @@ export default function BookManagement() {
       render: (val, row) => (
         <div className="flex items-center justify-end gap-2 transition-opacity">
           <button
-            onClick={() => setEditingRow(row)}
+            onClick={() => handleOpenEdit(row)}
             className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors"
             title="Chỉnh sửa bản sao"
           >
@@ -127,13 +245,31 @@ export default function BookManagement() {
     }
   ];
 
+  if (!bookId) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <BookCopy className="w-16 h-16 text-slate-300 mb-4" />
+        <h2 className="text-xl font-bold text-slate-700 mb-2">Vui lòng chọn một đầu sách</h2>
+        <p className="text-slate-500 mb-6">Bạn cần chọn một cuốn sách từ Danh mục để xem chi tiết tồn kho.</p>
+        <Button variant="primary" onClick={() => navigate('/admin/catalog')}>Quay lại Danh mục</Button>
+      </div>
+    );
+  }
+
+  const totalCopies = tableData.length;
+  const availableCopies = tableData.filter(c => c.rawStatus === 'AVAILABLE').length;
+  const availablePercent = totalCopies > 0 ? Math.round((availableCopies / totalCopies) * 100) : 0;
+  const borrowedCopies = tableData.filter(c => c.rawStatus === 'BORROWED').length;
+  const brokenCopies = tableData.filter(c => c.rawStatus === 'DAMAGED' || c.rawStatus === 'LOST').length;
+  const brokenPercent = totalCopies > 0 ? Math.round((brokenCopies / totalCopies) * 100) : 0;
+
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Quản lý Tồn kho & Bản sao Sách</h1>
-          <p className="text-sm text-slate-500 mt-1">Kiểm soát số lượng bản sao vật lý, định vị trí kệ và tình trạng hiện tại.</p>
+          <h1 className="text-2xl font-bold text-slate-800">Tồn kho: {bookInfo?.title || 'Đang tải...'}</h1>
+          <p className="text-sm text-slate-500 mt-1">Quản lý các bản sao vật lý của đầu sách này.</p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
@@ -155,11 +291,10 @@ export default function BookManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng bản sao vật lý</p>
           <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">24,850 <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
+            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{totalCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
           </div>
           <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">+180 tháng này</span>
-            <span className="text-slate-400">tổng lượng lưu kho</span>
+            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">Của đầu sách này</span>
           </div>
         </div>
 
@@ -170,10 +305,10 @@ export default function BookManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sẵn sàng trên kệ</p>
           <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">19,420 <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
+            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{availableCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
           </div>
           <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">78.1%</span>
+            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{availablePercent}%</span>
             <span className="text-slate-500">tổng số lượng</span>
           </div>
         </div>
@@ -185,11 +320,10 @@ export default function BookManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đang cho mượn</p>
           <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">4,890 <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
+            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{borrowedCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
           </div>
           <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded">+15 hôm nay</span>
-            <span className="text-slate-500">lưu thông</span>
+            <span className="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Đang lưu thông</span>
           </div>
         </div>
 
@@ -200,11 +334,11 @@ export default function BookManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cần xử lý & Bảo quản</p>
           <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-rose-700 leading-none">540 <span className="text-sm font-medium text-rose-500">cuốn</span></h3>
+            <h3 className="text-3xl font-extrabold text-rose-700 leading-none">{brokenCopies} <span className="text-sm font-medium text-rose-500">cuốn</span></h3>
           </div>
           <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-rose-600 font-bold">2.2%</span>
-            <span className="text-slate-500">sách hư hỏng, đang sửa, thất lạc</span>
+            <span className="text-rose-600 font-bold">{brokenPercent}%</span>
+            <span className="text-slate-500">hư hỏng, sửa, thất lạc</span>
           </div>
         </div>
       </div>
@@ -285,7 +419,6 @@ export default function BookManagement() {
         />
       </div>
 
-      {/* Modal Thêm bản in mới */}
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
@@ -294,10 +427,7 @@ export default function BookManagement() {
         footer={
           <>
             <Button variant="outline" onClick={() => setShowAddModal(false)}>Hủy</Button>
-            <Button variant="primary" onClick={() => {
-              alert('Đã thêm bản in mới thành công!');
-              setShowAddModal(false);
-            }}>
+            <Button variant="primary" onClick={handleSaveCopy}>
               Xác nhận Thêm
             </Button>
           </>
@@ -306,43 +436,47 @@ export default function BookManagement() {
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã Barcode</label>
-            <Input placeholder="VD: BC-2026-9999" className="w-full font-mono" />
+            <Input 
+              placeholder="VD: BC-2026-9999" 
+              className="w-full font-mono" 
+              value={addForm.barcode}
+              onChange={(e) => setAddForm({...addForm, barcode: e.target.value})}
+            />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên đầu sách</label>
-            <Input placeholder="Chọn tên sách..." className="w-full" />
+            <Input value={bookInfo?.title || ''} disabled className="w-full bg-slate-50 text-slate-500" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ</label>
-              <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm">
-                <option>Kệ A - Tầng 1</option>
-                <option>Kệ B - Tầng 2</option>
-              </select>
+              <div className="flex gap-2">
+                 <Input placeholder="Khu vực (VD: Khu A)" className="w-1/3 text-sm" value={addForm.zone} onChange={e => setAddForm({...addForm, zone: e.target.value})} />
+                 <Input placeholder="Tầng (VD: Tầng 1)" className="w-1/3 text-sm" value={addForm.floor} onChange={e => setAddForm({...addForm, floor: e.target.value})} />
+                 <Input placeholder="Kệ (VD: Kệ 1)" className="w-1/3 text-sm" value={addForm.shelf} onChange={e => setAddForm({...addForm, shelf: e.target.value})} />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tình trạng vật lý</label>
-              <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm">
-                <option>Nguyên vẹn</option>
-                <option>Rách bìa</option>
-                <option>Mất trang</option>
-                <option>Hư hỏng khác</option>
-              </select>
+              <Input placeholder="Nguyên vẹn, Rách bìa..." className="w-full text-sm" value={addForm.condition} onChange={e => setAddForm({...addForm, condition: e.target.value})} />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-              <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm">
-                <option>Sẵn sàng</option>
-                <option>Đang mượn</option>
-                <option>Cần sửa chữa</option>
-                <option>Thanh lý / Ngừng lưu thông</option>
+              <select 
+                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
+                value={addForm.status}
+                onChange={e => setAddForm({...addForm, status: e.target.value})}
+              >
+                <option value="AVAILABLE">Sẵn sàng</option>
+                <option value="BORROWED">Đang mượn</option>
+                <option value="DAMAGED">Cần sửa chữa</option>
+                <option value="LOST">Báo mất</option>
               </select>
             </div>
           </div>
         </div>
       </Modal>
 
-      {/* Modal Chỉnh sửa bản sao */}
       <Modal
         isOpen={!!editingRow}
         onClose={() => setEditingRow(null)}
@@ -351,10 +485,7 @@ export default function BookManagement() {
         footer={
           <>
             <Button variant="outline" onClick={() => setEditingRow(null)}>Hủy</Button>
-            <Button variant="primary" onClick={() => {
-              alert('Cập nhật bản sao thành công!');
-              setEditingRow(null);
-            }}>
+            <Button variant="primary" onClick={handleSaveEdit}>
               Lưu thay đổi
             </Button>
           </>
@@ -373,27 +504,27 @@ export default function BookManagement() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ</label>
-                <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm" defaultValue={editingRow.location}>
-                  <option>Kệ A - Tầng 1</option>
-                  <option>Kệ B - Tầng 2</option>
-                </select>
+                <div className="flex gap-2">
+                   <Input placeholder="Khu vực" className="w-1/3 text-sm" value={editForm.zone} onChange={e => setEditForm({...editForm, zone: e.target.value})} />
+                   <Input placeholder="Tầng" className="w-1/3 text-sm" value={editForm.floor} onChange={e => setEditForm({...editForm, floor: e.target.value})} />
+                   <Input placeholder="Kệ" className="w-1/3 text-sm" value={editForm.shelf} onChange={e => setEditForm({...editForm, shelf: e.target.value})} />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tình trạng vật lý</label>
-                <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm">
-                  <option>Nguyên vẹn</option>
-                  <option>Rách bìa</option>
-                  <option>Mất trang</option>
-                  <option>Hư hỏng khác</option>
-                </select>
+                <Input placeholder="Ghi chú hỏng hóc..." className="w-full text-sm" value={editForm.condition} onChange={e => setEditForm({...editForm, condition: e.target.value})} />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-                <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm" defaultValue={editingRow.status}>
-                  <option>Sẵn sàng</option>
-                  <option>Đang mượn</option>
-                  <option>Cần sửa chữa</option>
-                  <option>Thanh lý / Ngừng lưu thông</option>
+                <select 
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
+                  value={editForm.status}
+                  onChange={e => setEditForm({...editForm, status: e.target.value})}
+                >
+                  <option value="AVAILABLE">Sẵn sàng</option>
+                  <option value="BORROWED">Đang mượn</option>
+                  <option value="DAMAGED">Cần sửa chữa</option>
+                  <option value="LOST">Báo mất</option>
                 </select>
               </div>
             </div>
@@ -412,10 +543,7 @@ export default function BookManagement() {
             <Button
               variant="primary"
               className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600"
-              onClick={() => {
-                setTableData(prev => prev.filter(r => r.id !== deletingRow.id));
-                setDeletingRow(null);
-              }}
+              onClick={handleConfirmDelete}
             >
               Xác nhận Xóa
             </Button>

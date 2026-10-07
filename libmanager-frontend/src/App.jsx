@@ -18,6 +18,8 @@ import LoanManagement from './pages/admin/LoanManagement';
 import FineManagement from './pages/admin/FineManagement';
 import EbookManagement from './pages/admin/EbookManagement';
 
+import AdminGuard from './components/AdminGuard';
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -41,11 +43,12 @@ export default function App() {
           <Route path="/dev/ui-kit" element={<UiKitPage />} />
         )}
 
-        {/* Cổng Quản trị Admin Portal */}
-        <Route path="/admin" element={<AdminLayout />}>
+        {/* Cổng Quản trị Admin Portal (Đã được bảo vệ bởi AdminGuard) */}
+        <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
           <Route index element={<AdminDashboard />} />
           <Route path="catalog" element={<CatalogManagement />} />
           <Route path="books" element={<BookManagement />} />
+          <Route path="books/:bookId" element={<BookManagement />} />
           <Route path="ebooks" element={<EbookManagement />} />
           <Route path="loans" element={<LoanManagement />} />
           <Route path="fines" element={<FineManagement />} />

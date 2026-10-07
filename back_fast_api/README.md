@@ -222,3 +222,15 @@ Hoàn tác một migration gần nhất:
 ```bash
 python -m alembic downgrade -1
 ```
+
+## Cổng riêng của bản Nhất 05/10
+
+Để tránh xung đột với backend khác đang dùng cổng 8000, khi chạy trực tiếp có thể dùng:
+
+```powershell
+python -m uvicorn app.main:app --reload --port 8010
+```
+
+Swagger: <http://127.0.0.1:8010/docs>
+
+Khi chạy toàn bộ bằng Docker Compose, bản này mặc định dùng host ports 8010 (API), 5174 (frontend), 5433 (PostgreSQL). Có thể đổi bằng `.env` ở thư mục gốc, xem `RUN_NHAT.md`.

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -26,7 +27,15 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
             detail="Password must not exceed 72 UTF-8 bytes",
         )
 
-    account = db.query(Account).filter(Account.username == payload.username).first()
+    try:
+        account = db.query(Account).filter(Account.username == payload.username).first()
+    except SQLAlchemyError as exc:
+        # Không để lỗi DB bị biến thành 500 khó hiểu trên Swagger.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not ready. Please check migrations and database connection.",
+        ) from exc
+
     if account is None or not verify_password(payload.password, account.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

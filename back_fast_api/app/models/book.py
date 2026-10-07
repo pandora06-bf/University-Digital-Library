@@ -56,6 +56,7 @@ class Book(Base):
     publisher: Mapped[str] = mapped_column(String(150), nullable=False)
     publication_year: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cover_image_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     num_pages: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     book_type: Mapped[str] = mapped_column(String(50), nullable=False)

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { BookOpen, Lock, Mail, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { BookOpen, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { CursorRipple } from '../../components/motion/CursorRipple';
-import { DEMO_USERS, setCurrentUser } from '../../mocks/auth';
+import { login } from '../../services/authService';
 
 /**
  * Màn hình Đăng nhập (Login Page)
@@ -18,55 +18,40 @@ import { DEMO_USERS, setCurrentUser } from '../../mocks/auth';
  */
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!email.trim() || !password.trim()) {
-      setErrorMsg('Vui lòng nhập đầy đủ email và mật khẩu');
+    if (!username.trim() || !password.trim()) {
+      setErrorMsg('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu');
       return;
     }
 
     setIsLoading(true);
 
-    // Mô phỏng độ trễ đăng nhập xác thực
-    setTimeout(() => {
+    // Gọi POST /api/auth/login; token được lưu để Axios Interceptor tự đính kèm
+    try {
+      const user = await login(username.trim(), password);
+      if (onLogin) onLogin(user);
+      navigate(user.role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      if (err.response?.status === 401) setErrorMsg('Sai tên đăng nhập hoặc mật khẩu');
+      else if (err.response?.status === 403) setErrorMsg('Tài khoản đã bị khóa');
+      else setErrorMsg('Không kết nối được máy chủ, vui lòng thử lại');
+    } finally {
       setIsLoading(false);
-
-      // Tìm tài khoản demo hoặc tạo session độc giả
-      const normalizedEmail = email.trim().toLowerCase();
-      const matchedUser = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
-
-      let loggedInUser;
-      if (matchedUser) {
-        loggedInUser = matchedUser;
-      } else {
-        // Tài khoản sinh viên tự do
-        const isStaff = normalizedEmail.includes('thuthu') || normalizedEmail.includes('admin');
-        loggedInUser = {
-          id: `user_${Date.now()}`,
-          email: normalizedEmail,
-          name: isStaff ? 'Cán bộ Thư viện' : 'Sinh viên TDTU',
-          role: isStaff ? 'admin' : 'user',
-          studentId: isStaff ? 'TT-MOCK' : '522H0999',
-        };
-      }
-
-      setCurrentUser(loggedInUser);
-      if (onLogin) onLogin(loggedInUser);
-      navigate(loggedInUser.role === 'admin' ? '/admin' : '/');
-    }, 500);
+    }
   };
 
-  const fillDemoAccount = (demoEmail) => {
-    setEmail(demoEmail);
-    setPassword('12345678');
+  const fillDemoAccount = (demoUsername, demoPassword) => {
+    setUsername(demoUsername);
+    setPassword(demoPassword);
     setErrorMsg('');
   };
 
@@ -124,21 +109,21 @@ export default function Login({ onLogin }) {
               Đăng nhập
             </h2>
             <p className="text-body-md text-[#5B6B82] mt-1">
-              Sử dụng tài khoản email sinh viên hoặc cán bộ thư viện
+              Sử dụng tài khoản sinh viên hoặc cán bộ thư viện
             </p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Input Email */}
+            {/* Input Tên đăng nhập (backend xác thực bằng username) */}
             <Input
-              label="Tên đăng nhập hoặc Email"
-              type="email"
+              label="Tên đăng nhập"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="sinhvien@tdtu.edu.vn"
-              leftIcon={<Mail className="w-4 h-4" />}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Nhập tên đăng nhập"
+              leftIcon={<User className="w-4 h-4" />}
               autoComplete="username"
             />
 
@@ -191,23 +176,15 @@ export default function Login({ onLogin }) {
             <span className="text-[12px] font-medium text-[#667085] block text-center">
               Chọn nhanh tài khoản kiểm thử:
             </span>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 gap-2.5">
+              {/* Tài khoản ADMIN do backend tự tạo (bootstrap_admin.py) */}
               <button
                 type="button"
-                onClick={() => fillDemoAccount('sinhvien@tdtu.edu.vn')}
-                className="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-xs"
-              >
-                <div className="font-semibold text-slate-800">Độc giả</div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">sinhvien@tdtu.edu.vn</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('thuthu@tdtu.edu.vn')}
+                onClick={() => fillDemoAccount('admin', 'Admin@123')}
                 className="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-xs"
               >
                 <div className="font-semibold text-slate-800">Thủ thư</div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">thuthu@tdtu.edu.vn</div>
+                <div className="text-[11px] text-slate-500 font-mono truncate">admin</div>
               </button>
             </div>
           </div>

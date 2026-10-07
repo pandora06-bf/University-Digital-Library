@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axiosInstance from '../../services/axios_instance';
 import { 
   Plus, Search, BookType, LayoutGrid, Clock, Edit2, Trash2,
-  RotateCcw, Circle, LayoutList, BookCopy
+  RotateCcw, Circle, LayoutList, BookCopy, Upload
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
@@ -9,203 +10,9 @@ import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
 
-// Dữ liệu giả lập chuẩn theo thiết kế Stitch
-const catalogData = [
-  {
-    id: '1',
-    cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=100&auto=format&fit=crop',
-    title: 'Clean Code: A Handbook of Agile Software Craftsmanship',
-    isbn: 'ISBN: 978-0132350884',
-    barcode: 'BC-881021',
-    author: 'Robert C. Martin',
-    publisher: 'NXB Prentice Hall',
-    category: 'CNTT & Phần mềm',
-    categoryColor: 'blue',
-    year: '2008',
-    copies: 15,
-    available: 12,
-    status: 'Đang lưu hành',
-    statusColor: 'blue'
-  },
-  {
-    id: '2',
-    cover: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=100&auto=format&fit=crop',
-    title: 'Giải thuật & Lập trình nâng cao',
-    isbn: 'ISBN: 978-6047721290',
-    barcode: 'BC-774012',
-    author: 'Lê Minh Hoàng',
-    publisher: 'NXB ĐHQG Hà Nội',
-    category: 'Giáo trình',
-    categoryColor: 'indigo',
-    year: '2021',
-    copies: 40,
-    available: 3,
-    status: 'Mượn nhiều',
-    statusColor: 'indigo'
-  },
-  {
-    id: '3',
-    cover: 'https://images.unsplash.com/photo-1555661530-68c8e98db4e6?q=80&w=100&auto=format&fit=crop',
-    title: 'Designing Data-Intensive Applications',
-    isbn: 'ISBN: 978-1449373320',
-    barcode: 'BC-994322',
-    author: 'Martin Kleppmann',
-    publisher: "O'Reilly Media",
-    category: 'Hệ thống TT',
-    categoryColor: 'blue',
-    year: '2017',
-    copies: 8,
-    available: 8,
-    status: 'Sẵn sàng',
-    statusColor: 'emerald'
-  },
-  {
-    id: '4',
-    cover: 'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?q=80&w=100&auto=format&fit=crop',
-    title: 'Tư duy nhanh và chậm (Thinking, Fast and Slow)',
-    isbn: 'ISBN: 978-6045628612',
-    barcode: 'BC-331004',
-    author: 'Daniel Kahneman',
-    publisher: 'NXB Thế Giới',
-    category: 'Kinh tế',
-    categoryColor: 'indigo',
-    year: '2020',
-    copies: 22,
-    available: 18,
-    status: 'Đang lưu hành',
-    statusColor: 'blue'
-  },
-  {
-    id: '5',
-    cover: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=100&auto=format&fit=crop',
-    title: 'Nguyên lý Tiếp thị (Principles of Marketing)',
-    isbn: 'ISBN: 978-0134492513',
-    barcode: 'BC-552190',
-    author: 'Philip Kotler, Gary Armstrong',
-    publisher: 'NXB Lao Động Xã Hội',
-    category: 'Kinh tế & QTKD',
-    categoryColor: 'blue',
-    year: '2022',
-    copies: 16,
-    available: 0,
-    status: 'Hết bản in',
-    statusColor: 'rose'
-  },
-  {
-    id: '6',
-    cover: 'https://images.unsplash.com/photo-1526379095098-d400fd0bfce8?q=80&w=100&auto=format&fit=crop',
-    title: 'Giải Phẫu Học Người',
-    isbn: 'ISBN: 978-6047321556',
-    barcode: 'BC-998123',
-    author: 'Frank H. Netter',
-    publisher: 'NXB Y Học',
-    category: 'Y học & Sức khỏe',
-    categoryColor: 'emerald',
-    year: '2019',
-    copies: 5,
-    available: 5,
-    status: 'Sẵn sàng',
-    statusColor: 'emerald'
-  },
-  {
-    id: '7',
-    cover: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=100&auto=format&fit=crop',
-    title: 'Quản trị Dự án Cơ bản',
-    isbn: 'ISBN: 978-0123456789',
-    barcode: 'BC-887123',
-    author: 'Harold Kerzner',
-    publisher: 'NXB Trẻ',
-    category: 'Kinh tế & QTKD',
-    categoryColor: 'blue',
-    year: '2020',
-    copies: 12,
-    available: 4,
-    status: 'Đang lưu hành',
-    statusColor: 'amber'
-  },
-  {
-    id: '8',
-    cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=100&auto=format&fit=crop',
-    title: 'Nhập Môn Lập Trình Python',
-    isbn: 'ISBN: 978-9876543210',
-    barcode: 'BC-112233',
-    author: 'John V. Guttag',
-    publisher: 'MIT Press',
-    category: 'CNTT & Phần mềm',
-    categoryColor: 'indigo',
-    year: '2021',
-    copies: 20,
-    available: 15,
-    status: 'Sẵn sàng',
-    statusColor: 'emerald'
-  },
-  {
-    id: '9',
-    cover: 'https://images.unsplash.com/photo-1585776245991-cf89dd7fc73a?q=80&w=100&auto=format&fit=crop',
-    title: 'Thiết Kế Đồ Họa Căn Bản',
-    isbn: 'ISBN: 978-1112223334',
-    barcode: 'BC-445566',
-    author: 'Robin Williams',
-    publisher: 'Peachpit Press',
-    category: 'Thiết kế',
-    categoryColor: 'blue',
-    year: '2018',
-    copies: 8,
-    available: 2,
-    status: 'Đang lưu hành',
-    statusColor: 'amber'
-  },
-  {
-    id: '10',
-    cover: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?q=80&w=100&auto=format&fit=crop',
-    title: 'Cơ Sở Dữ Liệu Quan Hệ',
-    isbn: 'ISBN: 978-5556667778',
-    barcode: 'BC-778899',
-    author: 'Ramez Elmasri',
-    publisher: 'Pearson',
-    category: 'CNTT & Phần mềm',
-    categoryColor: 'indigo',
-    year: '2019',
-    copies: 15,
-    available: 10,
-    status: 'Sẵn sàng',
-    statusColor: 'emerald'
-  },
-  {
-    id: '11',
-    cover: 'https://images.unsplash.com/photo-1491841550275-ad7854e35ca6?q=80&w=100&auto=format&fit=crop',
-    title: 'English Grammar in Use',
-    isbn: 'ISBN: 978-0521189064',
-    barcode: 'BC-334455',
-    author: 'Raymond Murphy',
-    publisher: 'Cambridge',
-    category: 'Ngoại ngữ',
-    categoryColor: 'blue',
-    year: '2019',
-    copies: 30,
-    available: 0,
-    status: 'Hết bản in',
-    statusColor: 'rose'
-  },
-  {
-    id: '12',
-    cover: 'https://images.unsplash.com/photo-1544928147-79a2dbc1f389?q=80&w=100&auto=format&fit=crop',
-    title: 'Tiếng Nhật Minna no Nihongo',
-    isbn: 'ISBN: 978-4883196036',
-    barcode: 'BC-990011',
-    author: '3A Network',
-    publisher: '3A Corporation',
-    category: 'Ngoại ngữ',
-    categoryColor: 'blue',
-    year: '2012',
-    copies: 25,
-    available: 5,
-    status: 'Đang lưu hành',
-    statusColor: 'amber'
-  }
-];
 
-const getCatalogColumns = (onEdit, onDelete, navigate) => [
+
+const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'cover',
     header: 'Bìa',
@@ -245,13 +52,15 @@ const getCatalogColumns = (onEdit, onDelete, navigate) => [
   {
     key: 'category',
     header: 'Thể Loại',
-    render: (value, row) => (
-      <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold text-center leading-tight ${
-        row.categoryColor === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'
-      }`}>
-        {row.category}
-      </span>
-    )
+    render: (value, row) => {
+      const cat = categories.find(c => c.id === row.category_id);
+      const catName = cat ? cat.category_name : 'Chưa phân loại';
+      return (
+        <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold text-center leading-tight bg-blue-50 text-blue-600`}>
+          {catName}
+        </span>
+      );
+    }
   },
   {
     key: 'year',
@@ -309,12 +118,20 @@ const getCatalogColumns = (onEdit, onDelete, navigate) => [
     render: (value, row) => (
       <div className="flex items-center justify-end gap-2 transition-opacity">
         <button 
+          onClick={() => navigate(`/admin/books/${row.id}`)}
+          title="Tồn kho"
+          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors">
+          <BookCopy className="w-4 h-4" />
+        </button>
+        <button 
           onClick={() => onEdit(row)}
+          title="Sửa"
           className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors">
           <Edit2 className="w-4 h-4" />
         </button>
         <button 
           onClick={() => onDelete(row)}
+          title="Xóa"
           className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors">
           <Trash2 className="w-4 h-4" />
         </button>
@@ -328,19 +145,75 @@ export default function CatalogManagement() {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
   const [editingBook, setEditingBook] = useState(null);
   const [isAddingBook, setIsAddingBook] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categoryFormName, setCategoryFormName] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [deletingBook, setDeletingBook] = useState(null);
   
   // Form State for Validation
   const [bookForm, setBookForm] = useState({ 
     title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
-    bookType: 'Sách in', category: 'CNTT & Phần mềm', subject: '', courseCode: '', description: '', keywords: '' 
+    bookType: 'Sách in', categoryId: '', subject: '', courseCode: '', description: '', keywords: '' 
   });
   const [formErrors, setFormErrors] = useState({});
+  const [coverFile, setCoverFile] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [booksData, setBooksData] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Lấy dữ liệu sách từ API
+  const fetchBooks = async () => {
+    setIsLoading(true);
+    try {
+      const res = await axiosInstance.get('/api/books/search?page_size=100');
+      const data = res.data;
+      if (data && data.items) {
+        // Map data từ Backend sang dạng UI
+        const mappedData = data.items.map(b => ({
+          id: b.id,
+          cover: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=100&auto=format&fit=crop', // Tạm thời
+          title: b.title,
+          isbn: b.isbn || 'N/A',
+          barcode: `BC-${b.id}000`, // Giả lập barcode
+          author: b.author || 'Đang cập nhật',
+          publisher: b.publisher || 'Đang cập nhật',
+          category: b.category_id ? 'Thể loại ' + b.category_id : 'Chưa phân loại',
+          categoryColor: 'blue',
+          year: b.published_year || 2024,
+          copies: 10, // Mock, vì search API không trả về
+          available: 10,
+          status: 'Sẵn sàng',
+          statusColor: 'emerald',
+          ...b // Giữ lại id và các trường gốc
+        }));
+        setBooksData(mappedData);
+      }
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách sách:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await axiosInstance.get('/api/admin/categories');
+      setCategories(res.data);
+    } catch (error) {
+      console.error('Lỗi khi tải danh sách thể loại:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBooks();
+    fetchCategories();
+  }, []);
 
   const handleOpenAdd = () => {
     setBookForm({ 
       title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
-      bookType: 'Sách in', category: 'CNTT & Phần mềm', subject: '', courseCode: '', description: '', keywords: '' 
+      bookType: 'Sách in', categoryId: categories.length > 0 ? categories[0].id : '', subject: '', courseCode: '', description: '', keywords: '' 
     });
     setFormErrors({});
     setIsAddingBook(true);
@@ -355,7 +228,7 @@ export default function CatalogManagement() {
       publisher: book.publisher || '',
       year: book.year || '',
       bookType: book.bookType || 'Sách in',
-      category: book.category || 'CNTT & Phần mềm',
+      categoryId: book.category_id || (categories.length > 0 ? categories[0].id : ''),
       subject: book.subject || '',
       courseCode: book.courseCode || '',
       description: book.description || '',
@@ -368,42 +241,132 @@ export default function CatalogManagement() {
   const handleCloseModal = () => {
     setIsAddingBook(false);
     setEditingBook(null);
+    setCoverFile(null);
+    setPdfFile(null);
   };
 
-  const handleSaveBook = () => {
+  const handleSaveBook = async () => {
     const errors = {};
     if (!bookForm.title.trim()) errors.title = 'Tên sách không được để trống';
     if (!bookForm.author.trim()) errors.author = 'Tác giả không được để trống';
-    if (!bookForm.year.trim()) errors.year = 'Năm xuất bản không được để trống';
+    if (!bookForm.year.toString().trim()) errors.year = 'Năm xuất bản không được để trống';
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
 
-    alert(`Đã lưu thành công sách: ${bookForm.title}`);
-    handleCloseModal();
+    const payload = {
+      title: bookForm.title,
+      author: bookForm.author,
+      publisher: bookForm.publisher || "NXB Chưa Rõ",
+      publication_year: parseInt(bookForm.year) || 2024,
+      description: bookForm.description || "",
+      book_type: bookForm.bookType === "eBook" ? "EBOOK" : "PRINTED",
+      category_id: parseInt(bookForm.categoryId) || null, 
+      available_stock: 10
+    };
+
+    try {
+      let savedBook = null;
+      let bookId = null;
+
+      if (editingBook) {
+        const res = await axiosInstance.put(`/api/admin/books/${editingBook.id}`, payload);
+        savedBook = res.data;
+      } else {
+        const res = await axiosInstance.post('/api/admin/books', payload);
+        savedBook = res.data;
+      }
+
+      if (savedBook) {
+        bookId = savedBook.id || (editingBook ? editingBook.id : null);
+
+        // Gọi API Upload Ảnh Bìa (nếu có chọn file)
+        if (bookId && coverFile) {
+          const coverData = new FormData();
+          coverData.append('file', coverFile);
+          await fetch(`/api/admin/books/${bookId}/upload-cover`, {
+            method: 'POST',
+            body: coverData
+          });
+        }
+
+        // Gọi API Upload PDF (nếu có chọn file và sách là eBook)
+        if (bookId && pdfFile && payload.book_type === 'EBOOK') {
+          const pdfData = new FormData();
+          pdfData.append('file', pdfFile);
+          await fetch(`/api/admin/books/${bookId}/upload-pdf`, {
+            method: 'POST',
+            body: pdfData
+          });
+        }
+
+        alert(editingBook ? 'Cập nhật thành công!' : 'Thêm sách mới thành công!');
+        handleCloseModal();
+        fetchBooks(); // Load lại data
+      } else {
+        alert('Lỗi Backend không xác định');
+      }
+    } catch (error) {
+      console.error('Lỗi lưu sách:', error);
+      const detail = error.response?.data?.detail || error.message || 'Network Error';
+      alert(`Lỗi Backend: ${detail}`);
+    }
   };
 
-  const catalogColumns = getCatalogColumns(handleOpenEdit, setDeletingBook, navigate);
+  const confirmDelete = async () => {
+    if (!deletingBook) return;
+    try {
+      await axiosInstance.delete(`/api/admin/books/${deletingBook.id}`);
+      alert('Đã xóa sách thành công!');
+      setDeletingBook(null);
+      fetchBooks();
+    } catch (error) {
+      alert(`Lỗi Backend: ${error.response?.data?.detail || 'Không thể xóa sách'}`);
+    }
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryFormName.trim()) return;
+    setIsSavingCategory(true);
+    try {
+      await axiosInstance.post('/api/admin/categories', {
+        category_name: categoryFormName.trim()
+      });
+      await fetchCategories(); // Cập nhật lại danh sách thể loại ngay lập tức
+      setIsAddingCategory(false);
+      setCategoryFormName('');
+    } catch (error) {
+      alert(`Lỗi: ${error.response?.data?.detail || 'Không thể thêm thể loại'}`);
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const catalogColumns = getCatalogColumns(handleOpenEdit, setDeletingBook, navigate, categories);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('Tất cả thể loại');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [publisherFilter, setPublisherFilter] = useState('Tất cả nhà xuất bản');
   const [statusFilter, setStatusFilter] = useState('Tất cả tình trạng');
 
-  const filteredData = catalogData.filter(item => {
+  const filteredData = booksData.filter(item => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || 
                           item.title.toLowerCase().includes(searchLower) || 
                           item.author.toLowerCase().includes(searchLower) ||
                           item.barcode.toLowerCase().includes(searchLower) ||
                           item.isbn.toLowerCase().includes(searchLower);
-    const matchesCategory = categoryFilter === 'Tất cả thể loại' || item.category === categoryFilter;
+    const matchesCategory = categoryFilter === '' || (item.category_id && item.category_id.toString() === categoryFilter);
     const matchesPublisher = publisherFilter === 'Tất cả nhà xuất bản' || item.publisher === publisherFilter;
     const matchesStatus = statusFilter === 'Tất cả tình trạng' || item.status === statusFilter;
     
     return matchesSearch && matchesCategory && matchesPublisher && matchesStatus;
   });
+
+  const totalBooks = booksData.length;
+  const uniqueCategories = new Set(booksData.map(b => b.category_id)).size || 0;
+  const recentBooksCount = Math.min(booksData.length, 5);
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
@@ -416,10 +379,10 @@ export default function CatalogManagement() {
         <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
-            icon={<BookCopy className="w-4 h-4" />}
-            onClick={() => navigate('/admin/books')}
+            icon={<Plus className="w-4 h-4" />}
+            onClick={() => setIsAddingCategory(true)}
           >
-            Quản lý tồn kho
+            Thêm thể loại
           </Button>
           <Button 
             variant="primary" 
@@ -442,16 +405,12 @@ export default function CatalogManagement() {
           </div>
           <p className="text-sm font-bold text-slate-500 mb-2">Tổng số đầu sách</p>
           <h3 className="text-4xl font-extrabold text-slate-800 flex items-baseline gap-2">
-            12,450 <span className="text-sm font-medium text-slate-500">tựa sách</span>
+            {totalBooks} <span className="text-sm font-medium text-slate-500">tựa sách</span>
           </h3>
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">+120 đầu sách mới tháng này</span>
+              <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md">Toàn hệ thống</span>
             </div>
-            {/* Fake mini chart */}
-            <svg className="w-16 h-4 text-indigo-500" viewBox="0 0 64 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M0 12C5 12 10 14 15 14C20 14 25 8 30 8C35 8 40 10 45 10C50 10 55 4 64 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
           </div>
         </div>
 
@@ -463,10 +422,9 @@ export default function CatalogManagement() {
             </div>
           </div>
           <p className="text-sm font-bold text-slate-500 mb-2">Thể loại & Chủ đề</p>
-          <h3 className="text-4xl font-extrabold text-slate-800">48 <span className="text-base font-bold text-slate-500">chuyên ngành</span></h3>
+          <h3 className="text-4xl font-extrabold text-slate-800">{uniqueCategories} <span className="text-base font-bold text-slate-500">chuyên ngành</span></h3>
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500 font-medium truncate pr-4">CNTT, Kinh tế, Ngoại ngữ, Y học...</span>
-            <a href="#" className="text-[11px] font-bold text-blue-600 hover:underline shrink-0">Xem phân bổ &gt;</a>
+            <span className="text-[11px] text-slate-500 font-medium truncate pr-4">Đã được ghi nhận</span>
           </div>
         </div>
 
@@ -477,14 +435,13 @@ export default function CatalogManagement() {
               <Clock className="w-6 h-6 text-emerald-600" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Mới nhập nhận gần đây</p>
-          <h3 className="text-4xl font-extrabold text-slate-800">32 <span className="text-base font-bold text-slate-500">đầu sách</span></h3>
+          <p className="text-sm font-bold text-slate-500 mb-2">Mới nhập gần đây</p>
+          <h3 className="text-4xl font-extrabold text-slate-800">{recentBooksCount} <span className="text-base font-bold text-slate-500">đầu sách</span></h3>
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Circle className="w-2 h-2 fill-indigo-400 text-indigo-400" />
-              <span className="text-[11px] font-medium text-slate-500">Cập nhật số lượng & bản in tuần này</span>
+              <span className="text-[11px] font-medium text-slate-500">Đã đồng bộ thành công</span>
             </div>
-            <span className="text-[11px] font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded-md whitespace-nowrap">24 giờ qua</span>
           </div>
         </div>
       </div>
@@ -513,13 +470,10 @@ export default function CatalogManagement() {
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
             >
-              <option>Tất cả thể loại</option>
-              <option>CNTT & Phần mềm</option>
-              <option>Kinh tế & QTKD</option>
-              <option>Ngoại ngữ</option>
-              <option>Hệ thống TT</option>
-              <option>Giáo trình</option>
-              <option>Kinh tế</option>
+              <option value="">Tất cả thể loại</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id.toString()}>{c.category_name}</option>
+              ))}
             </select>
 
             {/* Publisher Dropdown */}
@@ -559,7 +513,7 @@ export default function CatalogManagement() {
               className="!bg-transparent !p-0 !h-auto !px-2 !text-slate-500 hover:!text-slate-800"
               onClick={() => {
                 setSearchTerm('');
-                setCategoryFilter('Tất cả thể loại');
+                setCategoryFilter('');
                 setPublisherFilter('Tất cả nhà xuất bản');
                 setStatusFilter('Tất cả tình trạng');
               }}
@@ -671,6 +625,53 @@ export default function CatalogManagement() {
 
       </div>
 
+      {/* Modal Thêm Thể Loại */}
+      <Modal 
+        isOpen={isAddingCategory} 
+        onClose={() => {
+          setIsAddingCategory(false);
+          setCategoryFormName('');
+        }}
+        title="Thêm thể loại mới"
+        width="max-w-md"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên thể loại <span className="text-rose-500">*</span></label>
+            <Input 
+              value={categoryFormName}
+              onChange={(e) => setCategoryFormName(e.target.value)}
+              className="w-full" 
+              placeholder="VD: Tâm lý học, Khoa học dữ liệu..."
+              autoFocus
+            />
+          </div>
+          <div className="pt-2 flex justify-end gap-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setIsAddingCategory(false)} disabled={isSavingCategory}>
+              Hủy
+            </Button>
+            <Button variant="primary" onClick={handleSaveCategory} isLoading={isSavingCategory} disabled={!categoryFormName.trim()}>
+              Lưu Thể Loại
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingBook}
+        onClose={() => setDeletingBook(null)}
+        title="Xác nhận xóa"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeletingBook(null)}>Hủy</Button>
+            <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={confirmDelete}>Xác nhận xóa</Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600">Bạn có chắc chắn muốn xóa cuốn sách <b>{deletingBook?.title}</b> không? Dữ liệu đã xóa sẽ không thể khôi phục.</p>
+      </Modal>
+
       {/* Add / Edit Modal */}
       <Modal
         isOpen={isAddingBook || !!editingBook}
@@ -763,14 +764,16 @@ export default function CatalogManagement() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Thể loại</label>
               <select 
                 className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-                value={bookForm.category}
-                onChange={(e) => setBookForm({...bookForm, category: e.target.value})}
+                value={bookForm.categoryId}
+                onChange={(e) => setBookForm({...bookForm, categoryId: e.target.value})}
               >
-                <option>CNTT & Phần mềm</option>
-                <option>Kinh tế & QTKD</option>
-                <option>Ngoại ngữ</option>
-                <option>Khoa học Cơ bản</option>
-                <option>Giáo trình</option>
+                {categories.length > 0 ? (
+                  categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.category_name}</option>
+                  ))
+                ) : (
+                  <option value="">Chưa có thể loại (Vui lòng tạo trước)</option>
+                )}
               </select>
             </div>
 
@@ -812,6 +815,38 @@ export default function CatalogManagement() {
                 placeholder="Nhập tóm tắt nội dung sách..."
               />
             </div>
+
+            {/* Khu vực Upload Files */}
+            <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4 mt-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
+                <Upload className="w-3.5 h-3.5" />
+                Tải lên Ảnh bìa
+              </label>
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={(e) => setCoverFile(e.target.files[0])}
+                className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+              />
+              {editingBook && editingBook.cover_image_path && !coverFile && (
+                <p className="text-[11px] text-slate-500 mt-2">Đang sử dụng ảnh bìa hiện tại. Chọn file mới để thay đổi.</p>
+              )}
+            </div>
+
+            {bookForm.bookType === 'eBook' && (
+              <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
+                  <Upload className="w-3.5 h-3.5 text-rose-500" />
+                  Tải lên file PDF (eBook)
+                </label>
+                <input 
+                  type="file" 
+                  accept="application/pdf"
+                  onChange={(e) => setPdfFile(e.target.files[0])}
+                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 cursor-pointer"
+                />
+              </div>
+            )}
           </div>
         </div>
       </Modal>
@@ -824,10 +859,7 @@ export default function CatalogManagement() {
         footer={
           <>
             <Button variant="outline" onClick={() => setDeletingBook(null)}>Hủy bỏ</Button>
-            <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={() => {
-              alert('Đã xóa thành công sách ' + deletingBook?.title);
-              setDeletingBook(null);
-            }}>
+            <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={confirmDelete}>
               Xác nhận Xóa
             </Button>
           </>
