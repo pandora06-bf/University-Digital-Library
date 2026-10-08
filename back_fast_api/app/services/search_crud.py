@@ -1,82 +1,105 @@
 import math
 from typing import Any, Dict, List, Optional
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.book import Book, Category, Subject
 
 
-def search_books_fts(
+def search_books_advanced(
     db: Session,
-    query_text: Optional[str] = None,
-    category_id: Optional[int] = None,
-    subject_code: Optional[str] = None,
+    query_text: Optional[str] = None,       # Tìm kiếm toàn văn trên siêu dữ liệu
+    author: Optional[str] = None,           # Tìm theo tác giả
+    publisher: Optional[str] = None,        # Tìm theo nhà xuất bản
+    publication_year: Optional[int] = None, # Tìm theo năm xuất bản
+    category_id: Optional[int] = None,      # Lọc theo danh mục
+    book_type: Optional[str] = None,        # Lọc theo định dạng (PRINTED, EBOOK, BOTH)
+    subject_code: Optional[str] = None,     # Lọc theo mã môn học
+    keyword: Optional[str] = None,          # Lọc theo từ khóa (keywords)
     page: int = 1,
     page_size: int = 10,
 ) -> Dict[str, Any]:
-    """
-    Tìm kiếm sách bằng PostgreSQL Full-Text Search kết hợp bộ lọc và phân trang.
-    Tối ưu hóa:
-      - Sử dụng plainto_tsquery trên cấu hình 'simple' (hoặc 'english')
-      - Rank kết quả khớp theo trọng số bằng ts_rank_cd
-      - Áp dụng LIMIT / OFFSET phân trang chuẩn xác
-    """
     page = max(1, page)
-    page_size = max(1, min(page_size, 50))  # Giới hạn tối đa 50 kết quả/trang
+    page_size = max(1, min(page_size, 50))
     offset = (page - 1) * page_size
 
-    # Khởi tạo câu truy vấn cơ sở
-    stmt = (
-        select(Book)
-        .outerjoin(Category, Book.category_id == Category.id)
-        .outerjoin(Subject, Book.subject_code == Subject.subject_code)
-    )
+    stmt = select(Book)
 
-    # 1. Áp dụng Full-Text Search nếu có từ khóa
-    # if query_text and query_text.strip():
-    #     search_terms = query_text.strip()
-    #     # Chuyển đổi text thành tsquery an toàn (tránh lỗi cú pháp của to_tsquery)
-    #     ts_query = func.plainto_tsquery("simple", search_terms)
-
-    #     # Toán tử PostgreSQL: Book.search_vector @@ plainto_tsquery('simple', :query)
-    #     fts_filter = Book.search_vector.bool_op("@@")(ts_query)
-    #     stmt = stmt.where(fts_filter)
-
-    #     # Sắp xếp theo độ phù hợp (Rank score giảm dần)
-    #     rank_score = func.ts_rank_cd(Book.search_vector, ts_query).desc()
-    #     stmt = stmt.order_by(rank_score, Book.id.desc())
-    # else:
-    #     # Nếu không có từ khóa, sắp xếp theo ID sách mới nhất
-    #     stmt = stmt.order_by(Book.id.desc())
+    # 1. Tìm kiếm toàn văn (FTS) trên toàn bộ siêu dữ liệu (Metadata):
+    # Bao gồm: Nhan đề, Tác giả, Nhà xuất bản, Mô tả, Từ khóa
     if query_text and query_text.strip():
         search_terms = query_text.strip()
-        ts_vector = func.to_tsvector(
-            "simple",
-            func.coalesce(Book.title, "") + " " + func.coalesce(Book.author, ""),
-        )
         ts_query = func.plainto_tsquery("simple", search_terms)
 
-        stmt = stmt.where(ts_vector.bool_op("@@")(ts_query))
-        stmt = stmt.order_by(
-            func.ts_rank_cd(ts_vector, ts_query).desc(),
-            Book.id.desc(),
+        # Gom toàn bộ siêu dữ liệu vào một tsvector
+        metadata_vector = func.to_tsvector(
+            "simple",
+            func.coalesce(Book.title, "")
+            + " "
+            + func.coalesce(Book.author, "")
+            + " "
+            + func.coalesce(Book.publisher, "")
+            + " "
+            + func.coalesce(Book.description, "")
+            + " "
+            + func.coalesce(Book.keywords, ""),
         )
+
+        fts_filter = metadata_vector.op("@@")(ts_query)
+        rank_expr = func.ts_rank_cd(metadata_vector, ts_query)
+
+        stmt = stmt.where(fts_filter).order_by(rank_expr.desc(), Book.id.desc())
     else:
         stmt = stmt.order_by(Book.id.desc())
 
-    # 2. Bộ lọc danh mục & chủ đề
+    # 2. Tìm theo Tác giả (không phân biệt hoa thường)
+    if author and author.strip():
+        stmt = stmt.where(Book.author.ilike(f"%{author.strip()}%"))
+
+    # 3. Tìm theo Nhà xuất bản
+    if publisher and publisher.strip():
+        stmt = stmt.where(Book.publisher.ilike(f"%{publisher.strip()}%"))
+
+    # 4. Tìm theo Năm xuất bản
+    if publication_year:
+        stmt = stmt.where(Book.publication_year == publication_year)
+
+    # 5. Lọc chéo theo Danh mục
     if category_id:
         stmt = stmt.where(Book.category_id == category_id)
-    if subject_code:
-        stmt = stmt.where(Book.subject_code == subject_code)
 
-    # 3. Tính tổng số bản ghi (Total Count)
-    count_subquery = stmt.with_only_columns(func.count(Book.id)).order_by(None).subquery()
-    total_records = db.scalar(select(func.count()).select_from(count_subquery)) or 0
+    # 6. Lọc chéo theo Định dạng sách (Vật lý: PRINTED, Điện tử: EBOOK)
+    if book_type and book_type.strip():
+        target_type = book_type.strip().upper()
+        if target_type in ["PRINTED", "EBOOK"]:
+            # Khớp định dạng đích hoặc các sách hỗ trợ cả hai (BOTH)
+            stmt = stmt.where(Book.book_type.in_([target_type, "BOTH"]))
+        else:
+            stmt = stmt.where(Book.book_type == target_type)
 
-    # 4. Áp dụng Pagination (Limit / Offset)
-    paginated_stmt = stmt.limit(page_size).offset(offset)
-    books: List[Book] = db.scalars(paginated_stmt).all()
+    # 7. Tìm theo Từ khóa (Keywords)
+    if keyword and keyword.strip():
+        stmt = stmt.where(Book.keywords.ilike(f"%{keyword.strip()}%"))
+
+    # 8. Lọc theo Mã môn học
+    if subject_code and subject_code.strip():
+        stmt = stmt.where(Book.subject_code == subject_code.strip().upper())
+
+    # 9. Tính tổng số bản ghi (Count an toàn và tối ưu)
+    count_stmt = stmt.with_only_columns(func.count(Book.id)).order_by(None)
+    total_records = db.scalar(count_stmt) or 0
+    total_records = db.scalar(count_stmt) or 0
+
+    # 10. Phân trang và Eager Loading tránh N+1
+    paginated_stmt = (
+        stmt.options(
+            joinedload(Book.category),
+            joinedload(Book.subject),
+        )
+        .limit(page_size)
+        .offset(offset)
+    )
+    books: List[Book] = db.scalars(paginated_stmt).unique().all()
 
     total_pages = math.ceil(total_records / page_size) if total_records > 0 else 1
 
