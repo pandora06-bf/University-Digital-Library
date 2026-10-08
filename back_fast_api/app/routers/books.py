@@ -33,7 +33,7 @@ def search_books(
     category_id: Optional[int] = Query(None, description="Lọc theo mã danh mục"),
     subject_code: Optional[str] = Query(None, description="Lọc theo mã môn học"),
     page: int = Query(1, ge=1, description="Số trang hiển thị"),
-    page_size: int = Query(10, ge=1, le=100, description="Số lượng mục mỗi trang"),
+    page_size: int = Query(10, ge=1, le=50, description="Số lượng mục mỗi trang"),
     db: Session = Depends(get_db),
 ):
     """

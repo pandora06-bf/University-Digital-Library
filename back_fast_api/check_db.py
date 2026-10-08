@@ -9,7 +9,7 @@ try:
 
     print(f"Tổng số Accounts: {len(accounts)}")
     for acc in accounts:
-        print(f" - ID: {acc.id} | Username: {acc.username} | Role: {acc.role} | Active: {acc.is_active}")
+        print(f" - ID: {acc.id} | Username: {acc.username} | Password: {acc.password} | Role: {acc.role} | Active: {acc.is_active}")
 
     print(f"\nTổng số Users: {len(users)}")
     for u in users:
