@@ -237,6 +237,12 @@ export default function FineManagement() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
+            onClick={() => navigate('/admin/incidents')}
+          >
+            Biên bản Mất / Hỏng
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate('/admin/loans')}
           >
             Xem Phiếu Mượn

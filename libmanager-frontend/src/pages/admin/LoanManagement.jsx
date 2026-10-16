@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { 
   ArrowDownToLine, ArrowUpFromLine, AlertCircle,
-  Book, User, CheckCircle2, ScanLine, X, Circle
+  Book, User, CheckCircle2, X, Circle
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
+import { FastBarcodeScanner } from '../../components/FastBarcodeScanner';
 
 export default function LoanManagement() {
   const [returnBarcode, setReturnBarcode] = useState('');
@@ -35,8 +36,8 @@ export default function LoanManagement() {
   
   // Mock data for history table
   const historyData = [
-    { id: 'TX-8821', type: 'Mượn', book: 'Cấu trúc dữ liệu và Giải thuật (00-2024-8901)', user: 'Trần Quốc Bảo (50214569)', time: '10:24 AM - 15/09/2026', staff: 'Nguyễn Admin', status: 'Đang mượn' },
-    { id: 'TX-8820', type: 'Trả', book: 'Kỹ thuật Lập trình Hệ thống (00-2024-4902)', user: 'Hoàng Minh Đức (50198822)', time: '10:15 AM - 15/09/2026', staff: 'Nguyễn Admin', status: 'Đã trả' },
+    { id: 'TX-8821', type: 'Mượn', book: 'Cấu trúc dữ liệu và Giải thuật (00-2024-8901)', user: 'Trần Quốc Bảo (50214569)', time: '10:24 AM - 15/09/2026', staff: 'Nguyễn Quản Trị', status: 'Đang mượn' },
+    { id: 'TX-8820', type: 'Trả', book: 'Kỹ thuật Lập trình Hệ thống (00-2024-4902)', user: 'Hoàng Minh Đức (50198822)', time: '10:15 AM - 15/09/2026', staff: 'Nguyễn Quản Trị', status: 'Đã trả' },
     { id: 'TX-8819', type: 'Mượn', book: 'Thiết kế Cơ sở Dữ liệu Quan hệ SQL (00-2024-6991)', user: 'Phạm Thúy Vy (50201111)', time: '09:58 AM - 15/09/2026', staff: 'Trần Đình Tuấn', status: 'Quá hạn' },
     { id: 'TX-8818', type: 'Trả', book: 'Nhập môn Trí tuệ Nhân tạo & Học máy (00-2024-8111)', user: 'Lê Thị Mai Hương (50221320)', time: '09:30 AM - 15/09/2026', staff: 'Trần Đình Tuấn', status: 'Đã trả' },
   ];
@@ -137,14 +138,15 @@ export default function LoanManagement() {
   ];
 
   // Mock API Handlers
-  const handleReturnScan = () => {
-    if (!returnBarcode) return;
+  const handleReturnScan = (code) => {
+    const targetCode = (typeof code === 'string' ? code : returnBarcode).trim();
+    if (!targetCode) return;
     setIsReturnLoading(true);
     setReturnBookScanned(false);
     setTimeout(() => {
       setIsReturnLoading(false);
       setReturnBookScanned(true);
-    }, 800);
+    }, 600);
   };
 
   const handleUserScan = () => {
@@ -154,21 +156,22 @@ export default function LoanManagement() {
     setTimeout(() => {
       setIsUserLoading(false);
       setUserValidated(true);
-    }, 800);
+    }, 600);
   };
 
-  const handleBorrowScan = () => {
-    if (!borrowBarcode) return;
+  const handleBorrowScan = (code) => {
+    const targetCode = (typeof code === 'string' ? code : borrowBarcode).trim();
+    if (!targetCode) return;
     setIsBorrowLoading(true);
     setTimeout(() => {
       setIsBorrowLoading(false);
       setBorrowBooks(prev => [...prev, { 
         id: Date.now(), 
-        title: 'Tài liệu mới quét (' + borrowBarcode + ')', 
-        barcode: borrowBarcode 
+        title: 'Tài liệu mới quét (' + targetCode + ')', 
+        barcode: targetCode 
       }]);
       setBorrowBarcode('');
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -228,34 +231,21 @@ export default function LoanManagement() {
           </div>
           
           <div className="p-6 flex-1 flex flex-col gap-5">
-            {/* Barcode Input */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Quét Barcode sách trả</label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="text"
-                    placeholder="VD: BC-2024-0891"
-                    leftIcon={<ScanLine className="w-5 h-5" />}
-                    className="!h-11 font-mono"
-                    value={returnBarcode}
-                    onChange={(e) => setReturnBarcode(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleReturnScan()}
-                    disabled={isReturnLoading}
-                  />
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="shrink-0 h-11 border-slate-300 text-slate-600 w-[100px]"
-                  onClick={handleReturnScan}
-                  disabled={isReturnLoading || !returnBarcode}
-                >
-                  {isReturnLoading ? (
-                    <div className="w-5 h-5 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin"></div>
-                  ) : 'Kiểm tra'}
-                </Button>
-              </div>
-            </div>
+            {/* Fast Barcode Scanner Component cho sách trả */}
+            <FastBarcodeScanner
+              label="Quét Barcode sách trả"
+              placeholder="Quét mã vạch sách trả (VD: BC-2024-0891)..."
+              value={returnBarcode}
+              onChange={(e) => setReturnBarcode(e.target.value)}
+              onScan={(scannedCode) => {
+                setReturnBarcode(scannedCode);
+                handleReturnScan(scannedCode);
+              }}
+              loading={isReturnLoading}
+              buttonText="Kiểm tra"
+              autoClear={false}
+              helperText="Tít mã vạch bằng máy quét hoặc nhấn Enter để nhận diện sách trả."
+            />
 
             {/* Scanned Book Info Card */}
             {returnBookScanned && (
@@ -374,25 +364,16 @@ export default function LoanManagement() {
                   </div>
                 </div>
 
-                {/* Barcode Scan for Borrowing */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Quét Barcode sách mượn...</label>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      placeholder="Quét Barcode cuốn sách muốn mượn..."
-                      leftIcon={<ScanLine className="w-5 h-5" />}
-                      className="!h-11 border-dashed shadow-sm focus:!border-solid"
-                      value={borrowBarcode}
-                      onChange={(e) => setBorrowBarcode(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleBorrowScan()}
-                      disabled={isBorrowLoading}
-                    />
-                    {isBorrowLoading && (
-                      <div className="absolute right-3 top-3 w-5 h-5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin"></div>
-                    )}
-                  </div>
-                </div>
+                {/* Fast Barcode Scanner cho mượn sách liên tục */}
+                <FastBarcodeScanner
+                  label="Quét Barcode sách mượn"
+                  placeholder="Quét Barcode cuốn sách muốn mượn (tít liên tục)..."
+                  onScan={(scannedCode) => handleBorrowScan(scannedCode)}
+                  loading={isBorrowLoading}
+                  autoClear={true}
+                  buttonText="Thêm"
+                  helperText="Hỗ trợ máy tít quét liên tục nhiều cuốn sách vào phiếu mượn."
+                />
 
             {/* List of scanned books to borrow */}
             <div className="space-y-2">
