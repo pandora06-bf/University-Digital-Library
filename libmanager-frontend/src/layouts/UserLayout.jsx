@@ -42,8 +42,13 @@ export default function UserLayout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 h-20 sm:h-24 lg:h-32 flex items-center justify-between gap-4">
           
           {/* Logo & Brand Name */}
-          <NavLink to="/" className="flex items-center gap-3 shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl p-1">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#312E81] via-[#4F46E5] to-[#0E7490] flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <NavLink 
+            to="/" 
+            aria-label="Về trang chủ thư viện LibManager"
+            title="Về trang chủ Thư viện"
+            className="flex items-center gap-3 shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl p-1 cursor-pointer hover:opacity-95 transition-opacity group"
+          >
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#312E81] via-[#4F46E5] to-[#0E7490] flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
               <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
@@ -105,7 +110,7 @@ export default function UserLayout() {
               <div className="flex items-center gap-3 pl-2 sm:border-l border-slate-200">
                 <div className="hidden sm:flex flex-col text-right">
                   <span className="text-sm font-semibold text-slate-900 line-clamp-1">{user.name}</span>
-                  <span className="text-xs text-slate-500">{user.role === 'admin' ? 'Thủ thư / Admin' : 'Độc giả'}</span>
+                  <span className="text-xs text-slate-500">{user.role === 'admin' ? 'Thủ thư / Quản trị viên' : 'Độc giả'}</span>
                 </div>
                 <Button
                   variant="ghost"
@@ -225,9 +230,9 @@ export default function UserLayout() {
           <div className="flex items-center gap-4 font-medium">
             <span>Phiên bản 2.0.0</span>
             <span>•</span>
-            <span>Frontend User: Đạt</span>
+            <span>Cổng Độc giả: Đạt</span>
             <span>•</span>
-            <span>Frontend Admin: Vân</span>
+            <span>Cổng Quản trị: Vân</span>
           </div>
         </div>
       </footer>

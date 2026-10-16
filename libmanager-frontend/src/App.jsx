@@ -13,10 +13,11 @@ import UiKitPage from './pages/dev/UiKitPage';
 import AdminLayout from './layouts/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CatalogManagement from './pages/admin/CatalogManagement';
-import BookManagement from './pages/admin/BookManagement';
+import InventoryManagement from './pages/admin/InventoryManagement';
 import LoanManagement from './pages/admin/LoanManagement';
 import FineManagement from './pages/admin/FineManagement';
 import EbookManagement from './pages/admin/EbookManagement';
+import IncidentPage from './pages/admin/IncidentPage';
 
 import AdminGuard from './components/AdminGuard';
 
@@ -47,11 +48,14 @@ export default function App() {
         <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
           <Route index element={<AdminDashboard />} />
           <Route path="catalog" element={<CatalogManagement />} />
-          <Route path="books" element={<BookManagement />} />
-          <Route path="books/:bookId" element={<BookManagement />} />
+          <Route path="inventory" element={<InventoryManagement />} />
+          <Route path="inventory/:bookId" element={<InventoryManagement />} />
+          <Route path="books" element={<InventoryManagement />} />
+          <Route path="books/:bookId" element={<InventoryManagement />} />
           <Route path="ebooks" element={<EbookManagement />} />
           <Route path="loans" element={<LoanManagement />} />
           <Route path="fines" element={<FineManagement />} />
+          <Route path="incidents" element={<IncidentPage />} />
         </Route>
 
         {/* 404 Route */}

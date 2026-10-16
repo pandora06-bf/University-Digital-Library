@@ -7,9 +7,9 @@ Tài liệu này hướng dẫn chi tiết cách khởi động, đăng nhập t
 ## 1. Cách khởi động Dự án
 
 ### Bước 1: Mở Terminal tại thư mục `libmanager-frontend`
-Nếu đang ở thư mục gốc `CNPM`, hãy gõ:
+Nếu đang ở thư mục gốc workspace, hãy gõ:
 ```bash
-cd libmanager-frontend
+cd University-Digital-Library/libmanager-frontend
 ```
 
 ### Bước 2: Chạy Dev Server
@@ -26,12 +26,13 @@ Hệ thống sẽ chạy máy chủ phát triển tại: **[http://localhost:517
 
 Truy cập vào trang đăng nhập: **[http://localhost:5173/login](http://localhost:5173/login)**
 
-Hệ thống có sẵn các nút bấm **1-click tự điền tài khoản mẫu**:
+Đăng nhập gọi API backend. Trên màn hình có nút **1-click điền** tài khoản ADMIN mẫu:
 
-| Vai trò | Email đăng nhập | Mật khẩu | Chức năng chính |
+| Vai trò | Username | Mật khẩu | Chức năng chính |
 | :--- | :--- | :--- | :--- |
-| **Độc giả (Sinh viên)** | `sinhvien@tdtu.edu.vn` | `12345678` | Tra cứu danh mục, mượn sách thời gian thực, quản lý phiếu mượn cá nhân, đọc sách điện tử trực tuyến. |
-| **Thủ thư (Cán bộ)** | `thuthu@tdtu.edu.vn` | `12345678` | Đăng nhập với tư cách quản trị viên (điểm tích hợp sẵn cho Vân). |
+| **Thủ thư / Admin** | `admin` | `Admin@123` | Cổng Quản trị (`/admin`) — tài khoản bootstrap backend / Docker `.env`. |
+
+*(Các tài khoản `sinhvien@…` / `thuthu@…` trong mock cũ không còn dùng cho form login hiện tại.)*
 
 > [!TIP]
 > Bạn có thể bấm vào biểu tượng **Con mắt** ở ô mật khẩu để kiểm tra tính năng hiển thị/ẩn mật khẩu bằng nút bấm chuẩn tiếp cận (accessibility).

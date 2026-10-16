@@ -39,11 +39,11 @@ Mở Docker Desktop. Tại thư mục gốc repository, chạy trong CMD hoặc 
 docker compose up --build
 ```
 
-Các địa chỉ sau khi khởi động:
+Các địa chỉ sau khi khởi động (host map mặc định **8010**, tránh đụng cổng 8000):
 
-- API: <http://localhost:8000>
-- Swagger: <http://localhost:8000/docs>
-- Kiểm tra trạng thái: <http://localhost:8000/health>
+- API: <http://localhost:8010>
+- Swagger: <http://localhost:8010/docs>
+- Kiểm tra trạng thái: <http://localhost:8010/health>
 
 Nếu lệnh `docker` chưa có trong PATH của CMD, thêm đường dẫn Docker Desktop cho
 cửa sổ hiện tại rồi chạy Compose:

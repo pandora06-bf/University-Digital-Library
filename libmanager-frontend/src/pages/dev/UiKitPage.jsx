@@ -4,11 +4,13 @@ import { Link } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Table, StatusBadge } from '../../components/Table';
+import { FastBarcodeScanner } from '../../components/FastBarcodeScanner';
 
 export default function UiKitPage() {
   const [btnLoading, setBtnLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [tableLoading, setTableLoading] = useState(false);
+  const [scannedHistory, setScannedHistory] = useState(['BC-2026-0001', 'BC-2026-0002']);
 
   // Custom columns test cho User Loan Records
   const userLoanColumns = [
@@ -208,6 +210,45 @@ export default function UiKitPage() {
             data={[]}
             emptyMessage="Hiện tại bạn chưa có tài liệu nào quá hạn"
           />
+        </div>
+      </section>
+
+      {/* SECTION 4: FAST BARCODE SCANNER (SPRINT 3 - VÂN) */}
+      <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-10 space-y-6">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">4. FastBarcodeScanner Component (`FastBarcodeScanner.jsx` — Sprint 3 của Vân)</h2>
+          <p className="text-xs text-slate-500">Bắt sự kiện Enter liên tục cho máy quét mã vạch không cần dùng chuột; tự động xóa ô nhập và phát âm thanh beep / hiệu ứng thị giác.</p>
+        </div>
+
+        <div className="max-w-xl space-y-4">
+          <FastBarcodeScanner
+            label="Mô phỏng máy tít mã vạch tại quầy"
+            placeholder="Tít mã vạch hoặc nhập mã rồi gõ Enter..."
+            onScan={(code) => setScannedHistory(prev => [code, ...prev])}
+            helperText="Nhập mã (VD: BC-2026-8888) rồi nhấn Enter để trải nghiệm âm thanh POS và hiệu ứng viền xanh."
+          />
+
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-700 uppercase">Lịch sử tít mã vạch ({scannedHistory.length})</span>
+              {scannedHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setScannedHistory([])}
+                  className="text-xs text-rose-600 hover:underline cursor-pointer"
+                >
+                  Xóa lịch sử
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {scannedHistory.map((code, idx) => (
+                <span key={idx} className="font-mono text-xs font-semibold px-2.5 py-1 bg-white border border-indigo-200 text-indigo-700 rounded-lg shadow-xs">
+                  {code}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </div>

@@ -10,8 +10,9 @@ export const setToken = (token) => {
 };
 
 // 1. Tạo instance: mọi request dùng chung baseURL
+// Mặc định 8010 — tránh đụng cổng 8000 (web khác trên máy). Docker/.env cũng dùng 8010.
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8010',
   timeout: 10000,
 });
 
