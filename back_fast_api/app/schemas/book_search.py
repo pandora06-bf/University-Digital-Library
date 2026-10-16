@@ -10,6 +10,7 @@ class BookSearchItemResponse(BaseModel):
     author: Optional[str] = None
     isbn: Optional[str] = None
     publisher: Optional[str] = None
+    price: int
     published_year: Optional[int] = None
     category_id: Optional[int] = None
     subject_id: Optional[int] = None

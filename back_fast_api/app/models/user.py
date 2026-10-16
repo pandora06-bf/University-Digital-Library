@@ -17,8 +17,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from fine import Fine, FinePayment
-    from loan import Loan, Waitlist
+    from app.models.fine import Fine, FinePayment
+    from app.models.loan import Loan, Waitlist, Incident
+    from app.models.room import RoomBooking
+    from app.models.wallet import TopUp, WalletTxn
+    
 """
 Quản lý thông tin người dùng (User) và tài khoản (Account)"""
 
@@ -44,6 +47,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("total_fines >= 0", name="chk_user_total_fines_positive"),
+        CheckConstraint("service_balance >= 0", name="chk_user_service_balance_non_negative"),
     )
 
     user_code: Mapped[str] = mapped_column(String(50), primary_key=True)
@@ -62,6 +66,10 @@ class User(Base):
 
     is_borrowing_blocked: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
     total_fines: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), server_default="0.00", nullable=False)
+    service_balance: Mapped[int] = mapped_column(
+        Integer, server_default="0", default=0, nullable=False
+    )
+
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=False), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -77,3 +85,7 @@ class User(Base):
     payments_collected: Mapped[List["FinePayment"]] = relationship(
         "FinePayment", foreign_keys="FinePayment.admin_collector_code", back_populates="collector"
     )
+    incidents: Mapped[List["Incident"]] = relationship("Incident", back_populates="user")
+    room_bookings: Mapped[List["RoomBooking"]] = relationship("RoomBooking", back_populates="user")
+    top_ups: Mapped[List["TopUp"]] = relationship("TopUp", back_populates="user")
+    wallet_txns: Mapped[List["WalletTxn"]] = relationship("WalletTxn", back_populates="user")

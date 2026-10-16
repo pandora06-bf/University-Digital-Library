@@ -12,6 +12,7 @@ class BookBase(BaseModel):
     author: str = Field(min_length=1, max_length=150)
     publisher: str = Field(min_length=1, max_length=150)
     publication_year: int = Field(ge=1000, le=2100)
+    price: int = Field(default=0, ge=0, description="Giá bìa sách, tính bằng VNĐ")
     description: str | None = None
     keywords: str | None = None
     num_pages: int | None = Field(default=None, ge=1)
@@ -36,6 +37,7 @@ class BookUpdate(BaseModel):
     author: str | None = Field(default=None, min_length=1, max_length=150)
     publisher: str | None = Field(default=None, min_length=1, max_length=150)
     publication_year: int | None = Field(default=None, ge=1000, le=2100)
+    price: int | None = Field(default=None, ge=0, description="Giá bìa sách, tính bằng VNĐ")
     description: str | None = None
     keywords: str | None = None
     num_pages: int | None = Field(default=None, ge=1)

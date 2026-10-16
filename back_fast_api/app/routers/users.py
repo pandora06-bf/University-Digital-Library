@@ -30,6 +30,7 @@ def get_my_dashboard(
 ):
     if not account.user:
         raise HTTPException(
+            
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
         )

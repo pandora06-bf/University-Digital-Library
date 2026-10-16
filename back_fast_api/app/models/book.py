@@ -18,7 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
-    from loan import Loan, Waitlist
+    from app.models.loan import Loan, Waitlist
 
 """
 Quản lý thông tin sách (Book), 
@@ -47,6 +47,7 @@ class Book(Base):
     __tablename__ = "books"
     __table_args__ = (
         CheckConstraint("available_stock >= 0", name="chk_book_available_stock_positive"),
+        CheckConstraint("price >= 0", name="chk_book_price_nonnegative"),
         Index("idx_books_search_vector", "search_vector", postgresql_using="gin"),
     )
 
@@ -55,12 +56,15 @@ class Book(Base):
     author: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     publisher: Mapped[str] = mapped_column(String(150), nullable=False)
     publication_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Giá bìa (VNĐ), mặc định 0, không âm
+    price: Mapped[int] = mapped_column(Integer, server_default="0", default=0, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     cover_image_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     num_pages: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     book_type: Mapped[str] = mapped_column(String(50), nullable=False)
     available_stock: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    
     search_vector: Mapped[Optional[str]] = mapped_column(TSVECTOR, nullable=True)
 
     category_id: Mapped[Optional[int]] = mapped_column(
@@ -95,7 +99,6 @@ class Ebook(Base):
     is_free: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
 
     book: Mapped["Book"] = relationship("Book", back_populates="ebook")
-
 
 class BookCopy(Base):
     __tablename__ = "book_copies"

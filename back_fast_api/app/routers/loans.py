@@ -60,7 +60,7 @@ def format_loan_response(loan: Loan):
 
 @router.get("/me")
 def get_my_loans(
-    loan_status: Optional[str] = Query(None, description="Lọc theo trạng thái: BORROWED, RETURNED, OVERDUE"),
+    loan_status: Optional[str] = Query(None, description="Lọc theo trạng thái: BORROWED, RETURNED, OVERDUE, LOST"),
     skip: int = Query(0, ge=0, description="Số bản ghi bỏ qua (phân trang)"),
     limit: int = Query(10, ge=1, le=50, description="Số lượng bản ghi lấy ra"),
     account: Account = Depends(get_current_account),
@@ -97,7 +97,7 @@ def get_my_loans(
 @router.get("")
 def get_all_loans(
     user_code: Optional[str] = Query(None, description="Tìm theo mã bạn đọc (SV/GV)"),
-    loan_status: Optional[str] = Query(None, description="Lọc trạng thái: REQUESTED, BORROWED, RETURNED, OVERDUE"),
+    loan_status: Optional[str] = Query(None, description="Lọc trạng thái: REQUESTED, BORROWED, RETURNED, OVERDUE, LOST"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     account: Account = Depends(get_current_account),

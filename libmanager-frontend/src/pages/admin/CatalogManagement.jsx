@@ -71,6 +71,14 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
     )
   },
   {
+    key: 'price',
+    header: 'Giá bìa',
+    align: 'right',
+    render: (value, row) => (
+      <span className="font-mono text-slate-600">{new Intl.NumberFormat('vi-VN').format(row.price || 0)} ₫</span>
+    )
+  },
+  {
     key: 'copies',
     header: 'Số Bản Sao (Sẵn Sàng)',
     render: (value, row) => (
@@ -153,7 +161,7 @@ export default function CatalogManagement() {
   // Form State for Validation
   const [bookForm, setBookForm] = useState({ 
     title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
-    bookType: 'Sách in', categoryId: '', subject: '', courseCode: '', description: '', keywords: '' 
+    price: '', bookType: 'Sách in', categoryId: '', subject: '', courseCode: '', description: '', keywords: ''
   });
   const [formErrors, setFormErrors] = useState({});
   const [coverFile, setCoverFile] = useState(null);
@@ -181,6 +189,7 @@ export default function CatalogManagement() {
           category: b.category_id ? 'Thể loại ' + b.category_id : 'Chưa phân loại',
           categoryColor: 'blue',
           year: b.published_year || 2024,
+          price: b.price || 0,
           copies: 10, // Mock, vì search API không trả về
           available: 10,
           status: 'Sẵn sàng',
@@ -213,7 +222,7 @@ export default function CatalogManagement() {
   const handleOpenAdd = () => {
     setBookForm({ 
       title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
-      bookType: 'Sách in', categoryId: categories.length > 0 ? categories[0].id : '', subject: '', courseCode: '', description: '', keywords: '' 
+      price: '', bookType: 'Sách in', categoryId: categories.length > 0 ? categories[0].id : '', subject: '', courseCode: '', description: '', keywords: ''
     });
     setFormErrors({});
     setIsAddingBook(true);
@@ -227,6 +236,7 @@ export default function CatalogManagement() {
       author: book.author || '',
       publisher: book.publisher || '',
       year: book.year || '',
+      price: book.price ?? 0,
       bookType: book.bookType || 'Sách in',
       categoryId: book.category_id || (categories.length > 0 ? categories[0].id : ''),
       subject: book.subject || '',
@@ -261,6 +271,7 @@ export default function CatalogManagement() {
       author: bookForm.author,
       publisher: bookForm.publisher || "NXB Chưa Rõ",
       publication_year: parseInt(bookForm.year) || 2024,
+      price: parseInt(bookForm.price, 10) || 0,
       description: bookForm.description || "",
       book_type: bookForm.bookType === "eBook" ? "EBOOK" : "PRINTED",
       category_id: parseInt(bookForm.categoryId) || null, 
@@ -744,6 +755,18 @@ export default function CatalogManagement() {
                 className="w-full" 
                 error={formErrors.year}
                 placeholder="VD: 2024"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Giá bìa (VNĐ)</label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={bookForm.price}
+                onChange={(e) => setBookForm({...bookForm, price: e.target.value})}
+                className="w-full"
+                placeholder="VD: 150000"
               />
             </div>
 
