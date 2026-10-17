@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X } from 'lucide-react';
+import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays } from 'lucide-react';
 import { getCurrentUser, setCurrentUser } from '../mocks/auth';
 import { Button } from '../components/Button';
 import { PageTransition } from '../components/motion/PageTransition';
@@ -30,10 +30,11 @@ export default function UserLayout() {
     { to: '/', label: 'Trang chủ', icon: Home },
     { to: '/catalog', label: 'Danh mục', icon: Layers },
     { to: '/my-books', label: 'Sách của tôi', icon: BookmarkCheck },
+    { to: '/rooms', label: 'Đặt phòng', icon: CalendarDays },
   ];
 
   // Kiểm tra trang có cần bottom navigation trên mobile không
-  const showMobileBottomNav = ['/catalog', '/my-books'].includes(location.pathname);
+  const showMobileBottomNav = ['/catalog', '/my-books', '/rooms', '/wallet/top-up'].includes(location.pathname);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FC] text-[#172033]">
@@ -62,7 +63,7 @@ export default function UserLayout() {
           </NavLink>
 
           {/* Search Header Bar (Desktop & Tablet) */}
-          <form onSubmit={handleSearchSubmit} className="hidden md:flex flex-1 max-w-md mx-6">
+          <form onSubmit={handleSearchSubmit} className="hidden 2xl:flex flex-1 max-w-xs mx-4">
             <div className="relative w-full">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -76,13 +77,13 @@ export default function UserLayout() {
           </form>
 
           {/* Navigation Links Desktop (18/24/600 theo Figma) */}
-          <nav className="hidden lg:flex items-center gap-8">
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-6">
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  `text-[18px] leading-6 font-semibold transition-colors relative py-1 ${
+                  `text-sm xl:text-base whitespace-nowrap leading-6 font-semibold transition-colors relative py-1 ${
                     isActive
                       ? 'text-[#4F46E5] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#4F46E5]'
                       : 'text-[#5B6B82] hover:text-[#172033]'
@@ -202,7 +203,7 @@ export default function UserLayout() {
 
       {/* Mobile Bottom Navigation (Cao 84px chuẩn Figma cho Catalog & My Books) */}
       {showMobileBottomNav && (
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-[84px] bg-white border-t border-slate-200 z-40 px-6 flex items-center justify-around pb-4 shadow-lg">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-[84px] bg-white border-t border-slate-200 z-40 px-2 flex items-center justify-around pb-4 shadow-lg">
           {navLinks.map((link) => {
             const Icon = link.icon;
             return (
