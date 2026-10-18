@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Đảm bảo thư mục gốc của backend luôn nằm trong sys.path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

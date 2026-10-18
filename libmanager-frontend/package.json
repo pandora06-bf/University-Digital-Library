@@ -8,7 +8,6 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:e2e": "playwright test",
-    "predev": "msw init public/",
     "preview": "vite preview"
   },
   "dependencies": {
