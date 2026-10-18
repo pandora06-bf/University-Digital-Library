@@ -120,3 +120,38 @@ def auth_headers(test_account):
         {"sub": str(test_account.id), "role": test_account.role.strip().upper()}
     )
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def admin_account(db_session):
+    account = Account(
+        username="admin_test",
+        password=hash_password("Admin@123"),
+        role="ADMIN",
+        is_active=True,
+    )
+    db_session.add(account)
+    db_session.commit()
+    db_session.refresh(account)
+
+    user = User(
+        account_id=account.id,
+        user_code="ADMIN-TEST",
+        full_name="Quản trị Test",
+        email="admintest@library.local",
+        department="Thư viện",
+        user_type="ADMIN",
+        max_borrow_limit=0,
+        max_borrow_days=0,
+    )
+    db_session.add(user)
+    db_session.commit()
+    return account
+
+
+@pytest.fixture
+def admin_headers(admin_account):
+    token = create_access_token(
+        {"sub": str(admin_account.id), "role": "ADMIN"}
+    )
+    return {"Authorization": f"Bearer {token}"}
