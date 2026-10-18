@@ -7,8 +7,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+
+
+@compiles(TSVECTOR, "sqlite")
+def _compile_tsvector_sqlite(element, compiler, **kw):
+    return "TEXT"
+
 
 from app.main import app
 from app.core.database import get_db

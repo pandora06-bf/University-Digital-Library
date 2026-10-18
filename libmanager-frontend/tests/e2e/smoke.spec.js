@@ -10,8 +10,8 @@ test('homepage and catalog are available', async ({ page }) => {
 
 test('mock login routes an admin account into the admin portal', async ({ page }) => {
   await page.goto('/login');
-  await page.getByLabel('Tên đăng nhập').fill('admin');
-  await page.getByLabel('Mật khẩu').fill('Admin@123');
+  await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
+  await page.getByPlaceholder('Nhập mật khẩu').fill('Admin@123');
   await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
   await expect(page).toHaveURL(/\/admin$/);
 });
