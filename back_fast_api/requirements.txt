@@ -11,3 +11,7 @@ python-multipart
 apscheduler
 python-dotenv
 alembic
+Faker
+pytest
+pytest-cov
+httpx

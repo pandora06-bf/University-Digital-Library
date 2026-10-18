@@ -1,139 +1,189 @@
-import random
+"""Seed repeatable development/demo data after applying Alembic migrations."""
 
-import bcrypt
+import os
+import random
 from faker import Faker
 
-from app.core.database import SessionLocal, engine
-from app.models.base import Base
-from app.models.book import Book, BookCopy, Category, Subject
-from app.models.user import Account, User
+from app.core.database import SessionLocal
+from app.core.security import hash_password
+from app.models import Account, Book, BookCopy, Category, Ebook, Room, Subject, User
+
 
 fake = Faker("vi_VN")
+fake.seed_instance(20261016)
 DEMO_PASSWORD = "User@123"
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Admin@123")
+
+CATEGORIES = [
+    "Công nghệ thông tin",
+    "Khoa học",
+    "Văn học",
+    "Kinh tế",
+    "Ngoại ngữ",
+]
+SUBJECTS = [
+    ("IT", "Công nghệ thông tin", "Khoa Công nghệ thông tin"),
+    ("MATH", "Toán học", "Khoa Khoa học cơ bản"),
+    ("PHYS", "Vật lý", "Khoa Khoa học cơ bản"),
+    ("ECON", "Kinh tế", "Khoa Kinh tế"),
+    ("ENG", "Tiếng Anh", "Khoa Ngoại ngữ"),
+]
 
 
-def get_password_hash(password):
-    # Dùng trực tiếp thư viện bcrypt nguyên thủy thay vì thông qua passlib
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+def _get_or_create(db, model, lookup, **values):
+    instance = db.query(model).filter_by(**lookup).one_or_none()
+    if instance is None:
+        instance = model(**lookup, **values)
+        db.add(instance)
+        db.flush()
+    return instance
+
+
+def _seed_user(db, *, username, role, user_code, name, email, password, balance=0):
+    account = _get_or_create(
+        db,
+        Account,
+        {"username": username},
+        password=hash_password(password),
+        role=role,
+        is_active=True,
+    )
+    account.role = role
+    account.is_active = True
+    user = db.query(User).filter_by(user_code=user_code).one_or_none()
+    if user is None:
+        user = User(
+            user_code=user_code,
+            account_id=account.id,
+            full_name=name,
+            email=email,
+            department="Thư viện" if role == "ADMIN" else "Khoa Công nghệ thông tin",
+            user_type=role,
+            max_borrow_limit=0 if role == "ADMIN" else (5 if role == "LECTURER" else 3),
+            max_borrow_days=0 if role == "ADMIN" else 14,
+            service_balance=balance,
+        )
+        db.add(user)
+    return user
 
 
 def seed_database():
-    # Tự động tạo tất cả các bảng nếu chưa tồn tại
-    Base.metadata.create_all(bind=engine)
+    """Insert missing demo rows without duplicating or resetting existing data.
+
+    Run ``alembic upgrade head`` before invoking this script. The stable demo
+    keys make this safe to run repeatedly and allow partially seeded databases
+    to be completed on a later run.
+    """
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+        raise ValueError("ADMIN_USERNAME và ADMIN_PASSWORD không được để trống")
+
+    fake.seed_instance(20261016)
+    rng = random.Random(20261016)
     db = SessionLocal()
-
     try:
-        if db.query(Book).count() > 0 or db.query(User).count() > 0:
-            print("Database đã có dữ liệu, bỏ qua seed.")
-            return
+        categories = {
+            name: _get_or_create(db, Category, {"category_name": name})
+            for name in CATEGORIES
+        }
+        subjects = {
+            code: _get_or_create(
+                db,
+                Subject,
+                {"subject_code": code},
+                subject_name=name,
+                department_name=department,
+            )
+            for code, name, department in SUBJECTS
+        }
 
-        # Seed Categories
-        categories = ["Khoa học", "Văn học", "Lịch sử", "Toán học", "Công nghệ thông tin"]
-        db_categories = []
-        for name in categories:
-            cat = db.query(Category).filter(Category.category_name == name).first()
-            if not cat:
-                cat = Category(category_name=name)
-                db.add(cat)
-            db_categories.append(cat)
-        db.commit()
-
-        # Seed Subjects
-        subjects = ["IT", "MATH", "PHYS", "CHEM", "BIO"]
-        db_subjects = []
-        for code in subjects:
-            subj = db.query(Subject).filter(Subject.subject_code == code).first()
-            if not subj:
-                subj = Subject(
-                    subject_code=code,
-                    subject_name=f"Môn {code}",
-                    department_name="Khoa Cơ bản",
-                )
-                db.add(subj)
-            db_subjects.append(subj)
-        db.commit()
-
-        hashed_password = get_password_hash(DEMO_PASSWORD)
-
-        # Seed 100 Users
-        print("Seeding Users...")
-        first_username = None
-        for i in range(1, 101):
-            role = random.choice(["STUDENT", "LECTURER"])
-            username = f"user_{i:03d}"
-            if first_username is None:
-                first_username = username
-
-            acc = Account(
-                username=username,
-                password=hashed_password,
+        _seed_user(
+            db,
+            username=ADMIN_USERNAME,
+            role="ADMIN",
+            user_code="ADMIN-0001",
+            name="Quản trị viên thư viện",
+            email="admin@library.local",
+            password=ADMIN_PASSWORD,
+        )
+        for index in range(1, 101):
+            role = "STUDENT" if index % 2 else "LECTURER"
+            prefix = "SV" if role == "STUDENT" else "GV"
+            _seed_user(
+                db,
+                username=f"demo_{role.lower()}_{index:03d}",
                 role=role,
-                is_active=True,
+                user_code=f"{prefix}-DEMO-{index:03d}",
+                name=fake.name(),
+                email=f"demo.user.{index:03d}@library.local",
+                password=DEMO_PASSWORD,
+                balance=[0, 50000, 150000, 300000][index % 4],
             )
-            db.add(acc)
-            db.flush()
+        db.flush()
 
-            user_code = (
-                f"SV{fake.random_int(min=10000, max=99999)}_{i}"
-                if role == "STUDENT"
-                else f"GV{fake.random_int(min=10000, max=99999)}_{i}"
-            )
-            limit, days = (3, 14) if role == "STUDENT" else (5, 30)
-
-            user = User(
-                user_code=user_code,
-                account_id=acc.id,
-                full_name=fake.name(),
-                email=f"email_{i}_{fake.email()}",
-                phone_number=fake.phone_number()[:20],
-                department=random.choice(["IT", "Kinh tế", "Ngoại ngữ"]),
-                user_type=role,
-                max_borrow_limit=limit,
-                max_borrow_days=days,
-            )
-            db.add(user)
-        db.commit()
-
-        # Seed 100 Books
-        print("Seeding Books...")
-        for i in range(1, 101):
-            cat = random.choice(db_categories)
-            subj = random.choice(db_subjects)
-
-            book = Book(
-                title=f"{fake.catch_phrase()} - {i}",
+        for index in range(1, 101):
+            title = f"[DEMO-{index:03d}] {fake.catch_phrase()}"
+            book = _get_or_create(
+                db,
+                Book,
+                {"title": title},
                 author=fake.name(),
                 publisher=fake.company(),
                 publication_year=int(fake.year()),
-                description=fake.text(),
-                keywords=fake.word(),
-                num_pages=random.randint(100, 1000),
-                book_type=random.choice(["PRINTED", "EBOOK", "BOTH"]),
-                available_stock=random.randint(1, 10),
-                category_id=cat.id,
-                subject_code=subj.subject_code,
+                price=rng.randrange(5, 61) * 5000,
+                description=fake.text(max_nb_chars=240),
+                keywords=" ".join(fake.words(nb=4, unique=True)),
+                num_pages=rng.randint(80, 800),
+                book_type="BOTH" if index % 3 == 0 else ("EBOOK" if index % 3 == 1 else "PRINTED"),
+                available_stock=0,
+                category_id=categories[CATEGORIES[(index - 1) % len(CATEGORIES)]].id,
+                subject_code=SUBJECTS[(index - 1) % len(SUBJECTS)][0],
             )
-            db.add(book)
-            db.flush()
+            # Repair any partially seeded demo row, while preserving inventory
+            # changes made through the application after the first seed.
+            book.price = book.price or rng.randrange(5, 61) * 5000
+            book.subject_code = book.subject_code or SUBJECTS[(index - 1) % len(SUBJECTS)][0]
 
-            # Create Book Copies
-            if book.book_type in ["PRINTED", "BOTH"]:
-                for j in range(book.available_stock):
-                    copy = BookCopy(
-                        copy_barcode=f"BC-{book.id}-{j}-{fake.random_int(min=1000, max=9999)}",
-                        book_id=book.id,
-                        zone=random.choice(["A", "B", "C"]),
-                        floor=random.choice(["1", "2", "3"]),
-                        shelf=random.choice(["101", "102", "201", "202"]),
-                        status="AVAILABLE",
+            copy_count = rng.randint(1, 3)
+            existing_copy_count = db.query(BookCopy).filter_by(book_id=book.id).count()
+            for copy_index in range(existing_copy_count + 1, copy_count + 1):
+                copy = BookCopy(
+                    copy_barcode=f"DEMO-BC-{index:03d}-{copy_index:02d}",
+                    book_id=book.id,
+                    zone=chr(ord("A") + (index % 4)),
+                    floor=str(1 + index % 3),
+                    shelf=f"{100 + index:03d}",
+                    status="AVAILABLE",
+                )
+                db.add(copy)
+                book.available_stock = (book.available_stock or 0) + 1
+
+            if book.book_type in {"EBOOK", "BOTH"} and db.query(Ebook).filter_by(id=book.id).first() is None:
+                db.add(
+                    Ebook(
+                        id=book.id,
+                        file_path=f"demo/ebook-{index:03d}.pdf",
+                        is_free=index % 5 == 0,
                     )
-                    db.add(copy)
+                )
+
+        for index in range(1, 5):
+            _get_or_create(
+                db,
+                Room,
+                {"room_name": f"Phòng học nhóm {index:02d}"},
+                capacity=4 + index * 2,
+                room_type="STUDY",
+                floor=str(index),
+                is_active=True,
+            )
+
         db.commit()
-        print("Database seeded successfully with 100 users and 100 books!")
-        print(f"Demo login: username={first_username} password={DEMO_PASSWORD}")
-    except Exception as e:
-        print(f"Error seeding database: {e}")
+        print("Seed hoàn tất: 100 sách, 101 hồ sơ (gồm ADMIN), 4 phòng.")
+        print(f"Tài khoản ADMIN: {ADMIN_USERNAME}; tài khoản mẫu: demo_student_001 / {DEMO_PASSWORD}")
+    except Exception:
         db.rollback()
+        raise
     finally:
         db.close()
 
