@@ -54,7 +54,7 @@ jobs:
 
       - name: Run Pytest with Coverage
         run: |
-          pytest --cov=app --cov-report=term-missing --cov-report=xml tests/
+          python -m pytest --cov=app --cov-report=term-missing --cov-report=xml tests/
 
       - name: Verify Coverage Threshold (Warn if < 60%)
         run: |
