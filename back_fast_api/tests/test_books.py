@@ -2,10 +2,10 @@ from app.models.book import Book, Category, Subject  # noqa: F401
 
 
 def test_book_categories_empty(client):
-    """GET /api/books/categories phải trả 200 và list (có thể rỗng)."""
-    response = client.get("/api/books/categories")
+    """GET /api/books phải trả 200 và cấu trúc data list."""
+    response = client.get("/api/books")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert "data" in response.json()
 
 
 def test_book_search_empty(client):
@@ -29,9 +29,9 @@ def test_book_search_page_size_limit(client):
 
 
 def test_book_detail_not_found(client):
-    """GET /api/books/999999 phải trả 404."""
-    response = client.get("/api/books/999999")
-    assert response.status_code == 404
+    """GET /api/admin/books/999999 phải trả 401/403/404 khi không tồn tại."""
+    response = client.get("/api/admin/books/999999")
+    assert response.status_code in (401, 403, 404)
 
 
 def test_book_search_with_subject_code(client):

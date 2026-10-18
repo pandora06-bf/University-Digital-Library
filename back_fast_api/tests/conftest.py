@@ -6,16 +6,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.sql.expression import BinaryExpression
 
 
 @compiles(TSVECTOR, "sqlite")
 def _compile_tsvector_sqlite(element, compiler, **kw):
     return "TEXT"
+
+
+@compiles(BinaryExpression, "sqlite")
+def _compile_binary_sqlite(binary, compiler, **kw):
+    if getattr(binary.operator, "opstring", None) == "@@":
+        return "1 = 1"
+    return compiler.visit_binary(binary, **kw)
 
 
 from app.main import app
@@ -30,6 +38,15 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_custom_functions(dbapi_connection, connection_record):
+    dbapi_connection.create_function("to_tsvector", -1, lambda *args: "")
+    dbapi_connection.create_function("plainto_tsquery", -1, lambda *args: "")
+    dbapi_connection.create_function("ts_rank_cd", -1, lambda *args: 1.0)
+
+
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -83,6 +100,8 @@ def test_account(db_session):
         account_id=account.id,
         user_code="SV2026001",
         full_name="Nguyễn Văn Test",
+        email="testuser@library.local",
+        department="Khoa Công nghệ thông tin",
         user_type="STUDENT",
         max_borrow_limit=3,
         max_borrow_days=14,
