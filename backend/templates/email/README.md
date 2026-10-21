@@ -55,15 +55,28 @@ Thư mục `preview/` có bốn bản HTML đã gắn dữ liệu để kiểm t
 Các bản hiện tại được tạo từ dữ liệu mẫu để xem trước; cần chạy lệnh trên
 trên môi trường backend để xác nhận với runtime Jinja2 thật.
 
-Kiểm tra Gmail vẫn **chưa thực hiện**: phiên làm việc hiện tại chưa có Gmail
-kết nối và trình duyệt khả dụng. Không coi kiểm tra mã HTML hoặc bản preview
-trong trình duyệt là bằng chứng email đã render đúng trong Gmail.
+### Kết quả kiểm tra Gmail: **đã thực hiện, 4/4 mẫu đạt**
 
-Khi có hộp thư thử nghiệm được cho phép gửi, gửi từng bản qua SMTP với MIME
-`text/html; charset=utf-8`, kèm nội dung `text/plain`. Kiểm tra Gmail web và
-Gmail điện thoại: dấu tiếng Việt, tiêu đề dài xuống dòng, nút CTA, link hỗ trợ,
-không cuộn ngang ở 320/375 px, chế độ tối, không xuất hiện biến Jinja còn sót.
-Thử cả biên lai có nhiều sách. Lưu ảnh kiểm tra và thời điểm thực hiện.
+- **Thời điểm:** 21/10/2026, gửi lúc 13:48, kiểm tra trên điện thoại lúc 14:29.
+- **Cách gửi:** gửi thật qua SMTP Gmail (`smtp.gmail.com`), MIME
+  `multipart/alternative` gồm `text/plain` và `text/html; charset=utf-8`,
+  nội dung là 4 bản trong `preview/` (render từ `sample_context.json`).
+- **Môi trường:** Gmail app iOS ở chế độ tối; Gmail web trên Chrome ở giao diện sáng.
+
+| Tiêu chí | Kết quả |
+|---|---|
+| Dấu tiếng Việt | Đạt |
+| Không sót biến Jinja | Đạt |
+| Tiêu đề dài xuống dòng | Đạt (sách có tiêu đề dài trong biên lai) |
+| Biên lai nhiều sách | Đạt (2 sách hiển thị 2 khung riêng) |
+| Nút CTA có màu, link gắn đúng địa chỉ | Đạt |
+| Không cuộn ngang trên điện thoại | Đạt |
+| Đọc được ở chế độ tối | Đạt |
+
+Link trong bản preview dùng tên miền mẫu `example.edu.vn` nên không mở ra trang
+thật. Đã xác nhận nút và link hỗ trợ trỏ đúng địa chỉ; backend (3-06) thay bằng
+domain thư viện thật. Ảnh chụp màn hình lưu trong thư mục bằng chứng
+`Bang_chung_3-23` (nộp kèm báo cáo, không đưa vào repo).
 
 Các thuộc tính CSS được đối chiếu với [tài liệu CSS chính thức của Gmail](https://developers.google.com/workspace/gmail/design/css);
 việc đối chiếu này chưa thay thế kiểm tra hiển thị thực tế.
