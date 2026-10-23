@@ -9,6 +9,10 @@ import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
+import { Toast } from '../../components/Toast';
+import { useToast } from '../../hooks/useToast';
+import axiosInstance from '../../services/axios_instance';
+import { getApiErrorMessage } from '../../services/errorHandler';
 
 // Dữ liệu giả lập cho Bảng Thu phạt
 const initialFinesData = [
@@ -76,30 +80,112 @@ const initialFinesData = [
 
 export default function FineManagement() {
   const navigate = useNavigate();
+  const { toast, showToast, hideToast } = useToast();
   const [finesData, setFinesData] = useState(initialFinesData);
   const [collectingRow, setCollectingRow] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('Loại vi phạm (Tất cả)');
   const [statusFilter, setStatusFilter] = useState('Trạng thái (Tất cả)');
-  const [successToast, setSuccessToast] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  const showToast = (msg) => {
-    setSuccessToast(msg);
-    setTimeout(() => setSuccessToast(''), 3000);
+  const [lookupTotal, setLookupTotal] = useState(null);
+
+  const handleCollect = async (row) => {
+    if (!row) {
+      showToast('Không có phiếu phạt để thu.', 'error');
+      return;
+    }
+    const userCode = row.mssv;
+    const amount = lookupTotal != null ? Number(lookupTotal) : row.amountNum;
+    if (!userCode || !amount || amount <= 0) {
+      showToast('Thiếu MSSV hoặc số tiền thu (API chỉ thu đủ toàn bộ nợ).', 'error');
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      await axiosInstance.post('/api/admin/fines/collect', {
+        user_code: userCode,
+        amount,
+        notes: `Thu tại quầy — phiếu ${row.id}`,
+      });
+      setFinesData((prev) =>
+        prev.map((r) =>
+          r.mssv === userCode
+            ? { ...r, status: 'Đã hoàn tất', statusColor: 'emerald', action: 'Chi tiết' }
+            : r
+        )
+      );
+      setCollectingRow(null);
+      setLookupTotal(null);
+      showToast(`Đã thu đủ ${amount.toLocaleString('vi-VN')} ₫ cho ${userCode}.`, 'success');
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Thu phạt thất bại.'), 'error');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleCollect = (row) => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      setFinesData(prev => prev.map(r =>
-        r.id === row.id ? { ...r, status: 'Đã hoàn tất', statusColor: 'emerald', action: 'Chi tiết', paid: undefined } : r
-      ));
-      setCollectingRow(null);
-      setIsProcessing(false);
-      showToast(`Đã xác nhận thu phí phiếu ${row.id} thành công!`);
-    }, 1000);
+  const handleSearchSubmit = async () => {
+    const q = searchTerm.trim();
+    if (!q) {
+      showToast('Nhập MSSV rồi Enter để tra cứu API công nợ.', 'warning');
+      return;
+    }
+    try {
+      const res = await axiosInstance.get('/api/admin/fines/lookup', {
+        params: { user_code: q },
+      });
+      const data = res.data || {};
+      const fines = data.fines || [];
+      setLookupTotal(data.total_fines != null ? Number(data.total_fines) : null);
+      if (fines.length === 0) {
+        setFinesData([]);
+        showToast(
+          data.total_fines > 0
+            ? `${data.full_name || q}: tổng nợ ${data.total_fines} nhưng không có dòng UNPAID.`
+            : `${data.full_name || q}: không còn công nợ.`,
+          'warning'
+        );
+        return;
+      }
+      const mapped = fines.map((f) => ({
+        id: `FINE-${f.fine_id}`,
+        date: f.created_at ? new Date(f.created_at).toLocaleDateString('vi-VN') : '—',
+        user: data.full_name || q,
+        mssv: data.user_code || q,
+        reason: f.overdue_days
+          ? `Trễ hạn ${f.overdue_days} ngày (phiếu mượn ${f.loan_id || '—'})`
+          : `Phạt phiếu mượn ${f.loan_id || '—'}`,
+        amount: `${Number(f.total_amount || 0).toLocaleString('vi-VN')} ₫`,
+        amountNum: Number(f.total_amount || 0),
+        status: 'Chưa thu',
+        statusColor: 'rose',
+        action: 'Thu tiền',
+      }));
+      setFinesData(mapped);
+      showToast(
+        `Tìm thấy ${mapped.length} khoản UNPAID · Tổng nợ ${Number(data.total_fines || 0).toLocaleString('vi-VN')} ₫`,
+        'success'
+      );
+    } catch (error) {
+      // Fallback lọc mock nếu API lỗi / không có user
+      const hits = initialFinesData.filter(
+        (item) =>
+          item.user.toLowerCase().includes(q.toLowerCase()) ||
+          item.mssv.includes(q) ||
+          item.id.toLowerCase().includes(q.toLowerCase())
+      );
+      if (hits.length) {
+        setFinesData(hits);
+        setLookupTotal(null);
+        showToast(
+          `${getApiErrorMessage(error, 'API lỗi')} — hiển thị ${hits.length} dòng mock.`,
+          'warning'
+        );
+      } else {
+        showToast(getApiErrorMessage(error, `Không tìm thấy công nợ cho «${q}».`), 'error');
+      }
+    }
   };
 
   const fineColumns = [
@@ -220,19 +306,15 @@ export default function FineManagement() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
-      {/* Toast */}
-      {successToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-emerald-600 text-white px-5 py-3 rounded-2xl shadow-xl">
-          <CheckCircle2 className="w-5 h-5 shrink-0" />
-          <span className="font-semibold text-sm">{successToast}</span>
-        </div>
-      )}
+      <Toast toast={toast} onClose={hideToast} />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Thu phạt &amp; Công nợ</h1>
-          <p className="text-sm text-slate-500 mt-1">Theo dõi và xử lý các khoản phí trễ hạn, làm mất, hoặc hư hỏng tài liệu.</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Tra MSSV (Enter) + «Xác nhận Đã Thu» — đã nối API `/api/admin/fines/*` (thu đủ toàn bộ nợ).
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -304,11 +386,12 @@ export default function FineManagement() {
             <div className="w-full sm:w-80">
               <Input
                 type="text"
-                placeholder="Tìm MSSV, Tên độc giả hoặc Mã phiếu..."
+                placeholder="Tìm MSSV, Tên độc giả hoặc Mã phiếu... (Enter)"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
               />
             </div>
             <select

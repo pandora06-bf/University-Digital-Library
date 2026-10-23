@@ -2,7 +2,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import ProtectedPDFViewer from '../../components/ProtectedPDFViewer';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import Toast from '../../components/UserToast';
+import Toast from '../../components/Toast';
 import { Button } from '../../components/Button';
 import { ebookService } from '../../services/ebookService';
 import { getCurrentUser } from '../../mocks/auth';
@@ -53,7 +53,7 @@ function ReaderSession({ loanId, bookId }) {
   if (!session) return <p role="status" className="p-12 text-center">Đang kiểm tra quyền đọc…</p>;
   return <>
     <ProtectedPDFViewer key={`${session.loanId ?? session.bookId}:${session.access}:${session.expiresAt ?? ''}`} session={session} onBorrow={borrow} onReturn={() => setReturning(true)} busy={busy} watermark={`${getCurrentUser()?.name ?? 'LIBMANAGER'} · CHỈ ĐỌC TRỰC TUYẾN`} />
-    <Toast toast={toast} onClose={closeToast} />
+    <Toast toast={toast} onClose={closeToast} placement="bottom" />
     {returning && <ConfirmDialog title="Trả eBook?" confirmLabel="Trả sách" loading={busy} onClose={() => setReturning(false)} onConfirm={returnBook}>Sau khi trả “{session.title}”, quyền đọc của phiếu mượn sẽ kết thúc ngay.</ConfirmDialog>}
   </>;
 }

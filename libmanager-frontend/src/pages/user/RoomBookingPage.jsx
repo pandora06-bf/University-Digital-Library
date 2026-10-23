@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, Clock3, DoorOpen, MapPin, Users, Wallet, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import Toast from '../../components/UserToast';
+import Toast from '../../components/Toast';
 import { roomBookingService } from '../../services/roomBookingService';
 import { libraryToday, formatLibraryDate, formatMoney, slotTimestamp } from '../../utils/libraryDate';
 
@@ -60,7 +60,7 @@ export default function RoomBookingPage() {
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 space-y-8">
-      <Toast toast={toast} onClose={closeToast} />
+      <Toast toast={toast} onClose={closeToast} placement="bottom" />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <p className="text-sm font-semibold text-indigo-600 mb-2">KHÔNG GIAN HỌC TẬP</p>

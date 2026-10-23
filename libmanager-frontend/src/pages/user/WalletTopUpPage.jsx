@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wallet } from 'lucide-react';
 import { Button } from '../../components/Button';
-import Toast from '../../components/UserToast';
+import Toast from '../../components/Toast';
 import { roomBookingService } from '../../services/roomBookingService';
 import { formatMoney } from '../../utils/libraryDate';
 
@@ -21,7 +21,7 @@ export default function WalletTopUpPage() {
     finally { setBusy(false); }
   };
   return <div className="max-w-xl mx-auto px-4 py-12">
-    <Toast toast={toast} onClose={closeToast} />
+    <Toast toast={toast} onClose={closeToast} placement="bottom" />
     <Link to="/rooms" className="text-sm text-indigo-600 font-semibold">← Quay lại đặt phòng</Link>
     <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 space-y-6">
       <Wallet className="w-10 h-10 text-indigo-600" /><h1 className="text-2xl font-semibold">Nạp tiền thử nghiệm</h1>
