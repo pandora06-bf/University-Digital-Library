@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "category_name": "Giáo trình - Công nghệ"
+  },
+  {
+    "id": 2,
+    "category_name": "Báo cáo - Khóa luận"
+  },
+  {
+    "id": 3,
+    "category_name": "Kinh tế - Xã hội"
+  },
+  {
+    "id": 4,
+    "category_name": "Ngoại ngữ"
+  },
+  {
+    "id": 5,
+    "category_name": "Khoa học Tự nhiên"
+  }
+]

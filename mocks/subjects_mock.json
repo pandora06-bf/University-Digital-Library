@@ -1,0 +1,27 @@
+[
+  {
+    "subject_code": "IT",
+    "subject_name": "Công nghệ thông tin",
+    "department_name": "Khoa CNTT"
+  },
+  {
+    "subject_code": "ECO",
+    "subject_name": "Kinh tế",
+    "department_name": "Khoa Quản trị Kinh doanh"
+  },
+  {
+    "subject_code": "ENG",
+    "subject_name": "Tiếng Anh",
+    "department_name": "Khoa Ngoại ngữ"
+  },
+  {
+    "subject_code": "MATH",
+    "subject_name": "Toán học",
+    "department_name": "Khoa Khoa học cơ bản"
+  },
+  {
+    "subject_code": "PHYS",
+    "subject_name": "Vật lý",
+    "department_name": "Khoa Khoa học cơ bản"
+  }
+]

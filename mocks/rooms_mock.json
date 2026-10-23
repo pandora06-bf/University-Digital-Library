@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "room_name": "Phòng học nhóm 01",
+    "capacity": 6,
+    "room_type": "STUDY",
+    "floor": "1",
+    "is_active": true,
+    "created_at": "2026-09-01T08:00:00Z"
+  },
+  {
+    "id": 2,
+    "room_name": "Phòng học nhóm 02",
+    "capacity": 8,
+    "room_type": "STUDY",
+    "floor": "2",
+    "is_active": true,
+    "created_at": "2026-09-01T08:00:00Z"
+  },
+  {
+    "id": 3,
+    "room_name": "Phòng học nhóm 03",
+    "capacity": 10,
+    "room_type": "STUDY",
+    "floor": "3",
+    "is_active": true,
+    "created_at": "2026-09-01T08:00:00Z"
+  },
+  {
+    "id": 4,
+    "room_name": "Phòng học nhóm 04",
+    "capacity": 12,
+    "room_type": "STUDY",
+    "floor": "4",
+    "is_active": true,
+    "created_at": "2026-09-01T08:00:00Z"
+  }
+]
