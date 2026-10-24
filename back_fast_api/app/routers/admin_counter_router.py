@@ -18,7 +18,7 @@ from app.services.loan_service import (
     lookup_loans_service,
 )
 
-router = APIRouter(prefix="/api/admin", tags=["Quầy thủ thư (UC10)"])
+router = APIRouter(prefix="/api/admin", tags=["check-in/check-out"])
 
 
 def verify_librarian(account: Account = Depends(get_current_account)) -> Account:
