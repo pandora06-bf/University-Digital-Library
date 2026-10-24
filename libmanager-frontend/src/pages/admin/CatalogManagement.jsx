@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axiosInstance from '../../services/axios_instance';
 import { 
   Plus, Search, BookType, LayoutGrid, Clock, Edit2, Trash2,
@@ -247,59 +247,132 @@ export default function CatalogManagement() {
   const [formErrors, setFormErrors] = useState({});
   const [coverFile, setCoverFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
-  const [booksData, setBooksData] = useState(ADMIN_MOCK_BOOKS);
+  const [booksData, setBooksData] = useState([]);
   const [categories, setCategories] = useState(ADMIN_MOCK_CATEGORIES);
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
+  const [useMockCatalog, setUseMockCatalog] = useState(false);
 
-  // Lấy dữ liệu sách từ API (nếu API có dữ liệu sẽ cập nhật đè lên mock data)
-  const fetchBooks = () => {
-    // NFR-PE-02: page_size tối đa 50
-    axiosInstance.get('/api/books/search?page_size=50').then(res => {
-      const data = res.data;
-      if (data && data.items && data.items.length > 0) {
-        const mappedData = data.items.map(b => {
-          // Backend chưa có price: lấy local FE → mock cùng id (nếu có)
-          const mockMatch = ADMIN_MOCK_BOOKS.find((m) => String(m.id) === String(b.id));
-          const uiPrice =
-            b.price ??
-            b.book_price ??
-            getLocalBookPrice(b.id) ??
-            mockMatch?.price ??
-            mockMatch?.book_price ??
-            null;
+  // 4-17.a: phân trang server + debounce tìm kiếm
+  const PAGE_SIZE = 10;
+  const SEARCH_DEBOUNCE_MS = 350;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [publisherFilter, setPublisherFilter] = useState('Tất cả nhà xuất bản');
+  const [statusFilter, setStatusFilter] = useState('Tất cả tình trạng');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const fetchSeqRef = useRef(0);
 
-          return {
-            ...b,
-            id: b.id,
-            cover: b.cover_image_path || mockMatch?.cover_image_path || null,
-            title: b.title,
-            isbn: b.isbn || mockMatch?.isbn || 'N/A',
-            barcode: b.copy_barcode || b.barcode || mockMatch?.barcode || null,
-            author: b.author || 'Đang cập nhật',
-            publisher: b.publisher || 'Đang cập nhật',
-            category_id: b.category_id,
-            category: b.category_id ? 'Thể loại ' + b.category_id : 'Chưa phân loại',
-            categoryColor: 'blue',
-            year: b.publication_year || b.published_year || 2024,
-            copies: b.available_stock ?? 0,
-            available: b.available_stock ?? 0,
-            status: (b.available_stock === 0) ? 'Hết bản in' : 'Sẵn sàng',
-            statusColor: (b.available_stock === 0) ? 'rose' : 'emerald',
-            book_type: b.book_type || 'PRINTED',
-            bookType: (b.book_type === 'EBOOK' || b.bookType === 'eBook') ? 'eBook' : 'Vật lý',
-            price: uiPrice,
-            book_price: uiPrice,
-            num_pages: b.num_pages ?? mockMatch?.num_pages ?? null,
-            preview_pages: b.preview_pages ?? b.ebook?.preview_pages ?? mockMatch?.preview_pages ?? null,
-            book_attribute: b.book_attribute || b.attribute || mockMatch?.book_attribute || '',
-            subject_code: b.subject_code || mockMatch?.subject_code || '',
-          };
-        });
-        setBooksData(mappedData);
-      }
-    }).catch(error => {
-      console.warn('Backend API chưa sẵn sàng, tiếp tục sử dụng mock data danh mục:', error?.message);
-    });
-  };
+  const mapBookRow = useCallback((b) => {
+    const mockMatch = ADMIN_MOCK_BOOKS.find((m) => String(m.id) === String(b.id));
+    const uiPrice =
+      b.price ??
+      b.book_price ??
+      getLocalBookPrice(b.id) ??
+      mockMatch?.price ??
+      mockMatch?.book_price ??
+      null;
+
+    return {
+      ...b,
+      id: b.id,
+      cover: b.cover_image_path || mockMatch?.cover_image_path || null,
+      title: b.title,
+      isbn: b.isbn || mockMatch?.isbn || 'N/A',
+      barcode: b.copy_barcode || b.barcode || mockMatch?.barcode || null,
+      author: b.author || 'Đang cập nhật',
+      publisher: b.publisher || 'Đang cập nhật',
+      category_id: b.category_id,
+      category: b.category_id ? 'Thể loại ' + b.category_id : 'Chưa phân loại',
+      categoryColor: 'blue',
+      year: b.publication_year || b.published_year || 2024,
+      copies: b.available_stock ?? 0,
+      available: b.available_stock ?? 0,
+      status: (b.available_stock === 0) ? 'Hết bản in' : 'Sẵn sàng',
+      statusColor: (b.available_stock === 0) ? 'rose' : 'emerald',
+      book_type: b.book_type || 'PRINTED',
+      bookType: (b.book_type === 'EBOOK' || b.bookType === 'eBook') ? 'eBook' : 'Vật lý',
+      price: uiPrice,
+      book_price: uiPrice,
+      num_pages: b.num_pages ?? mockMatch?.num_pages ?? null,
+      preview_pages: b.preview_pages ?? b.ebook?.preview_pages ?? mockMatch?.preview_pages ?? null,
+      book_attribute: b.book_attribute || b.attribute || mockMatch?.book_attribute || '',
+      subject_code: b.subject_code || mockMatch?.subject_code || '',
+    };
+  }, []);
+
+  const applyMockPage = useCallback((pageNum, q, catId, publisher) => {
+    const qLower = (q || '').trim().toLowerCase();
+    let rows = ADMIN_MOCK_BOOKS.map(mapBookRow);
+    if (qLower) {
+      rows = rows.filter((item) =>
+        item.title.toLowerCase().includes(qLower) ||
+        item.author.toLowerCase().includes(qLower) ||
+        (item.barcode || '').toLowerCase().includes(qLower) ||
+        (item.isbn || '').toLowerCase().includes(qLower)
+      );
+    }
+    if (catId) {
+      rows = rows.filter((item) => item.category_id && item.category_id.toString() === catId);
+    }
+    if (publisher && publisher !== 'Tất cả nhà xuất bản') {
+      rows = rows.filter((item) => item.publisher === publisher);
+    }
+    const total = rows.length;
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, pageNum), pages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    setBooksData(rows.slice(start, start + PAGE_SIZE));
+    setTotalItems(total);
+    setTotalPages(pages);
+    if (safePage !== pageNum) setPage(safePage);
+  }, [mapBookRow]);
+
+  const fetchBooks = useCallback(async (opts = {}) => {
+    const pageNum = opts.page ?? page;
+    const q = opts.q !== undefined ? opts.q : debouncedSearch;
+    const catId = opts.categoryId !== undefined ? opts.categoryId : categoryFilter;
+    const publisher = opts.publisher !== undefined ? opts.publisher : publisherFilter;
+
+    if (useMockCatalog) {
+      applyMockPage(pageNum, q, catId, publisher);
+      return;
+    }
+
+    const seq = ++fetchSeqRef.current;
+    setIsLoadingBooks(true);
+    try {
+      const params = {
+        page: pageNum,
+        page_size: PAGE_SIZE,
+      };
+      if (q && q.trim()) params.q = q.trim();
+      if (catId) params.category_id = catId;
+      if (publisher && publisher !== 'Tất cả nhà xuất bản') params.publisher = publisher;
+
+      const res = await axiosInstance.get('/api/books/search', { params });
+      if (seq !== fetchSeqRef.current) return;
+
+      const data = res.data || {};
+      const items = data.items || [];
+      setBooksData(items.map(mapBookRow));
+      const total = data.total ?? items.length;
+      setTotalItems(total);
+      setTotalPages(Math.max(1, data.total_pages ?? (Math.ceil(total / PAGE_SIZE) || 1)));
+    } catch (error) {
+      if (seq !== fetchSeqRef.current) return;
+      console.warn('Backend API chưa sẵn sàng, dùng mock danh mục phân trang:', error?.message);
+      setUseMockCatalog(true);
+      applyMockPage(pageNum, q, catId, publisher);
+    } finally {
+      if (seq === fetchSeqRef.current) setIsLoadingBooks(false);
+    }
+  }, [
+    page, debouncedSearch, categoryFilter, publisherFilter,
+    useMockCatalog, applyMockPage, mapBookRow,
+  ]);
 
   const fetchCategories = () => {
     axiosInstance.get('/api/admin/categories').then(res => {
@@ -311,10 +384,27 @@ export default function CatalogManagement() {
     });
   };
 
+  // Debounce ô tìm kiếm → chỉ khi ổn định mới gọi API
   useEffect(() => {
-    fetchBooks();
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      fetchBooks({ page, q: debouncedSearch });
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch khi page/filter ổn định
+  }, [page, debouncedSearch, categoryFilter, publisherFilter, useMockCatalog]);
 
   const handleOpenAdd = () => {
     setBookForm({ 
@@ -486,6 +576,19 @@ export default function CatalogManagement() {
       }
     }
 
+    // Giá bìa (BE đã có field price ≥ 0)
+    const trimmedPrice = bookForm.price !== undefined && bookForm.price !== null
+      ? bookForm.price.toString().trim()
+      : '';
+    let validPrice = 0;
+    if (trimmedPrice !== '') {
+      if (!/^\d+$/.test(trimmedPrice)) {
+        errors.price = 'Giá bìa phải là số nguyên không âm (VNĐ)';
+      } else {
+        validPrice = parseInt(trimmedPrice, 10);
+      }
+    }
+
     // Nếu có lỗi validation, dừng ngay và không gọi API
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -495,12 +598,14 @@ export default function CatalogManagement() {
 
     // Ghi chú API contract:
     // 1. subject_code được Pydantic schema BookBase hỗ trợ (tối đa 50 ký tự, liên kết bảng subjects).
-    // 2. book_attribute và preview_pages chưa có trong model/schema Backend, tuân thủ không gửi field thừa để tránh lỗi 422.
+    // 2. book_attribute và preview_pages chưa có trong model/schema Backend → không gửi (tránh 422).
+    // 3. price đã có trên BE → gửi trong payload.
     const payload = {
       title: trimmedTitle,
       author: trimmedAuthor,
       publisher: trimmedPublisher,
       publication_year: parseInt(trimmedYear, 10),
+      price: validPrice,
       description: bookForm.description?.trim() || null,
       book_type: bookForm.bookType === "eBook" ? "EBOOK" : "PRINTED",
       category_id: parseInt(trimmedCatId, 10),
@@ -542,15 +647,8 @@ export default function CatalogManagement() {
           });
         }
 
-        // Giá bìa: Backend chưa nhận field price → giữ trên FE (sessionStorage) để UI/UC15 còn dùng
-        const trimmedPrice = bookForm.price !== undefined && bookForm.price !== null
-          ? bookForm.price.toString().trim()
-          : '';
-        let uiPrice = null;
-        if (trimmedPrice !== '' && /^\d+(\.\d+)?$/.test(trimmedPrice)) {
-          uiPrice = Number(trimmedPrice);
-          setLocalBookPrice(bookId, uiPrice);
-        }
+        // Đồng bộ cache FE (phòng khi list API chưa trả price ngay)
+        setLocalBookPrice(bookId, validPrice);
 
         // Cập nhật state nội bộ để giữ preview_pages, book_attribute, giá bìa khi sửa lại trong session
         setBooksData(prev => prev.map(b => {
@@ -564,21 +662,15 @@ export default function CatalogManagement() {
               bookAttribute: bookForm.bookAttribute || null,
               subject_code: payload.subject_code,
               courseCode: payload.subject_code,
-              price: uiPrice ?? b.price ?? null,
-              book_price: uiPrice ?? b.book_price ?? null,
+              price: validPrice,
+              book_price: validPrice,
             };
           }
           return b;
         }));
 
         showToast(
-          editingBook
-            ? (uiPrice !== null
-              ? 'Cập nhật đầu sách thành công! Giá bìa đã lưu tạm trên FE (chờ Backend).'
-              : 'Cập nhật đầu sách thành công!')
-            : (uiPrice !== null
-              ? 'Thêm sách mới thành công! Giá bìa đã lưu tạm trên FE (chờ Backend).'
-              : 'Thêm sách mới thành công!'),
+          editingBook ? 'Cập nhật đầu sách thành công!' : 'Thêm sách mới thành công!',
           'success'
         );
         handleCloseModal();
@@ -633,28 +725,16 @@ export default function CatalogManagement() {
   };
 
   const catalogColumns = getCatalogColumns(handleOpenEdit, setDeletingBook, navigate, categories);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [publisherFilter, setPublisherFilter] = useState('Tất cả nhà xuất bản');
-  const [statusFilter, setStatusFilter] = useState('Tất cả tình trạng');
 
-  const filteredData = booksData.filter(item => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
-                          item.title.toLowerCase().includes(searchLower) || 
-                          item.author.toLowerCase().includes(searchLower) ||
-                          item.barcode.toLowerCase().includes(searchLower) ||
-                          item.isbn.toLowerCase().includes(searchLower);
-    const matchesCategory = categoryFilter === '' || (item.category_id && item.category_id.toString() === categoryFilter);
-    const matchesPublisher = publisherFilter === 'Tất cả nhà xuất bản' || item.publisher === publisherFilter;
-    const matchesStatus = statusFilter === 'Tất cả tình trạng' || item.status === statusFilter;
-    
-    return matchesSearch && matchesCategory && matchesPublisher && matchesStatus;
-  });
+  // Lọc tình trạng trên trang hiện tại (API chưa có filter status tồn)
+  const filteredData = statusFilter === 'Tất cả tình trạng'
+    ? booksData
+    : booksData.filter((item) => item.status === statusFilter);
 
-  const totalBooks = booksData.length;
-  const uniqueCategories = new Set(booksData.map(b => b.category_id)).size || 0;
-  const recentBooksCount = Math.min(booksData.length, 5);
+  const totalBooks = totalItems;
+  const uniqueCategories = categories.length || 0;
+  const recentBooksCount = Math.min(totalItems, 5);
+  const isSearching = searchTerm !== debouncedSearch;
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
@@ -745,7 +825,7 @@ export default function CatalogManagement() {
             <div className="w-full">
               <Input
                 type="text"
-                placeholder="Tìm tên sách, tác giả, ISBN, Barcode..."
+                placeholder="Tìm tên sách, tác giả, ISBN… (debounce 350ms → API)"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg"
                 value={searchTerm}
@@ -757,7 +837,10 @@ export default function CatalogManagement() {
             <select 
               className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option value="">Tất cả thể loại</option>
               {categories.map(c => (
@@ -769,7 +852,10 @@ export default function CatalogManagement() {
             <select 
               className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={publisherFilter}
-              onChange={(e) => setPublisherFilter(e.target.value)}
+              onChange={(e) => {
+                setPublisherFilter(e.target.value);
+                setPage(1);
+              }}
             >
               <option>Tất cả nhà xuất bản</option>
               <option>NXB Trẻ</option>
@@ -802,9 +888,11 @@ export default function CatalogManagement() {
               className="!bg-transparent !p-0 !h-auto !px-2 !text-slate-500 hover:!text-slate-800"
               onClick={() => {
                 setSearchTerm('');
+                setDebouncedSearch('');
                 setCategoryFilter('');
                 setPublisherFilter('Tất cả nhà xuất bản');
                 setStatusFilter('Tất cả tình trạng');
+                setPage(1);
               }}
             >
               <RotateCcw className="w-4 h-4 mr-1.5" />
@@ -829,14 +917,25 @@ export default function CatalogManagement() {
           </div>
         </div>
 
-        {/* Table / Grid */}
+        {(isLoadingBooks || isSearching) && (
+          <div className="px-4 py-2 text-xs text-slate-500 border-b border-slate-100 bg-slate-50/80">
+            {isSearching ? 'Đang chờ gõ xong để tìm…' : 'Đang tải danh mục từ máy chủ…'}
+          </div>
+        )}
+
+        {/* Table / Grid — phân trang phía server */}
         {viewMode === 'list' ? (
           <Table 
             columns={catalogColumns}
             data={filteredData}
             hideHeader={false}
             pagination={true}
-            itemsPerPage={5}
+            loading={isLoadingBooks}
+            page={page}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            emptyMessage={isLoadingBooks ? 'Đang tải…' : 'Không tìm thấy đầu sách nào'}
           />
         ) : (
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 bg-slate-50">
@@ -908,9 +1007,30 @@ export default function CatalogManagement() {
                 </div>
               </div>
             ))}
+            {filteredData.length === 0 && (
+              <p className="col-span-full text-center text-sm text-slate-400 py-10">
+                {isLoadingBooks ? 'Đang tải…' : 'Không tìm thấy đầu sách nào'}
+              </p>
+            )}
           </div>
         )}
 
+        {viewMode === 'grid' && totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
+            <span className="text-sm text-slate-500">
+              Trang <strong className="font-semibold text-slate-700">{page}</strong> / {totalPages}
+              <span className="text-slate-400"> · {totalItems} bản ghi</span>
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                Trước
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                Sau
+              </Button>
+            </div>
+          </div>
+        )}
 
       </div>
 
@@ -1043,21 +1163,11 @@ export default function CatalogManagement() {
                 min="0"
                 step="1"
                 value={bookForm.price}
-                onChange={(e) => setBookForm({...bookForm, price: e.target.value})}
+                onChange={(e) => handleFieldChange('price', e.target.value)}
                 className="w-full"
                 placeholder="VD: 150000"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Giá bìa (VNĐ)</label>
-              <Input 
-                type="number"
-                value={bookForm.price}
-                onChange={(e) => handleFieldChange('price', e.target.value)}
-                className="w-full" 
-                placeholder="VD: 180000"
-                helperText="Hiển thị trên danh mục; tạm lưu FE vì Backend chưa có field price."
+                error={formErrors.price}
+                helperText={!formErrors.price ? 'Lưu cùng đầu sách qua API (field price).' : undefined}
               />
             </div>
 

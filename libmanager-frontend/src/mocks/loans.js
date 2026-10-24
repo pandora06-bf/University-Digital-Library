@@ -169,9 +169,14 @@ export const returnBookAction = (loanId) => {
 
   // Tăng lại số lượng sách
   const bookIndex = books.findIndex((b) => b.id === loan.bookId);
-  if (bookIndex !== -1) {
+  if (bookIndex !== -1 && loan.loanType !== 'EBOOK') {
     books[bookIndex].availableCopies += 1;
     setStoredBooks(books);
+  }
+
+  if (loan.loanType === 'EBOOK') {
+    delete loan.readToken;
+    setStoredLoans(loans);
   }
 
   return { success: true, message: 'Trả tài liệu thành công!' };

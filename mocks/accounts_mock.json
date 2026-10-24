@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "username": "sinhvien",
+    "password": "User@123",
+    "role": "STUDENT",
+    "is_active": true
+  },
+  {
+    "id": 2,
+    "username": "thuthu",
+    "password": "User@123",
+    "role": "ADMIN",
+    "is_active": true
+  },
+  {
+    "id": 3,
+    "username": "lvc.2022",
+    "password": "User@123",
+    "role": "STUDENT",
+    "is_active": true
+  },
+  {
+    "id": 4,
+    "username": "giangvien",
+    "password": "User@123",
+    "role": "LECTURER",
+    "is_active": true
+  },
+  {
+    "id": 5,
+    "username": "tte.2023",
+    "password": "User@123",
+    "role": "STUDENT",
+    "is_active": true
+  }
+]

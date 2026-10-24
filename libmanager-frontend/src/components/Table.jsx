@@ -59,11 +59,26 @@ export const Table = ({
   footerNote,
   pagination = false,
   itemsPerPage = 5,
+  /** Phân trang server: truyền page + totalPages + onPageChange — không cắt mảng data phía client */
+  page: controlledPage,
+  totalPages: controlledTotalPages,
+  totalItems,
+  onPageChange,
 }) => {
-  // Pagination State
+  const isServerPaging = typeof onPageChange === 'function'
+    && controlledTotalPages !== undefined
+    && controlledTotalPages !== null;
+
+  // Pagination State (client-side only)
   const [pageState, setPageState] = useState({ data, page: 1 });
-  const currentPage = pageState.data === data ? pageState.page : 1;
-  const changePage = (page) => setPageState({ data, page });
+  const clientPage = pageState.data === data ? pageState.page : 1;
+  const changeClientPage = (next) => setPageState({ data, page: next });
+
+  const currentPage = isServerPaging ? (controlledPage || 1) : clientPage;
+  const changePage = (next) => {
+    if (isServerPaging) onPageChange(next);
+    else changeClientPage(next);
+  };
 
   // Xác định dữ liệu an toàn
   const isCustomColumns = Array.isArray(columns) && columns.length > 0;
@@ -77,10 +92,15 @@ export const Table = ({
   }
 
   // Pagination Logic
-  const totalPages = Math.ceil(safeData.length / itemsPerPage);
-  const displayData = pagination 
+  const totalPages = isServerPaging
+    ? Math.max(1, Number(controlledTotalPages) || 1)
+    : Math.ceil(safeData.length / itemsPerPage);
+  const displayData = pagination && !isServerPaging
     ? safeData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
     : safeData;
+  const totalCount = isServerPaging
+    ? (totalItems ?? safeData.length)
+    : safeData.length;
 
   // Số lượng cột đang hiển thị
   const totalColumns = isCustomColumns ? columns.length : 7;
@@ -284,6 +304,9 @@ export const Table = ({
         <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
           <span className="text-sm text-slate-500">
             Trang <strong className="font-semibold text-slate-700">{currentPage}</strong> / {totalPages}
+            {isServerPaging && (
+              <span className="text-slate-400"> · {totalCount} bản ghi</span>
+            )}
           </span>
           <div className="flex items-center gap-1">
             <Button
@@ -295,19 +318,28 @@ export const Table = ({
               Trước
             </Button>
             <div className="flex items-center px-2 gap-1">
-              {Array.from({ length: totalPages }).map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => changePage(idx + 1)}
-                  className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
-                    currentPage === idx + 1 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
+              {Array.from({ length: Math.min(totalPages, 7) }).map((_, idx) => {
+                // Hiển thị tối đa 7 nút trang quanh trang hiện tại khi totalPages lớn
+                let pageNum = idx + 1;
+                if (totalPages > 7) {
+                  const start = Math.min(Math.max(1, currentPage - 3), totalPages - 6);
+                  pageNum = start + idx;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => changePage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-sm font-semibold transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
             </div>
             <Button
               variant="outline"
@@ -321,7 +353,7 @@ export const Table = ({
         </div>
       ) : (
         <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-          <span>Hiển thị <strong>{displayData.length}</strong> trên <strong>{safeData.length}</strong> bản ghi</span>
+          <span>Hiển thị <strong>{displayData.length}</strong> trên <strong>{totalCount}</strong> bản ghi</span>
           {footerNote && <span className="font-medium text-slate-400">{footerNote}</span>}
         </div>
       )}

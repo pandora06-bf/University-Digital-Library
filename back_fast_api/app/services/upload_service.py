@@ -7,7 +7,7 @@ from fastapi import HTTPException, UploadFile, status
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 STATIC_ROOT = BACKEND_ROOT / "static"
 COVERS_DIR = STATIC_ROOT / "covers"
-EBOOKS_DIR = STATIC_ROOT / "ebooks"
+EBOOKS_DIR = BACKEND_ROOT / "private_storage" / "ebooks"
 
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -15,7 +15,7 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024
 
 ALLOWED_PDF_EXTENSIONS = {".pdf"}
 ALLOWED_PDF_CONTENT_TYPES = {"application/pdf"}
-MAX_PDF_SIZE = 50 * 1024 * 1024
+MAX_PDF_SIZE = 20 * 1024 * 1024
 
 for directory in (COVERS_DIR, EBOOKS_DIR):
     directory.mkdir(parents=True, exist_ok=True)
@@ -77,18 +77,29 @@ async def save_ebook_pdf(file: UploadFile) -> str:
             detail="Nội dung tệp không phải PDF hợp lệ",
         )
 
+    # A PDF extension and declared MIME alone cannot prove its actual type.
+    try:
+        from pypdf import PdfReader
+        from io import BytesIO
+        PdfReader(BytesIO(data), strict=True).pages[0]
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="PDF bị hỏng hoặc không hợp lệ") from exc
     target = EBOOKS_DIR / filename
     target.write_bytes(data)
-    return f"/static/ebooks/{filename}"
+    return f"private:ebooks/{filename}"
 
 
 def delete_static_file(file_path: str | None) -> None:
-    if not file_path or not file_path.startswith("/static/"):
+    if not file_path:
         return
-
-    relative_path = file_path.removeprefix("/static/")
-    target = (STATIC_ROOT / relative_path).resolve()
-    static_root = STATIC_ROOT.resolve()
+    if file_path.startswith("/static/covers/"):
+        target = (STATIC_ROOT / file_path.removeprefix("/static/")).resolve()
+        static_root = STATIC_ROOT.resolve()
+    elif file_path.startswith("private:ebooks/"):
+        target = (EBOOKS_DIR / file_path.removeprefix("private:ebooks/")).resolve()
+        static_root = EBOOKS_DIR.resolve()
+    else:
+        return
 
     if static_root not in target.parents:
         return
@@ -98,3 +109,13 @@ def delete_static_file(file_path: str | None) -> None:
     except OSError:
         # Không làm hỏng giao dịch DB chỉ vì tệp cũ không thể xóa.
         pass
+
+
+def resolve_private_pdf(file_path: str) -> Path:
+    """Never interpret an arbitrary DB path as a filesystem path."""
+    if not file_path.startswith("private:ebooks/"):
+        raise HTTPException(status_code=404, detail="PDF cũ phải được chuyển sang kho riêng")
+    target = (EBOOKS_DIR / file_path.removeprefix("private:ebooks/")).resolve()
+    if target.parent != EBOOKS_DIR.resolve() or not target.is_file():
+        raise HTTPException(status_code=404, detail="Không tìm thấy PDF")
+    return target

@@ -157,13 +157,13 @@ export default function BookDetailPage() {
             </Button>
 
             {book.pdfAvailable && (
-              <Link to="/reader/sample">
+              <Link to={`/books/${book.id}/preview`}>
                 <Button
                   variant="outline"
                   size="lg"
                   icon={<FileText className="w-5 h-5" />}
                 >
-                  Đọc bản số hóa
+                  Xem trước eBook
                 </Button>
               </Link>
             )}

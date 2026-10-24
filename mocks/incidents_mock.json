@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "loan_id": 2,
+    "user_code": "SV20210001",
+    "incident_type": "BOOK_DAMAGED",
+    "severity": "NORMAL",
+    "penalty_amount": 0.0,
+    "description": "Gáy sách hơi sờn khi đang mượn; ghi nhận hiện trạng",
+    "status": "RECORDED",
+    "created_at": "2026-10-10T14:30:00Z"
+  },
+  {
+    "id": 2,
+    "loan_id": 3,
+    "user_code": "SV20220105",
+    "incident_type": "BOOK_DAMAGED",
+    "severity": "NORMAL",
+    "penalty_amount": 0.0,
+    "description": "Ghi nhận tình trạng sách trong lúc khoản mượn đang quá hạn",
+    "status": "RESOLVED",
+    "created_at": "2026-10-12T09:20:00Z"
+  },
+  {
+    "id": 3,
+    "loan_id": null,
+    "user_code": "SV20230987",
+    "incident_type": "FACILITY_DAMAGED",
+    "severity": "MINOR",
+    "penalty_amount": 30000.0,
+    "description": "Làm đổ nước lên mặt bàn phòng học nhóm 01",
+    "status": "RESOLVED",
+    "created_at": "2026-10-08T16:00:00Z"
+  }
+]

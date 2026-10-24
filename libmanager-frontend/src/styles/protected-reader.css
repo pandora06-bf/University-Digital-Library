@@ -1,0 +1,15 @@
+.protected-reader canvas {
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media print {
+  body.protected-reader-open #root { display: none !important; }
+  body.protected-reader-open::after {
+    content: "Tài liệu chỉ được đọc trực tuyến trên LibManager.";
+    display: block;
+    padding: 40px;
+    font-family: Arial, sans-serif;
+  }
+}

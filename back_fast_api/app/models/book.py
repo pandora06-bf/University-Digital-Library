@@ -97,6 +97,8 @@ class Ebook(Base):
     )
     file_path: Mapped[str] = mapped_column(String(255), nullable=False)
     is_free: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    preview_pages: Mapped[int] = mapped_column(Integer, server_default="10", nullable=False)
+    borrow_days: Mapped[int] = mapped_column(Integer, server_default="14", nullable=False)
 
     book: Mapped["Book"] = relationship("Book", back_populates="ebook")
 

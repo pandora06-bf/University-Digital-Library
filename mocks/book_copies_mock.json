@@ -1,0 +1,173 @@
+[
+  {
+    "copy_barcode": "BC-0001-01",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0001-02",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "BORROWED",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0001-03",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0001-04",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0001-05",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0001-06",
+    "book_id": 1,
+    "zone": "A",
+    "floor": "1",
+    "shelf": "101",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0003-01",
+    "book_id": 3,
+    "zone": "B",
+    "floor": "2",
+    "shelf": "205",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0003-02",
+    "book_id": 3,
+    "zone": "B",
+    "floor": "2",
+    "shelf": "205",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-01",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "BORROWED",
+    "damage_notes": "Gáy sách hơi sờn"
+  },
+  {
+    "copy_barcode": "BC-0004-02",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-03",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-04",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-05",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-06",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-07",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-08",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-09",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-10",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  },
+  {
+    "copy_barcode": "BC-0004-11",
+    "book_id": 4,
+    "zone": "C",
+    "floor": "1",
+    "shelf": "108",
+    "status": "AVAILABLE",
+    "damage_notes": null
+  }
+]

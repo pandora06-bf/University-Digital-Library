@@ -1,10 +1,13 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import UserLayout from './layouts/UserLayout';
 import HomePage from './pages/user/HomePage';
 import CatalogPage from './pages/user/CatalogPage';
 import BookDetailPage from './pages/user/BookDetailPage';
 import MyBooksPage from './pages/user/MyBooksPage';
-import PdfReaderPage from './pages/user/PdfReaderPage';
+const PdfReaderPage = lazy(() => import('./pages/user/PdfReaderPage'));
+import RoomBookingPage from './pages/user/RoomBookingPage';
+import WalletTopUpPage from './pages/user/WalletTopUpPage';
 import Login from './pages/auth/Login';
 import NotFoundPage from './pages/NotFoundPage';
 import UiKitPage from './pages/dev/UiKitPage';
@@ -34,10 +37,13 @@ export default function App() {
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="books/:bookId" element={<BookDetailPage />} />
           <Route path="my-books" element={<MyBooksPage />} />
+          <Route path="rooms" element={<RoomBookingPage />} />
+          <Route path="wallet/top-up" element={<WalletTopUpPage />} />
         </Route>
 
         {/* Trình đọc Sách PDF toàn màn hình */}
-        <Route path="/reader/:loanId" element={<PdfReaderPage />} />
+        <Route path="/reader/:loanId" element={<Suspense fallback={<p className="p-12 text-center">Đang mở trình đọc…</p>}><PdfReaderPage /></Suspense>} />
+        <Route path="/books/:bookId/preview" element={<Suspense fallback={<p className="p-12 text-center">Đang mở bản xem trước…</p>}><PdfReaderPage /></Suspense>} />
 
         {/* Trang kiểm thử Component Dev UI-Kit */}
         {import.meta.env.DEV && (

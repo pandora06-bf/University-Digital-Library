@@ -73,25 +73,46 @@ export default function InventoryManagement() {
       });
   }, []);
 
+  // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (không có RETIRED).
+  // Thanh lý FE → PATCH status=DAMAGED + damage_notes; UI vẫn hiện "Đã thanh lý".
+  const mapCopyStatusLabel = (status) => {
+    if (status === 'AVAILABLE') return 'Sẵn sàng';
+    if (status === 'BORROWED') return 'Đang cho mượn';
+    if (status === 'LOST') return 'Báo mất';
+    if (status === 'DAMAGED' || status === 'RETIRED') return 'Đã thanh lý';
+    return status || 'Không rõ';
+  };
+
+  const mapCopyStatusType = (status) => {
+    if (status === 'AVAILABLE') return 'success';
+    if (status === 'BORROWED') return 'warning';
+    if (status === 'DAMAGED' || status === 'RETIRED') return 'retired';
+    return 'danger';
+  };
+
+  const isCopyRetired = (status) =>
+    status === 'DAMAGED' || status === 'RETIRED' || status === 'LOST';
+
+  const mapCopyRow = (c, targetBook) => ({
+    id: c.copy_barcode || c.barcode,
+    barcode: c.copy_barcode || c.barcode,
+    location: `${c.zone} - ${c.floor} - ${c.shelf}`,
+    status: mapCopyStatusLabel(c.status),
+    statusType: mapCopyStatusType(c.status),
+    condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
+    title: targetBook?.title || '...',
+    author: targetBook?.author || '',
+    isbn: targetBook?.isbn || '',
+    rawZone: c.zone,
+    rawFloor: c.floor,
+    rawShelf: c.shelf,
+    rawStatus: c.status,
+    rawCondition: c.damage_notes,
+  });
+
   const fallbackMockCopies = (targetBookId, currentBookInfo) => {
     const rawCopies = ADMIN_MOCK_COPIES[parseInt(targetBookId)] || [];
-    const copies = rawCopies.map(c => ({
-      id: c.copy_barcode,
-      barcode: c.copy_barcode,
-      location: `${c.zone} - ${c.floor} - ${c.shelf}`,
-      status: c.status === 'AVAILABLE' ? 'Sẵn sàng' : c.status === 'BORROWED' ? 'Đang cho mượn' : c.status === 'LOST' ? 'Báo mất' : c.status === 'RETIRED' ? 'Đã thanh lý' : 'Cần sửa chữa',
-      statusType: c.status === 'AVAILABLE' ? 'success' : c.status === 'BORROWED' ? 'warning' : c.status === 'RETIRED' ? 'retired' : 'danger',
-      condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
-      title: currentBookInfo?.title || '...',
-      author: currentBookInfo?.author || '',
-      isbn: currentBookInfo?.isbn || '',
-      rawZone: c.zone,
-      rawFloor: c.floor,
-      rawShelf: c.shelf,
-      rawStatus: c.status,
-      rawCondition: c.damage_notes
-    }));
-    setTableData(copies);
+    setTableData(rawCopies.map((c) => mapCopyRow(c, currentBookInfo)));
   };
 
   const fetchInventory = async (targetBookId, currentBookInfo) => {
@@ -101,23 +122,7 @@ export default function InventoryManagement() {
     try {
       const res = await axiosInstance.get(`/api/admin/books/${idToFetch}/copies`);
       if (Array.isArray(res.data)) {
-        const copies = res.data.map(c => ({
-          id: c.copy_barcode,
-          barcode: c.copy_barcode,
-          location: `${c.zone} - ${c.floor} - ${c.shelf}`,
-          status: c.status === 'AVAILABLE' ? 'Sẵn sàng' : c.status === 'BORROWED' ? 'Đang cho mượn' : c.status === 'LOST' ? 'Báo mất' : c.status === 'RETIRED' ? 'Đã thanh lý' : 'Cần sửa chữa',
-          statusType: c.status === 'AVAILABLE' ? 'success' : c.status === 'BORROWED' ? 'warning' : c.status === 'RETIRED' ? 'retired' : 'danger',
-          condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
-          title: targetBook?.title || '...',
-          author: targetBook?.author || '',
-          isbn: targetBook?.isbn || '',
-          rawZone: c.zone,
-          rawFloor: c.floor,
-          rawShelf: c.shelf,
-          rawStatus: c.status,
-          rawCondition: c.damage_notes
-        }));
-        setTableData(copies);
+        setTableData(res.data.map((c) => mapCopyRow(c, targetBook)));
       } else {
         fallbackMockCopies(idToFetch, targetBook);
       }
@@ -233,8 +238,8 @@ export default function InventoryManagement() {
       showToast('Không thể thanh lý: Bản sao đang trong trạng thái "Đang cho mượn" (Quy tắc UC09 / BR-17).', 'warning');
       return;
     }
-    if (row.rawStatus === 'RETIRED') {
-      showToast('Bản sao này đã ở trạng thái "Đã thanh lý". Không thể thực hiện lại thao tác này.', 'warning');
+    if (isCopyRetired(row.rawStatus)) {
+      showToast('Bản sao này đã ở trạng thái "Đã thanh lý" / ngừng lưu thông. Không thể thực hiện lại.', 'warning');
       return;
     }
     setRetiringRow(row);
@@ -254,16 +259,22 @@ export default function InventoryManagement() {
       showToast('Không thể thanh lý bản sao đang trong trạng thái "Đang cho mượn" (Quy tắc UC09 / BR-17).', 'warning');
       return;
     }
-    if (retiringRow.rawStatus === 'RETIRED') {
+    if (isCopyRetired(retiringRow.rawStatus)) {
       showToast('Bản sao này đã ở trạng thái "Đã thanh lý".', 'warning');
       return;
     }
 
     setIsRetiring(true);
     try {
+      // BE không có RETIRED → dùng DAMAGED để loại khỏi tồn khả dụng + ghi chú thanh lý
+      const note = retireReason.trim()
+        ? `[Thanh lý] ${retireReason.trim()}`
+        : (retiringRow.rawCondition
+          ? `[Thanh lý] ${retiringRow.rawCondition}`
+          : '[Thanh lý] Ngừng lưu thông');
       await axiosInstance.patch(`/api/admin/copies/${retiringRow.barcode}/condition`, {
-        status: 'RETIRED',
-        damage_notes: retireReason.trim() ? retireReason.trim() : (retiringRow.rawCondition || 'Đã thanh lý')
+        status: 'DAMAGED',
+        damage_notes: note,
       });
       showToast('Thanh lý bản sao thành công!', 'success');
       handleCloseRetire();
@@ -272,7 +283,6 @@ export default function InventoryManagement() {
       console.error('Lỗi khi thanh lý bản sao:', error);
       const errorMsg = getApiErrorMessage(error, 'Không thể thanh lý bản sao. Vui lòng thử lại.');
       showToast(errorMsg, 'error');
-      // Giữ nguyên modal thanh lý và lý do đã nhập
     } finally {
       setIsRetiring(false);
     }
@@ -411,7 +421,7 @@ export default function InventoryManagement() {
       align: 'right',
       render: (val, row) => {
         const isBorrowed = row.rawStatus === 'BORROWED';
-        const isRetired = row.rawStatus === 'RETIRED';
+        const isRetired = isCopyRetired(row.rawStatus);
         const canRetire = !isBorrowed && !isRetired;
 
         return (
@@ -646,9 +656,8 @@ export default function InventoryManagement() {
               <option value="ALL">Tình trạng (Tất cả)</option>
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="BORROWED">Đang cho mượn</option>
-              <option value="DAMAGED">Cần sửa chữa</option>
+              <option value="DAMAGED">Đã thanh lý / Hỏng</option>
               <option value="LOST">Báo mất</option>
-              <option value="RETIRED">Đã thanh lý</option>
             </select>
           </div>
           
@@ -766,7 +775,7 @@ export default function InventoryManagement() {
               >
                 <option value="AVAILABLE">Sẵn sàng</option>
                 <option value="BORROWED">Đang mượn</option>
-                <option value="DAMAGED">Cần sửa chữa</option>
+                <option value="DAMAGED">Đã thanh lý / Hỏng</option>
                 <option value="LOST">Báo mất</option>
               </select>
             </div>
@@ -847,9 +856,8 @@ export default function InventoryManagement() {
                 >
                   <option value="AVAILABLE">Sẵn sàng</option>
                   <option value="BORROWED">Đang mượn</option>
-                  <option value="DAMAGED">Cần sửa chữa</option>
+                  <option value="DAMAGED">Đã thanh lý / Hỏng</option>
                   <option value="LOST">Báo mất</option>
-                  <option value="RETIRED">Đã thanh lý</option>
                 </select>
               </div>
             </div>
@@ -906,7 +914,7 @@ export default function InventoryManagement() {
               variant="primary"
               className="!bg-amber-600 hover:!bg-amber-700 !border-amber-600 text-white"
               onClick={handleConfirmRetire}
-              disabled={isRetiring || retiringRow?.rawStatus === 'BORROWED' || retiringRow?.rawStatus === 'RETIRED'}
+              disabled={isRetiring || retiringRow?.rawStatus === 'BORROWED' || isCopyRetired(retiringRow?.rawStatus)}
             >
               {isRetiring ? 'Đang xử lý...' : 'Xác nhận Thanh lý'}
             </Button>
@@ -957,7 +965,7 @@ export default function InventoryManagement() {
 
               <p className="text-xs font-medium text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200/60 flex items-start gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0 mt-1.5"></span>
-                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>RETIRED (Đã thanh lý)</strong>, ngừng lưu thông và bị loại khỏi tồn khả dụng. Hành động này không thể hoàn tác.</span>
+                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>DAMAGED (Đã thanh lý / ngừng lưu thông)</strong> theo API Backend, bị loại khỏi tồn khả dụng. Hành động này không thể hoàn tác dễ dàng.</span>
               </p>
             </div>
           </div>

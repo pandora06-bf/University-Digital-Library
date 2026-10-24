@@ -311,7 +311,7 @@ export default function IncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập biên bản sự cố tài liệu, ngừng lưu thông bản sao (RETIRED) và tính bồi thường theo giá bìa.
+            Lập biên bản sự cố tài liệu, ngừng lưu thông bản sao (DAMAGED / mất) và tính bồi thường theo giá bìa.
           </p>
         </div>
         <div className="flex items-center gap-3">
