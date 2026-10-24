@@ -27,7 +27,7 @@ class Loan(Base):
     __tablename__ = "loans"
     __table_args__ = (
         CheckConstraint(
-            "loan_status IN ('REQUESTED', 'BORROWED', 'RETURNED', 'OVERDUE', 'CANCELLED', 'LOST')",
+            "loan_status IN ('REQUESTED', 'BORROWED', 'RETURNED', 'OVERDUE', 'CANCELLED', 'LOST', 'EXPIRED')",
             name="chk_loan_status_valid",
         ),
     )

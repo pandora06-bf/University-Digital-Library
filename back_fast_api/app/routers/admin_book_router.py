@@ -168,6 +168,8 @@ async def upload_pdf(
     book_id: int,
     file: UploadFile = File(...),
     is_free: bool = False,
+    preview_pages: int = 10,
+    borrow_days: int = 14,
     db: Session = Depends(get_db),
     _: Account = Depends(require_roles("ADMIN")),
 ) -> UploadResponse:
@@ -178,14 +180,27 @@ async def upload_pdf(
             detail="Chỉ sách có book_type=EBOOK mới được upload PDF",
         )
 
+    if not 5 <= preview_pages <= 10 or not 1 <= borrow_days <= 365:
+        raise HTTPException(
+            status_code=422,
+            detail="preview_pages phải 5-10; borrow_days phải 1-365",
+        )
+
     old_path = book.ebook.file_path if book.ebook else None
     new_path = await save_ebook_pdf(file)
 
     if book.ebook is None:
-        book.ebook = Ebook(file_path=new_path, is_free=is_free)
+        book.ebook = Ebook(
+            file_path=new_path,
+            is_free=is_free,
+            preview_pages=preview_pages,
+            borrow_days=borrow_days,
+        )
     else:
         book.ebook.file_path = new_path
         book.ebook.is_free = is_free
+        book.ebook.preview_pages = preview_pages
+        book.ebook.borrow_days = borrow_days
 
     try:
         db.commit()
