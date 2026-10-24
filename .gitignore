@@ -7,3 +7,8 @@ __pycache__/
 .env.*.local
 *.env
 *$py.class
+
+back_fast_api/private_storage/ebooks/*
+!back_fast_api/private_storage/ebooks/.gitkeep
+back_fast_api/static/covers/*
+!back_fast_api/static/covers/.gitkeep

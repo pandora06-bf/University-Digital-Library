@@ -9,6 +9,7 @@ passlib[bcrypt]
 bcrypt==4.0.1
 python-multipart
 apscheduler
+pypdf
 python-dotenv
 alembic
 Faker
