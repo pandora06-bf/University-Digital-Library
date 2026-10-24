@@ -1,3 +1,4 @@
+from app.routers.waitlist_router import router as waitlist_router
 import os
 
 from fastapi import FastAPI
@@ -50,6 +51,7 @@ app.include_router(admin_book_router)
 app.include_router(admin_category_router)
 app.include_router(admin_inventory_router)
 app.include_router(admin_counter_router)
+app.include_router(waitlist_router)
 
 
 @app.get("/")
