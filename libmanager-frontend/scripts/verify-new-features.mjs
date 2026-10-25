@@ -106,7 +106,9 @@ try {
     assert.equal(isForbidden({ status: 403 }), true);
     assert.equal(isForbidden({ response: { status: 401 } }), true);
     assert.equal(previewLimit(3), 5); assert.equal(previewLimit(20), 10);
-    assert.equal(libraryTimestamp('2026-10-27T09:00:00'), '2026-10-27T09:00:00+07:00');
+    // ebook_service lưu due_date dạng UTC không timezone (đã đối chiếu với API thật)
+    assert.equal(libraryTimestamp('2026-10-27T09:00:00'), '2026-10-27T09:00:00Z');
+    assert.equal(libraryTimestamp('2026-11-08T04:12:41.528270'), '2026-11-08T04:12:41.528270Z');
     assert.equal(libraryTimestamp('2026-10-27T09:00:00Z'), '2026-10-27T09:00:00Z');
   });
   console.log(`${checks} kiểm tra nghiệp vụ đạt.`);
