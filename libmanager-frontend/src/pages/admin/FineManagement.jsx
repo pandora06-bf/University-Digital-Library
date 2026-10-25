@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { 
   Search,
   Wallet, Receipt, AlertCircle, Banknote, ShieldAlert,
-  CheckCircle2, Eye
+  CheckCircle2, Eye, AlertOctagon, ArrowLeftRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
@@ -319,12 +319,14 @@ export default function FineManagement() {
         <div className="flex items-center gap-3">
           <Button
             variant="outline"
+            icon={<AlertOctagon className="w-4 h-4" />}
             onClick={() => navigate('/admin/incidents')}
           >
             Biên bản Mất / Hỏng
           </Button>
           <Button
-            variant="outline"
+            variant="primary"
+            icon={<ArrowLeftRight className="w-4 h-4" />}
             onClick={() => navigate('/admin/loans')}
           >
             Xem Phiếu Mượn

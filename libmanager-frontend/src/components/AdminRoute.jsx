@@ -3,18 +3,15 @@ import { getToken } from '../services/axios_instance';
 import { getCurrentUser } from '../mocks/auth';
 
 /**
- * AdminGuard: Component chốt chặn bảo vệ các trang Admin.
- * Nếu chưa đăng nhập hoặc không phải quyền admin -> Đá về /login.
+ * AdminRoute: chặn truy cập khu Admin nếu chưa đăng nhập hoặc role khác ADMIN (2B-17).
  */
-export default function AdminGuard({ children }) {
+export default function AdminRoute({ children }) {
   const token = getToken();
   const user = getCurrentUser();
 
   if (!token || !user || user.role !== 'admin') {
-    // Chưa có vé hoặc vé không phải của Admin -> Đuổi về cửa
     return <Navigate to="/login" replace />;
   }
 
-  // Nếu hợp lệ, cho phép render component con (hoặc Layout)
   return children ? children : <Outlet />;
 }

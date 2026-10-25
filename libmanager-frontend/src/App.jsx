@@ -21,8 +21,10 @@ import LoanManagement from './pages/admin/LoanManagement';
 import FineManagement from './pages/admin/FineManagement';
 import EbookManagement from './pages/admin/EbookManagement';
 import IncidentPage from './pages/admin/IncidentPage';
+import AdminComingSoon from './pages/admin/AdminComingSoon';
+import UserManagement from './pages/admin/UserManagement';
 
-import AdminGuard from './components/AdminGuard';
+import AdminRoute from './components/AdminRoute';
 
 export default function App() {
   return (
@@ -50,8 +52,8 @@ export default function App() {
           <Route path="/dev/ui-kit" element={<UiKitPage />} />
         )}
 
-        {/* Cổng Quản trị Admin Portal (Đã được bảo vệ bởi AdminGuard) */}
-        <Route path="/admin" element={<AdminGuard><AdminLayout /></AdminGuard>}>
+        {/* Cổng Quản trị Admin Portal (2B-17: AdminRoute chặn non-ADMIN) */}
+        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
           <Route index element={<AdminDashboard />} />
           <Route path="catalog" element={<CatalogManagement />} />
           <Route path="inventory" element={<InventoryManagement />} />
@@ -62,6 +64,9 @@ export default function App() {
           <Route path="loans" element={<LoanManagement />} />
           <Route path="fines" element={<FineManagement />} />
           <Route path="incidents" element={<IncidentPage />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="rooms" element={<AdminComingSoon />} />
+          <Route path="unmatched" element={<AdminComingSoon />} />
         </Route>
 
         {/* 404 Route */}

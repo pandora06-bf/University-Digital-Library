@@ -13,10 +13,13 @@ import {
   ChevronRight,
   X,
   Menu,
-  AlertOctagon
+  AlertOctagon,
+  Users,
+  DoorOpen,
+  WalletCards,
 } from 'lucide-react';
 
-// Quick search data để navigate
+// Quick search data để navigate (2B-17: đủ mục Admin)
 const SEARCH_SUGGESTIONS = [
   { label: 'Tổng quan', desc: 'Bảng tổng quan báo cáo nhanh', path: '/admin', icon: <LayoutDashboard className="w-4 h-4" /> },
   { label: 'Quản lý Danh mục Sách', desc: 'Quản lý đầu sách và thể loại', path: '/admin/catalog', icon: <Book className="w-4 h-4" /> },
@@ -25,6 +28,9 @@ const SEARCH_SUGGESTIONS = [
   { label: 'Quản lý Mượn / Trả', desc: 'Quầy giao dịch thủ thư', path: '/admin/loans', icon: <ArrowLeftRight className="w-4 h-4" /> },
   { label: 'Thu phạt & Công nợ', desc: 'Phiếu phạt, dư nợ độc giả', path: '/admin/fines', icon: <FileWarning className="w-4 h-4" /> },
   { label: 'Báo mất / Hỏng sách', desc: 'Biên bản sự cố và bồi thường (UC15)', path: '/admin/incidents', icon: <AlertOctagon className="w-4 h-4" /> },
+  { label: 'Quản lý Người dùng', desc: 'CRUD, khóa, đặt lại mật khẩu (2B-18)', path: '/admin/users', icon: <Users className="w-4 h-4" /> },
+  { label: 'Phòng học nhóm', desc: 'Đang phát triển — quản lý phòng & check-in (3-17)', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" /> },
+  { label: 'Giao dịch chưa khớp', desc: 'Đang phát triển — gán nạp tiền unmatched (4-16)', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
 ];
 
 import { logout } from '../services/authService';
@@ -142,6 +148,18 @@ export default function AdminLayout() {
         { label: 'Quản trị viên', path: '/admin' },
         { label: 'Báo mất / Hỏng sách' }
       ],
+      '/admin/users': [
+        { label: 'Quản trị viên', path: '/admin' },
+        { label: 'Quản lý Người dùng' }
+      ],
+      '/admin/rooms': [
+        { label: 'Quản trị viên', path: '/admin' },
+        { label: 'Phòng học nhóm' }
+      ],
+      '/admin/unmatched': [
+        { label: 'Quản trị viên', path: '/admin' },
+        { label: 'Giao dịch chưa khớp' }
+      ],
     };
 
     if (STATIC_CRUMBS[pathname]) {
@@ -173,6 +191,7 @@ export default function AdminLayout() {
     return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/');
   };
 
+  // 2B-17: khung menu đủ; mục chưa làm gắn badge "Đang phát triển"
   const navItems = [
     { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Tổng quan' },
     { path: '/admin/catalog', icon: <Book size={20} />, label: 'Quản lý Danh mục Sách' },
@@ -181,6 +200,9 @@ export default function AdminLayout() {
     { path: '/admin/loans', icon: <ArrowLeftRight size={20} />, label: 'Quản lý Mượn / Trả' },
     { path: '/admin/fines', icon: <FileWarning size={20} />, label: 'Thu phạt & Công nợ' },
     { path: '/admin/incidents', icon: <AlertOctagon size={20} />, label: 'Báo mất / Hỏng sách' },
+    { path: '/admin/users', icon: <Users size={20} />, label: 'Người dùng' },
+    { path: '/admin/rooms', icon: <DoorOpen size={20} />, label: 'Phòng học nhóm', comingSoon: true },
+    { path: '/admin/unmatched', icon: <WalletCards size={20} />, label: 'GD chưa khớp', comingSoon: true },
   ];
 
   return (
@@ -249,7 +271,12 @@ export default function AdminLayout() {
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
                     )}
                     {item.icon}
-                    {item.label}
+                    <span className="flex-1 leading-tight">{item.label}</span>
+                    {item.comingSoon && (
+                      <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-400/90 text-amber-950 shrink-0">
+                        Đang PT
+                      </span>
+                    )}
                   </>
                 );
               }}

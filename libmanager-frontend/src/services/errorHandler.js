@@ -98,7 +98,7 @@ export function getApiErrorMessage(error, defaultMessage = '') {
 
   // 6. Xử lý HTTP 500 - Server Error
   if (status >= 500) {
-    return 'Lỗi hệ thống máy chủ (500). Vui lòng thử lại sau hoặc liên hệ bộ phận kỹ thuật.';
+    return 'Lỗi hệ thống máy chủ. Vui lòng thử lại sau hoặc liên hệ bộ phận kỹ thuật.';
   }
 
   // Các trường hợp có detail string khác

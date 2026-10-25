@@ -11,6 +11,8 @@ import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
+import axiosInstance from '../../services/axios_instance';
+import { getApiErrorMessage } from '../../services/errorHandler';
 import {
   getStoredIncidents,
   addStoredIncident,
@@ -56,7 +58,23 @@ export default function IncidentPage() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
   };
 
-  const handleLookupLoan = () => {
+  const applyLookupHit = (found, code, via) => {
+    setLoanLookedUp(true);
+    setCreateForm((prev) => ({
+      ...prev,
+      code,
+      book_price: found.book_price ?? found.price ?? 0,
+      book_title: found.book_title || found.title || '',
+      barcode: found.barcode || found.copy_barcode || code,
+      loan_code: found.loan_code || found.loan_id || found.id || '',
+      borrower_name: found.borrower_name || found.user_name || found.full_name || '',
+      borrower_code: found.borrower_code || found.user_code || '',
+      borrower_class: found.borrower_class || found.department || '',
+    }));
+    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id} (${via}).`, 'success');
+  };
+
+  const handleLookupLoan = async () => {
     const code = createForm.code.trim();
     if (!code) {
       setFormErrors((prev) => ({ ...prev, code: 'Mã barcode hoặc mã phiếu không được để trống' }));
@@ -71,44 +89,52 @@ export default function IncidentPage() {
       return next;
     });
 
-    // Mock FE: tra cứu đồng bộ trên MOCK_ACTIVE_LOANS (không gọi API)
-    window.setTimeout(() => {
-      const found = findMockActiveLoan(code);
-      setIsSearchingBook(false);
-
-      if (!found) {
-        setLoanLookedUp(false);
-        setCreateForm((prev) => ({
-          ...prev,
-          book_price: 0,
-          book_title: '',
-          barcode: '',
-          loan_code: '',
-          borrower_name: '',
-          borrower_code: '',
-          borrower_class: '',
-        }));
-        showToast(
-          `Không tìm thấy phiếu BORROWED cho "${code}". Thử: ${MOCK_ACTIVE_LOANS[0].barcode} hoặc ${MOCK_ACTIVE_LOANS[0].loan_code}.`,
-          'error'
-        );
+    // 4-15.b: thử API quầy lookup; fallback mock
+    try {
+      const { data } = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: code } });
+      const loans = data?.loans || data?.items || [];
+      const user = data?.user || {};
+      const hit = loans.find((l) =>
+        ['BORROWED', 'OVERDUE'].includes(String(l.loan_status || l.status || '').toUpperCase())
+      ) || loans[0];
+      if (hit) {
+        applyLookupHit({
+          ...hit,
+          book_title: hit.book_title || hit.title,
+          barcode: hit.copy_barcode || hit.barcode || code,
+          loan_code: hit.loan_code || String(hit.id),
+          borrower_name: user.full_name || hit.borrower_name,
+          borrower_code: user.user_code || hit.user_code,
+          book_price: hit.book_price ?? hit.price ?? 0,
+        }, code, 'API');
+        setIsSearchingBook(false);
         return;
       }
+    } catch {
+      /* fallback mock */
+    }
 
-      setLoanLookedUp(true);
+    const found = findMockActiveLoan(code);
+    setIsSearchingBook(false);
+    if (!found) {
+      setLoanLookedUp(false);
       setCreateForm((prev) => ({
         ...prev,
-        code,
-        book_price: found.book_price,
-        book_title: found.book_title,
-        barcode: found.barcode,
-        loan_code: found.loan_code,
-        borrower_name: found.borrower_name,
-        borrower_code: found.borrower_code,
-        borrower_class: found.borrower_class,
+        book_price: 0,
+        book_title: '',
+        barcode: '',
+        loan_code: '',
+        borrower_name: '',
+        borrower_code: '',
+        borrower_class: '',
       }));
-      showToast(`Đã tra cứu phiếu ${found.loan_code} (BORROWED).`, 'success');
-    }, 350);
+      showToast(
+        `Không tìm thấy phiếu BORROWED cho "${code}". Thử mock: ${MOCK_ACTIVE_LOANS[0].barcode}.`,
+        'error'
+      );
+      return;
+    }
+    applyLookupHit(found, code, 'mock');
   };
 
   // Lọc dữ liệu
@@ -134,14 +160,18 @@ export default function IncidentPage() {
   const damagedCount = incidents.filter(i => i.incident_type === 'DAMAGED').length;
   const totalCompensation = incidents.reduce((sum, item) => sum + (item.compensation_amount || 0), 0);
 
-  // Xử lý tạo biên bản mới
-  const handleSaveIncident = () => {
+  // 4-15.b: lưu local + thử check-in API (is_lost / is_damaged) khi có barcode
+  const handleSaveIncident = async () => {
     const errors = {};
     if (!createForm.code.trim()) errors.code = 'Mã barcode hoặc mã phiếu không được để trống';
     if (!loanLookedUp || !createForm.loan_code) {
       errors.code = errors.code || 'Vui lòng bấm Tra cứu và chọn phiếu BORROWED hợp lệ';
     }
     if (!createForm.description.trim()) errors.description = 'Mô tả chi tiết sự cố không được để trống';
+    const compensation = Number(createForm.book_price);
+    if (!compensation || compensation <= 0) {
+      errors.book_price = 'Nhập số tiền bồi thường (> 0). Nếu thiếu giá bìa, nhập thủ công (E2).';
+    }
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
@@ -149,6 +179,29 @@ export default function IncidentPage() {
       return;
     }
     setFormErrors({});
+
+    const isLost = createForm.incident_type === 'LOST';
+    let apiNote = '';
+    try {
+      if (createForm.barcode) {
+        await axiosInstance.post('/api/admin/loans/checkin', {
+          copy_barcode: createForm.barcode,
+          condition_notes: createForm.description.trim(),
+          is_lost: isLost,
+          is_damaged: !isLost,
+          damage_penalty: compensation,
+        });
+        apiNote = ' + check-in API';
+      }
+    } catch (error) {
+      const status = error?.response?.status;
+      const msg = getApiErrorMessage(error, 'Check-in API lỗi — vẫn lưu biên bản local.');
+      if (status === 409 || status === 422) {
+        showToast(msg, 'error');
+        return;
+      }
+      showToast(msg, 'warning');
+    }
 
     const newIncident = {
       id: `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`,
@@ -161,11 +214,11 @@ export default function IncidentPage() {
       borrower_class: createForm.borrower_class,
       incident_type: createForm.incident_type,
       description: createForm.description.trim(),
-      book_price: Number(createForm.book_price) || 0,
-      compensation_amount: Number(createForm.book_price) || 0,
+      book_price: compensation,
+      compensation_amount: compensation,
       created_at: new Date().toLocaleDateString('vi-VN'),
       created_by: 'Thủ thư Quản trị viên',
-      status: 'PENDING',
+      status: apiNote ? 'RECORDED' : 'PENDING',
     };
 
     const updated = addStoredIncident(newIncident);
@@ -173,7 +226,7 @@ export default function IncidentPage() {
     setShowCreateModal(false);
     setLoanLookedUp(false);
     setCreateForm({ ...EMPTY_CREATE_FORM });
-    showToast(`Đã lập biên bản ${newIncident.incident_code} thành công!`, 'success');
+    showToast(`Đã lập biên bản ${newIncident.incident_code}${apiNote}.`, 'success');
   };
 
   // Cấu hình các cột cho bảng Table component
@@ -629,7 +682,7 @@ export default function IncidentPage() {
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Mock FE — thử: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
+              Ưu tiên API lookup; fallback mock — thử: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
             </p>
           </div>
 
@@ -641,7 +694,6 @@ export default function IncidentPage() {
                 <p>Barcode: <span className="font-mono font-semibold text-slate-800">{createForm.barcode}</span></p>
                 <p>Phiếu: <span className="font-mono font-semibold text-slate-800">{createForm.loan_code}</span></p>
                 <p>Độc giả: <span className="font-semibold text-slate-800">{createForm.borrower_name} ({createForm.borrower_code})</span></p>
-                <p>Giá bìa: <span className="font-bold text-emerald-600">{formatVND(createForm.book_price)}</span></p>
               </div>
             </div>
           ) : (
@@ -714,16 +766,22 @@ export default function IncidentPage() {
             )}
           </div>
 
-          {/* Hiển thị số tiền bồi thường dự kiến */}
-          <div className="bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-indigo-900 uppercase">Số tiền bồi thường dự kiến</p>
-              <p className="text-[11px] text-indigo-700">Tự động lấy theo giá bìa của đầu sách (BR-28)</p>
-            </div>
-            <span className="text-lg font-extrabold text-indigo-700">
-              {formatVND(createForm.book_price)}
-            </span>
-          </div>
+          {/* Bồi thường: giá bìa hoặc nhập tay (E2) — 4-15.b */}
+          <Input
+            label="Số tiền bồi thường (VNĐ)"
+            type="number"
+            min={0}
+            value={createForm.book_price || ''}
+            error={formErrors.book_price}
+            helperText="Mặc định = giá bìa (BR-28). Thiếu giá thì nhập thủ công."
+            onChange={(e) => {
+              setCreateForm({ ...createForm, book_price: Number(e.target.value) || 0 });
+              if (formErrors.book_price) setFormErrors({ ...formErrors, book_price: '' });
+            }}
+          />
+          <p className="text-[11px] text-slate-400 -mt-2">
+            Lưu: ghi biên bản local; nếu có barcode sẽ thử <code>POST /api/admin/loans/checkin</code> (is_lost / is_damaged). API từ chối sẽ hiện Toast lỗi.
+          </p>
         </div>
       </Modal>
     </div>

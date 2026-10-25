@@ -55,12 +55,13 @@ Nếu hư hỏng / mất: chuyển **Thu phạt** (`/admin/fines`) hoặc **Biê
 
 ---
 
-## 5. Check-in phòng học nhóm
+## 5. Check-in phòng học nhóm (4-17.b / chờ 3-17)
 
 | | |
 |---|---|
 | Độc giả đặt / xem lượt | Cổng User **`/rooms`** (mock đặt phòng + số dư demo) |
-| Màn Admin quầy check-in phòng | **Chưa có** (ghi nợ phần 2/2 nếu sprint sau làm) |
+| Mục Admin **Phòng học nhóm** | Có trong menu (`/admin/rooms`) — hiện **Đang phát triển** (task 3-17) |
+| Màn quầy check-in mã đặt phòng | Chưa có UI thao tác; khi 3-17 xong sẽ bổ sung bước quét mã + xác nhận slot |
 | Cách làm tạm trong ca | Đối chiếu danh sách đặt trên `/rooms`; xác nhận miệng / ghi sổ khi SV đến giờ |
 
 ---
@@ -74,6 +75,7 @@ Nếu hư hỏng / mất: chuyển **Thu phạt** (`/admin/fines`) hoặc **Biê
 | Mượn–trả (quầy) | `/admin/loans` |
 | Thu phạt | `/admin/fines` |
 | Mất–hỏng | `/admin/incidents` |
+| Người dùng / Phòng / GD chưa khớp | Menu có — **Đang phát triển** (`/admin/users`, `/admin/rooms`, `/admin/unmatched`) |
 | Đặt phòng (User) | `/rooms` |
 
 ---
