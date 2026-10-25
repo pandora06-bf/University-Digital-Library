@@ -8,7 +8,7 @@ from app.models.book import Book, BookCopy, Category, Subject
 
 def get_catalog_tree_service(db: Session) -> Dict[str, Any]:
     subjects = db.scalars(select(Subject).order_by(Subject.subject_code)).all()
-    categories = db.scalars(select(Category).order_by(Category.id.asc())).all()[cite: 9]
+    categories = db.scalars(select(Category).order_by(Category.id.asc())).all()
     books = db.scalars(select(Book)).all()
 
     subject_tree = []
@@ -55,9 +55,9 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
     # Lấy tên thể loại nếu có
     cat_name = None
     if book.category_id:
-        category = db.get(Category, book.category_id)[cite: 9]
+        category = db.get(Category, book.category_id)
         if category:
-            cat_name = category.category_name[cite: 9]
+            cat_name = category.category_name
 
     # Danh sách vị trí bản sao trên kệ
     copies = db.scalars(

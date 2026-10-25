@@ -1,7 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional
-from pydantic import BaseModel, Field
-from app.schemas.category import CategoryResponse
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 
 def _normalize_category_name(value: str) -> str:
     """Chuẩn hóa khoảng trắng và không cho phép tên danh mục rỗng."""

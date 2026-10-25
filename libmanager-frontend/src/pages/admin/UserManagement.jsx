@@ -101,7 +101,11 @@ export default function UserManagement() {
   }, [debouncedQ, page, refreshMock]);
 
   useEffect(() => {
-    fetchUsers();
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      fetchUsers();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchUsers]);
 
   const filtered = useMemo(() => {
