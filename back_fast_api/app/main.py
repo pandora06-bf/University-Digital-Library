@@ -9,16 +9,9 @@ from app.routers import auth, books, loans, users
 from app.routers.admin_book_router import router as admin_book_router
 from app.routers.admin_category_router import router as admin_category_router
 from app.routers.admin_inventory_router import router as admin_inventory_router
-<<<<<<< HEAD
 from app.services.upload_service import COVERS_DIR, EBOOKS_DIR
 from app.routers.admin_counter_router import router as admin_counter_router
-=======
-from app.routers.admin_counter_router import router as admin_counter_router
-from app.routers.ebook_router import router as ebook_router
-from app.services.upload_service import COVERS_DIR
-
->>>>>>> c0a6efd79b51876ad9c7420076951eb99506afa2
-
+from app.routers.waitlist_router import router as waitlist_router
 app = FastAPI(
     title="Library Management API",
     description="Backend API for Library Management System",
@@ -45,9 +38,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Chỉ phục vụ ảnh bìa công khai; PDF eBook không mount static, chỉ phát qua
-# /api/ebooks/{id}/stream kèm read_token (ebook_router) để tránh lộ link trực tiếp.
+# Phục vụ ảnh bìa và PDF eBook qua URL tĩnh.
 app.mount("/static/covers", StaticFiles(directory=COVERS_DIR), name="covers")
+app.mount("/static/ebooks", StaticFiles(directory=EBOOKS_DIR), name="ebooks")
 
 app.include_router(auth.router)
 app.include_router(books.router)
@@ -57,12 +50,8 @@ app.include_router(admin_book_router)
 app.include_router(admin_category_router)
 app.include_router(admin_inventory_router)
 app.include_router(admin_counter_router)
-<<<<<<< HEAD
-=======
 app.include_router(waitlist_router)
-app.include_router(ebook_router)
 
->>>>>>> c0a6efd79b51876ad9c7420076951eb99506afa2
 
 @app.get("/")
 def root():

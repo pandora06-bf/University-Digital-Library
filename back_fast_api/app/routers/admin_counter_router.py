@@ -1,9 +1,9 @@
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_account
+from app.core.dependencies import require_roles
 from app.models.user import Account
 from app.schemas.loan import (
     FineCollectRequest,
@@ -18,27 +18,20 @@ from app.services.loan_service import (
     lookup_loans_service,
 )
 
-router = APIRouter(prefix="/api/admin", tags=["check-in/check-out"])
-
-
-def verify_librarian(account: Account = Depends(get_current_account)) -> Account:
-    """Chốt chặn phân quyền: Chỉ Admin / Thủ thư được gọi các API này (NFR-SE-03)"""
-    if account.role not in ["ADMIN", "LIBRARIAN"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Chỉ thủ thư mới có quyền thực hiện thao tác tại quầy"
-        )
-    return account
+router = APIRouter(
+    prefix="/api/admin",
+    tags=["Quầy thủ thư"],
+    dependencies=[Depends(require_roles("ADMIN", "LIBRARIAN"))]
+)
 
 
 # ----------------------------------------------------------------------
-# 1. GET /api/admin/loans/lookup: Tra cứu phiếu mượn theo mã mượn / MSSV
+# 1. GET /api/admin/loans/lookup: Tra cứu phiếu mượn (hỗ trợ nhập mã/quét)
 # ----------------------------------------------------------------------
 @router.get("/loans/lookup", summary="Tra cứu phiếu mượn theo mã mượn hoặc MSSV")
 def api_lookup_loans(
     q: str = Query(..., description="Nhập mã mượn (ID) hoặc MSSV (user_code)"),
     db: Session = Depends(get_db),
-    admin: Account = Depends(verify_librarian),
 ):
     loans = lookup_loans_service(db=db, q=q)
     return {
@@ -67,7 +60,6 @@ def api_checkout_loan(
     payload: LoanCheckoutRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    admin: Account = Depends(verify_librarian),
 ):
     loan = checkout_at_counter_service(
         db=db,
@@ -98,9 +90,8 @@ def api_checkout_loan(
 def api_checkin_loan(
     payload: LoanCheckinRequest,
     db: Session = Depends(get_db),
-    admin: Account = Depends(verify_librarian),
 ):
-    result = checkin_at_counter_service(
+    return checkin_at_counter_service(
         db=db,
         copy_barcode=payload.copy_barcode,
         condition_notes=payload.condition_notes,
@@ -108,7 +99,6 @@ def api_checkin_loan(
         is_damaged=payload.is_damaged,
         damage_penalty=payload.damage_penalty,
     )
-    return result
 
 
 # ----------------------------------------------------------------------
@@ -118,7 +108,6 @@ def api_checkin_loan(
 def api_lookup_fines(
     user_code: str = Query(..., description="MSSV/Mã bạn đọc cần tra cứu"),
     db: Session = Depends(get_db),
-    admin: Account = Depends(verify_librarian),
 ):
     return lookup_fines_service(db=db, user_code=user_code)
 
@@ -130,17 +119,20 @@ def api_lookup_fines(
 def api_collect_fines(
     payload: FineCollectRequest,
     db: Session = Depends(get_db),
-    admin: Account = Depends(verify_librarian),
+    admin: Account = Depends(require_roles("ADMIN", "LIBRARIAN")),
 ):
-    admin_code = admin.user.user_code if admin.user else "ADMIN"
-    payment = collect_counter_fines_service(
+    admin_code = admin.user.user_code if (admin and admin.user) else "ADMIN"
+    result = collect_counter_fines_service(
         db=db,
         user_code=payload.user_code,
         amount=payload.amount,
         admin_collector_code=admin_code,
         notes=payload.notes,
     )
-    return {
+    payment = result["payment"]
+    warning = result["warning"]
+
+    response = {
         "message": "Xác nhận thu phạt thành công",
         "receipt": {
             "payment_id": payment.id,
@@ -151,3 +143,7 @@ def api_collect_fines(
             "admin_collector_code": payment.admin_collector_code,
         }
     }
+    if warning:
+        response["warning"] = warning
+
+    return response
