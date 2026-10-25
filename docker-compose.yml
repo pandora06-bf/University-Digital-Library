@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:15-alpine
-    container_name: libmanager_db_nhat
+    container_name: libmanager_db
     environment:
       POSTGRES_USER: lib_user
       POSTGRES_PASSWORD: lib_password
