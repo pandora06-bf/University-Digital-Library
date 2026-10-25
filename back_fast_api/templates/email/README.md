@@ -1,16 +1,16 @@
 # Bàn giao mẫu email 3-23 cho Nhất (3-06)
 
 Bốn mẫu độc lập, HTML dạng bảng, CSS inline, UTF-8, không dùng JavaScript,
-ảnh từ xa hoặc font cần tải. Đuôi `.htm` theo yêu cầu bàn giao; Jinja2 đọc được
-cả `.htm` và `.html`. Không cần ghép thêm layout.
+ảnh từ xa hoặc font cần tải. Đuôi `.html` theo bảng phân công (3-23). Không cần
+ghép thêm layout.
 
-- `receipt.htm`: biên lai Check-out; `receipt_id`, `borrow_date`, `due_date`,
+- `receipt.html`: biên lai Check-out; `receipt_id`, `borrow_date`, `due_date`,
   `books` (danh sách có `title`, `author`, `loan_code`), `my_books_url`.
-- `due_reminder.htm`: nhắc tới hạn; `book_title`, `loan_code`, `due_date`, `my_books_url`.
-- `hold_24h.htm`: thông báo giữ chỗ; `book_title`, `hold_code`, `pickup_deadline`,
+- `due_reminder.html`: nhắc tới hạn; `book_title`, `loan_code`, `due_date`, `my_books_url`.
+- `hold_24h.html`: thông báo giữ chỗ; `book_title`, `hold_code`, `pickup_deadline`,
   `pickup_location`, `pickup_url`. Backend tính `pickup_deadline` đúng 24 giờ
   sau thời điểm bắt đầu giữ chỗ; không tính mốc này trong template.
-- `top_up.htm`: xác nhận nạp thành công; `transaction_id`, `pay_code`, `amount`
+- `top_up.html`: xác nhận nạp thành công; `transaction_id`, `pay_code`, `amount`
   (số tiền **thực nhận**), `paid_at`, `balance_after`, `wallet_url`.
 
 Biến dùng chung: `user_name`, `library_name`, `support_email`, `library_url`.
@@ -21,26 +21,27 @@ mật khẩu hoặc link PDF riêng tư vào email.
 
 ## Đường dẫn trong dự án hiện tại
 
-Backend thực tế là `back_fast_api/`. Thư mục template giữ đúng vị trí sản phẩm
-`backend/templates/email/` trong yêu cầu. Trong module
-`back_fast_api/app/services/email_notifier.py`, cấu hình đường dẫn bằng:
+Template nằm trong backend thật: `back_fast_api/templates/email/` (bảng phân công
+ghi `/backend/templates/email/`; nhóm thống nhất đặt trong `back_fast_api/` để
+Docker có sẵn template). Trong module `back_fast_api/app/services/email_notifier.py`,
+cấu hình đường dẫn bằng:
 
 ```python
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
-template_dir = Path(__file__).resolve().parents[3] / "backend" / "templates" / "email"
+template_dir = Path(__file__).resolve().parents[2] / "templates" / "email"
 environment = Environment(
     loader=FileSystemLoader(template_dir),
-    autoescape=select_autoescape(["html", "htm", "xml"]),
+    autoescape=select_autoescape(["html", "xml"]),
     undefined=StrictUndefined,
 )
-html = environment.get_template("receipt.htm").render(**context)
+html = environment.get_template("receipt.html").render(**context)
 ```
 
-Khi đóng gói Docker chỉ với build context `back_fast_api/`, cần copy thư mục
-template vào image hoặc mount nó và cấu hình lại đường dẫn. SMTP, retry và
-BackgroundTasks thuộc 3-06; các mẫu này chưa gửi thư tự động.
+Container `api` build từ `back_fast_api/` và mount thư mục này vào `/app`, nên
+template có sẵn tại `/app/templates/email/` mà không cần cấu hình thêm. SMTP,
+retry và BackgroundTasks thuộc 3-06; các mẫu này chưa gửi thư tự động.
 
 ## Xem trước và kiểm tra Gmail
 
@@ -48,7 +49,7 @@ BackgroundTasks thuộc 3-06; các mẫu này chưa gửi thư tự động.
 
 ```sh
 python -m pip install "Jinja2>=3.1,<4"
-python backend/templates/email/render_preview.py
+python back_fast_api/templates/email/render_preview.py
 ```
 
 Thư mục `preview/` có bốn bản HTML đã gắn dữ liệu để kiểm tra trực tiếp.
