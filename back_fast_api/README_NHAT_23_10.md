@@ -17,7 +17,7 @@
 ## Tích hợp còn phụ thuộc
 - 3-07 Check-in do thành viên khác phát triển chưa có trong bản ZIP, vì vậy chỉ cung cấp hook `promote_waitlist`.
 - 3-05 scheduler_worker.py chưa có trong bản ZIP: cần đăng ký `job_hold_expiry` với APScheduler tại 1 worker duy nhất, chạy định kỳ (khuyến nghị 1 phút).
-- 3-06 Email nền hạn 30/10: chưa có `email_notifier.py`. Để gửi sau commit, dùng `hold_24h.htm` với biến **đúng README**: `book_title`, `hold_code`, `pickup_deadline`, `pickup_location`, `pickup_url`, cộng `user_name`, `library_name`, `support_email`, `library_url`.
+- 3-06 Email nền hạn 30/10: chưa có `email_notifier.py`. Để gửi sau commit, dùng `back_fast_api/templates/email/hold_24h.html` với biến **đúng README**: `book_title`, `hold_code`, `pickup_deadline`, `pickup_location`, `pickup_url`, cộng `user_name`, `library_name`, `support_email`, `library_url`.
 - Cần xác nhận chính sách giữ chỗ ở tồn kho: code hiện xem `available_stock` là lượng bản vật lý AVAILABLE; HELD được trừ logic khi nâng hàng, không ghi đè số lượng vật lý. Kiểm thử E2E với Check-in/Check-out trước merge.
 
 ## Chạy
