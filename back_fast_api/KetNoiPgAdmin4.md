@@ -13,10 +13,10 @@ Kiểm tra cấu hình container database trong file `docker-compose.yml` hoặc
 | Thông số | Giá trị mặc định phổ biến | Ghi chú |
 | :--- | :--- | :--- |
 | **Host Name / Address** | `localhost` hoặc `127.0.0.1` | Nếu pgAdmin cài trên máy thật |
-| **Port ngoài (Host Port)** | `5432` (hoặc `5433`, `5434` tùy port map) | Cổng bên trái trong `ports: "5432:5432"` |
+| **Port ngoài (Host Port)** | `5433`| Cổng bên trái trong `ports: "5432:5432"` |
 | **Maintenance Database** | `libmanager_db` (hoặc `postgres`) | Tên database trong `POSTGRES_DB` |
-| **Username** | `postgres` (hoặc cấu hình riêng) | Khai báo ở `POSTGRES_USER` |
-| **Password** | `postgres` (hoặc cấu hình riêng) | Khai báo ở `POSTGRES_PASSWORD` |
+| **Username** |postgres (hoặc theo file .env) | Khai báo ở `POSTGRES_USER` |
+| **Password** | postgres (hoặc theo file .env) | Khai báo ở `POSTGRES_PASSWORD` |
 
 **Cách kiểm tra port đang map thực tế qua Terminal/PowerShell:**
 
@@ -41,7 +41,7 @@ Tìm cột **PORTS** của container postgres. Ví dụ: `0.0.0.0:5432->5432/tcp
    - **Name**: Đặt tên gợi nhớ cho kết nối (ví dụ: `Docker - Library DB`).
 4. **Tab `Connection`:**
    - **Host name/address**: Điền `localhost` hoặc `127.0.0.1`.
-   - **Port**: Điền cổng đã map ra máy host (thường là `5432`).
+   - **Port**: 5433.
    - **Maintenance database**: Điền tên database của dự án (ví dụ: `libmanager_db` hoặc `postgres`).
    - **Username**: Điền tài khoản quản trị (ví dụ: `postgres`).
    - **Password**: Điền mật khẩu database.
