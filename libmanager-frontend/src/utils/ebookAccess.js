@@ -16,7 +16,7 @@ export function isForbidden(error) {
 
 export function libraryTimestamp(value) {
   if (typeof value !== 'string') return value;
-  // Backend hiện tại dùng TIMESTAMP không timezone; thời gian nghiệp vụ là UTC+7.
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)) return `${value}+07:00`;
+  // ebook_service lưu TIMESTAMP không timezone theo giờ UTC (utcnow), nên gắn 'Z'.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(value)) return `${value}Z`;
   return value;
 }

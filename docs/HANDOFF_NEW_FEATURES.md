@@ -109,10 +109,10 @@ cộng tiền ở frontend khi dùng giao dịch thật.
 
 ## 3-23: Email
 
-Sản phẩm nằm đúng đường dẫn `backend/templates/email/*.htm` theo yêu cầu:
-`receipt`, `due_reminder`, `hold_24h`, `top_up`. Backend hiện tên
-`back_fast_api/`, nên có hướng dẫn đường dẫn loader/Docker trong
-`backend/templates/email/README.md`. Các mẫu dùng bảng 600px co theo chiều
+Sản phẩm nằm trong backend thật `back_fast_api/templates/email/*.html`:
+`receipt`, `due_reminder`, `hold_24h`, `top_up` (đã chuyển từ `backend/`
+để Docker có sẵn template). Hướng dẫn đường dẫn loader trong
+`back_fast_api/templates/email/README.md`. Các mẫu dùng bảng 600px co theo chiều
 rộng, CSS inline, escape biến, font hệ thống, không phụ thuộc hình ảnh.
 
 `sample_context.json`, `render_preview.py` và bốn bản HTML trong `preview/`
