@@ -26,6 +26,7 @@ export default function WalletTopUpPage() {
     <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 space-y-6">
       <Wallet className="w-10 h-10 text-indigo-600" /><h1 className="text-2xl font-semibold">Nạp tiền thử nghiệm</h1>
       <p className="text-sm text-slate-500">Tiền thử chỉ dùng để trải nghiệm đặt phòng. Bạn không cần thanh toán hoặc cung cấp thông tin ngân hàng.</p>
+      {roomBookingService.mode === 'api' && <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Hệ thống đang dùng tài khoản dịch vụ thật: nạp tiền qua mã QR (3-09) sẽ có khi backend hoàn thành.</p>}
       <fieldset><legend className="text-sm font-semibold mb-3">Chọn số tiền</legend><div className="grid grid-cols-3 gap-2">{[50000, 100000, 200000].map((value) => <button key={value} type="button" aria-pressed={amount === value} onClick={() => setAmount(value)} className={`rounded-xl p-3 border text-sm font-semibold ${amount === value ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600'}`}>{formatMoney(value)}</button>)}</div></fieldset>
       <Button fullWidth loading={busy} onClick={topUp}>Nạp {formatMoney(amount)} tiền thử</Button>
     </div>

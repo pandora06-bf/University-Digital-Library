@@ -111,5 +111,54 @@ try {
     assert.equal(libraryTimestamp('2026-11-08T04:12:41.528270'), '2026-11-08T04:12:41.528270Z');
     assert.equal(libraryTimestamp('2026-10-27T09:00:00Z'), '2026-10-27T09:00:00Z');
   });
+  const roomUi = await import('../src/utils/roomBooking.js');
+  await check('3-18.b: hiển thị đủ 5 trạng thái, hạn check-in 15 phút và mốc hủy 1 giờ', () => {
+    clock = RealDate.parse('2026-10-20T07:00:00+07:00');
+    const at = (status, date = '2026-10-20', start = '10:00', end = '12:00') => roomUi.describeBooking({ status, date, start, end }, clock);
+    assert.equal(at('CONFIRMED').cancellable, true);
+    assert.equal(at('CONFIRMED', '2026-10-20', '08:00', '10:00').cancellable, true); // đúng 1 giờ: vẫn được hủy
+    clock = RealDate.parse('2026-10-20T07:30:00+07:00');
+    assert.equal(at('CONFIRMED', '2026-10-20', '08:00', '10:00').cancellable, undefined);
+    assert.match(at('CONFIRMED', '2026-10-20', '08:00', '10:00').note, /dưới 1 giờ/);
+    clock = RealDate.parse('2026-10-20T10:10:00+07:00');
+    assert.equal(at('CONFIRMED').label, 'Chờ check-in');
+    clock = RealDate.parse('2026-10-20T10:16:00+07:00');
+    assert.equal(at('CONFIRMED').label, 'Quá hạn check-in');
+    assert.deepEqual(['CHECKED_IN', 'COMPLETED', 'CANCELLED', 'NO_SHOW'].map((s) => at(s).label), ['Đang sử dụng', 'Đã hoàn thành', 'Đã hủy', 'Không đến']);
+    assert.match(at('NO_SHOW').note, /không được hoàn tiền/);
+  });
+  await check('3-18.b: lỗi API 402/403/409/400 đổi đúng mã và thông báo số tiền thiếu', () => {
+    const err = (status, detail) => ({ response: { status, data: { detail } } });
+    const short = roomUi.mapRoomApiError(err(402, { message: 'Số dư không đủ', shortfall: 20000 }));
+    assert.equal(short.code, 'INSUFFICIENT_BALANCE'); assert.match(short.message, /20\.000/);
+    assert.equal(roomUi.mapRoomApiError(err(403, 'Tài khoản bị khóa')).code, 'ACCOUNT_LOCKED');
+    assert.equal(roomUi.mapRoomApiError(err(409, 'Mỗi ngày chỉ một lượt')).code, 'DAILY_LIMIT');
+    assert.equal(roomUi.mapRoomApiError(err(409, 'Khung giờ đã có người đặt')).code, 'SLOT_UNAVAILABLE');
+    assert.equal(roomUi.mapRoomApiError(err(400, 'Quá hạn hủy'), 'cancel').code, 'CANCELLATION_CUTOFF');
+    assert.equal(roomUi.mapRoomApiError({}).code, 'NETWORK');
+  });
+  await check('3-18.b: dữ liệu API (dạng mock MSW) ghép đúng snapshot; thiếu giá không lỗi', () => {
+    clock = RealDate.parse('2026-10-20T09:00:00+07:00');
+    const snap = roomUi.toRoomSnapshot({ date: '2026-10-20', now: clock,
+      rooms: [{ id: 1, room_name: 'Phong 01', capacity: 6, floor: '1', is_active: true }, { id: 2, room_name: 'Đóng cửa', capacity: 4, is_active: false }],
+      availability: { 1: { slots: [{ slot_start: '08:00:00', slot_end: '10:00:00', available: true }, { slot_start: '10:00', slot_end: '12:00', available: false }, { slot_start: '12:00', slot_end: '14:00', available: true }] } },
+      bookings: [{ id: 7, room_id: 1, booking_date: '2026-10-21', slot_start: '12:00:00', slot_end: '14:00:00', status: 'CONFIRMED' }],
+      wallet: { service_balance: '50000.00' } });
+    assert.equal(snap.balance, 50000);
+    assert.equal(snap.rooms.length, 1);
+    assert.deepEqual(snap.rooms[0].slots.map((s) => s.reason), ['Đã qua', 'Đã đặt', 'Còn trống']);
+    assert.equal(snap.rooms[0].slotPrice, null);
+    assert.equal(roomUi.formatPrice(null), 'Phí theo quy định');
+    assert.deepEqual({ ...snap.bookings[0] }, { id: 7, roomId: 1, roomName: 'Phong 01', date: '2026-10-21', slotId: '12:00', start: '12:00', end: '14:00', price: null, status: 'CONFIRMED' });
+  });
+  await check('3-18.b mock: khóa tài khoản kiểm tra trước; số tiền thiếu định dạng VNĐ; có lịch sử mẫu', () => {
+    clock = RealDate.parse('2026-10-13T08:00:00+07:00');
+    sessionStorage.setItem('libmanager_user', JSON.stringify({ id: 'locked-user', is_locked: true }));
+    assert.throws(() => rooms.createRoomBooking({ roomId: 'room-01', date: '2026-10-14', slotId: '10' }), { code: 'ACCOUNT_LOCKED' });
+    sessionStorage.setItem('libmanager_user', JSON.stringify({ id: 'poor-user' }));
+    assert.throws(() => rooms.createRoomBooking({ roomId: 'room-03', date: '2026-10-14', slotId: '16' }), (e) => e.code === 'INSUFFICIENT_BALANCE' && /10\.000/.test(e.message));
+    assert.deepEqual(rooms.getRoomSnapshot('2026-10-14').bookings.map((b) => b.status).sort(), ['COMPLETED', 'NO_SHOW']);
+    sessionStorage.removeItem('libmanager_user');
+  });
   console.log(`${checks} kiểm tra nghiệp vụ đạt.`);
 } finally { globalThis.Date = RealDate; }

@@ -6,6 +6,20 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import Toast from '../../components/Toast';
 import { roomBookingService } from '../../services/roomBookingService';
 import { libraryToday, formatLibraryDate, formatMoney, slotTimestamp } from '../../utils/libraryDate';
+import { describeBooking, formatPrice } from '../../utils/roomBooking';
+
+const TONES = {
+  emerald: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-800', rose: 'bg-rose-50 text-rose-700',
+  indigo: 'bg-indigo-50 text-indigo-700', slate: 'bg-slate-100 text-slate-600',
+};
+const ACTIVE = ['CONFIRMED', 'CHECKED_IN'];
+// Lượt còn hiệu lực lên đầu (gần nhất trước), lịch sử phía sau (mới nhất trước).
+const sortBookings = (bookings) => [...bookings].sort((a, b) => {
+  const activeA = ACTIVE.includes(a.status), activeB = ACTIVE.includes(b.status);
+  if (activeA !== activeB) return activeA ? -1 : 1;
+  const diff = slotTimestamp(a.date, a.start) - slotTimestamp(b.date, b.start);
+  return activeA ? diff : -diff;
+});
 
 export default function RoomBookingPage() {
   const [date, setDate] = useState(libraryToday);
@@ -89,7 +103,7 @@ export default function RoomBookingPage() {
                 <DoorOpen className="w-8 h-8 text-indigo-600 mb-5" />
                 <h2 className="text-lg font-semibold">{room.name}</h2>
                 <div className="flex flex-wrap gap-3 mt-2 text-sm text-slate-500"><span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{room.floor}</span><span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{room.capacity} người</span></div>
-                <p className="mt-4 text-xl text-indigo-700 font-semibold">{formatMoney(room.slotPrice)}<span className="text-xs font-normal text-slate-500"> / khung giờ</span></p>
+                <p className="mt-4 text-xl text-indigo-700 font-semibold">{formatPrice(room.slotPrice)}{Number.isFinite(room.slotPrice) && <span className="text-xs font-normal text-slate-500"> / khung giờ</span>}</p>
               </div>
               <div className="p-5">
                 <div className="flex flex-wrap gap-2 mb-5">{room.amenities.map((item) => <span key={item} className="text-xs text-slate-600 bg-slate-100 px-2 py-1 rounded-md">{item}</span>)}</div>
@@ -107,23 +121,26 @@ export default function RoomBookingPage() {
         </div>
       )}
       {selection && <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div><p className="font-semibold text-indigo-900">{selection.room.name}</p><p className="text-sm text-indigo-700 mt-1">{formatLibraryDate(date)} · {selection.slot.start}–{selection.slot.end} · {formatMoney(selection.room.slotPrice)}</p></div>
+        <div><p className="font-semibold text-indigo-900">{selection.room.name}</p><p className="text-sm text-indigo-700 mt-1">{formatLibraryDate(date)} · {selection.slot.start}–{selection.slot.end} · {formatPrice(selection.room.slotPrice)}</p></div>
         <Button onClick={() => setConfirm({ type: 'book' })} icon={<CalendarDays className="w-4 h-4" />}>Đặt khung giờ này</Button>
       </div>}
       <section className="space-y-4">
         <h2 className="text-xl font-semibold flex items-center gap-2"><Clock3 className="w-5 h-5 text-indigo-600" />Lượt đặt của tôi</h2>
         {snapshot?.bookings.length === 0 && <div className="bg-white rounded-2xl border border-dashed border-slate-300 py-10 text-center text-slate-500">Bạn chưa có lượt đặt nào. Chọn phòng và khung giờ phía trên để bắt đầu.</div>}
-        {snapshot?.bookings.map((booking) => {
-          const started = slotTimestamp(booking.date, booking.start) <= now;
-          const status = booking.status === 'CANCELLED' ? 'Đã hủy' : started ? 'Đã đến giờ sử dụng' : 'Đã xác nhận';
+        {snapshot && sortBookings(snapshot.bookings).map((booking) => {
+          const info = describeBooking(booking, now);
           return <article key={booking.id} className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row justify-between gap-4">
-            <div><div className="flex flex-wrap items-center gap-3"><h3 className="font-semibold">{booking.roomName}</h3><span className={`text-xs rounded-full px-3 py-1 ${booking.status === 'CANCELLED' ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>{status}</span></div><p className="mt-2 text-sm text-slate-500">{formatLibraryDate(booking.date)} · {booking.start}–{booking.end} · {formatMoney(booking.price)}</p></div>
-            {booking.status === 'CONFIRMED' && slotTimestamp(booking.date, booking.start) - now >= 3600000 && <Button size="sm" variant="ghost" disabled={busy} className="text-rose-600" onClick={() => setConfirm({ type: 'cancel', booking })} icon={<RotateCcw className="w-4 h-4" />}>Hủy đặt phòng</Button>}
+            <div>
+              <div className="flex flex-wrap items-center gap-3"><h3 className="font-semibold">{booking.roomName}</h3><span className={`text-xs rounded-full px-3 py-1 ${TONES[info.tone]}`}>{info.label}</span></div>
+              <p className="mt-2 text-sm text-slate-500">{formatLibraryDate(booking.date)} · {booking.start}–{booking.end} · {formatPrice(booking.price)}</p>
+              {info.note && <p className="mt-1 text-xs text-slate-500">{info.note}</p>}
+            </div>
+            {info.cancellable && <Button size="sm" variant="ghost" disabled={busy} className="text-rose-600 self-start sm:self-center" onClick={() => setConfirm({ type: 'cancel', booking })} icon={<RotateCcw className="w-4 h-4" />}>Hủy đặt phòng</Button>}
           </article>;
         })}
       </section>
       {confirm && <ConfirmDialog title={confirm.type === 'book' ? 'Xác nhận đặt phòng' : 'Hủy lượt đặt?'} confirmLabel={confirm.type === 'book' ? 'Xác nhận đặt' : 'Hủy và hoàn tiền'} danger={confirm.type === 'cancel'} loading={busy} onClose={() => setConfirm(null)} onConfirm={performAction}>
-        {confirm.type === 'book' ? <><p>{selection.room.name} · {formatLibraryDate(date)}</p><p>{selection.slot.start}–{selection.slot.end}. Phí {formatMoney(selection.room.slotPrice)} được trừ từ số dư khi đặt thành công.</p></> : <p>Hủy {confirm.booking.roomName} lúc {confirm.booking.start} ngày {formatLibraryDate(confirm.booking.date)}? Khoản {formatMoney(confirm.booking.price)} sẽ được hoàn vào số dư.</p>}
+        {confirm.type === 'book' ? <><p>{selection.room.name} · {formatLibraryDate(date)}</p><p>{selection.slot.start}–{selection.slot.end}. {Number.isFinite(selection.room.slotPrice) ? `Phí ${formatMoney(selection.room.slotPrice)} được trừ từ số dư khi đặt thành công.` : 'Phí được trừ từ số dư theo quy định của thư viện khi đặt thành công.'}</p></> : <p>Hủy {confirm.booking.roomName} lúc {confirm.booking.start} ngày {formatLibraryDate(confirm.booking.date)}? {Number.isFinite(confirm.booking.price) ? `Khoản ${formatMoney(confirm.booking.price)} sẽ được hoàn 100% vào số dư.` : 'Phí đã trả sẽ được hoàn 100% vào số dư.'}</p>}
       </ConfirmDialog>}
     </div>
   );

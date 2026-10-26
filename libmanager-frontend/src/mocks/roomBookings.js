@@ -1,5 +1,5 @@
 import { getCurrentUser } from './auth';
-import { libraryToday, slotTimestamp } from '../utils/libraryDate';
+import { libraryToday, slotTimestamp, formatMoney } from '../utils/libraryDate';
 
 export const ROOMS = [
   { id: 'room-01', name: 'Phòng học nhóm A201', floor: 'Tầng 2 · Khu A', capacity: 4, slotPrice: 20000, amenities: ['Bảng viết', 'Wi-Fi', 'Ổ cắm'] },
@@ -10,13 +10,21 @@ export const ROOM_SLOTS = Array.from({ length: 5 }, (_, i) => ({
   id: `${8 + i * 2}`, start: `${String(8 + i * 2).padStart(2, '0')}:00`, end: `${String(10 + i * 2).padStart(2, '0')}:00`,
 }));
 
+// Lịch sử mẫu để giao diện thể hiện trạng thái do thủ thư/JOB-06 cập nhật (2B-27).
+function demoHistory() {
+  const daysAgo = (n) => libraryToday(new Date(Date.now() - n * 86400000));
+  const past = (n, room, slot, status) => ({ id: `demo-${status.toLowerCase()}`, roomId: room.id, roomName: room.name,
+    date: daysAgo(n), slotId: slot.id, start: slot.start, end: slot.end, price: room.slotPrice, status, createdAt: daysAgo(n + 1) });
+  return [past(2, ROOMS[0], ROOM_SLOTS[1], 'COMPLETED'), past(5, ROOMS[1], ROOM_SLOTS[3], 'NO_SHOW')];
+}
+
 function storageKey() {
   return `libmanager_rooms_v1_${getCurrentUser()?.id ?? 'demo'}`;
 }
 function readState() {
   const raw = sessionStorage.getItem(storageKey());
   if (raw) return JSON.parse(raw);
-  return { balance: 50000, bookings: [] };
+  return { balance: 50000, bookings: demoHistory() };
 }
 function saveState(state) {
   // Số dư và lượt đặt ghi cùng một lần; không có bước trừ tiền riêng.
@@ -41,13 +49,14 @@ export function getRoomSnapshot(date) {
 
 export function createRoomBooking({ roomId, date, slotId }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < libraryToday() || !Number.isFinite(slotTimestamp(date, '00:00')) || libraryToday(new Date(slotTimestamp(date, '12:00'))) !== date) fail('INVALID_DATE', 'Vui lòng chọn ngày hợp lệ từ hôm nay.');
+  // Thứ tự kiểm tra theo 2B-22: khóa tài khoản trước, rồi khung giờ, hạn mức ngày, số dư.
+  if (getCurrentUser()?.is_locked) fail('ACCOUNT_LOCKED', 'Tài khoản đang bị khóa đặt phòng. Vui lòng liên hệ thủ thư.');
   const state = readState();
   const room = getRoomSnapshot(date).rooms.find((item) => item.id === roomId);
   const slot = room?.slots.find((item) => item.id === slotId);
   if (!room || !slot?.available) fail('SLOT_UNAVAILABLE', 'Khung giờ này không còn trống. Vui lòng chọn khung giờ khác.');
-  if (getCurrentUser()?.is_locked) fail('ACCOUNT_LOCKED', 'Tài khoản đang bị khóa đặt phòng. Vui lòng liên hệ thủ thư.');
   if (state.bookings.some((booking) => booking.date === date && ['CONFIRMED', 'CHECKED_IN'].includes(booking.status))) fail('DAILY_LIMIT', 'Bạn chỉ được có một lượt đặt còn hiệu lực mỗi ngày.');
-  if (state.balance < room.slotPrice) fail('INSUFFICIENT_BALANCE', `Số dư không đủ. Bạn còn thiếu ${room.slotPrice - state.balance} đồng để đặt phòng.`);
+  if (state.balance < room.slotPrice) fail('INSUFFICIENT_BALANCE', `Số dư không đủ. Bạn còn thiếu ${formatMoney(room.slotPrice - state.balance)} để đặt phòng.`);
   const booking = {
     id: crypto.randomUUID(), roomId, roomName: room.name, date, slotId, start: slot.start, end: slot.end,
     price: room.slotPrice, status: 'CONFIRMED', createdAt: new Date().toISOString(),

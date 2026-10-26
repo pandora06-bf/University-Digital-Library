@@ -103,6 +103,35 @@ khóa tài khoản và bảo vệ đặt trùng. Mock không thay thế transact
 tra cạnh tranh của backend. Ánh xạ 402 thành `INSUFFICIENT_BALANCE`, 409
 thành lỗi giờ đã đặt/hạn mức để trang hiển thị thông báo.
 
+## 3-18.b: hoàn thiện đặt phòng (26/10/2026)
+
+Không có góp ý review trên GitHub cho 3-18; tự review theo tiêu chí 2B-22/3-10:
+
+- Hiển thị đủ 5 trạng thái RoomBooking: Đã xác nhận, Chờ check-in (15 phút đầu),
+  Quá hạn check-in, Đang sử dụng (CHECKED_IN), Đã hoàn thành, Đã hủy, Không đến
+  (NO_SHOW, không hoàn tiền). Lượt còn hiệu lực xếp trước, lịch sử xếp sau.
+- Hủy: chỉ hiện nút khi còn từ 1 giờ trở lên; dưới 1 giờ ghi rõ lý do.
+- Thiếu số dư: thông báo số tiền thiếu dạng VNĐ, kèm nút Sang Nạp tiền.
+- Mock kiểm tra khóa tài khoản trước tiên; có lịch sử mẫu COMPLETED/NO_SHOW.
+- Model `Room` chưa có cột giá: thiếu giá thì hiện "Phí theo quy định".
+
+Adapter API thật đã viết trong `services/roomBookingService.js`, logic ghép dữ
+liệu và đổi lỗi ở `utils/roomBooking.js` (có kiểm thử trong
+`npm run verify:features`). Bật bằng `VITE_ROOM_BOOKING_API=true` khi backend có
+API; mặc định vẫn mock. Frontend đang chờ dữ liệu dạng:
+
+- `GET /api/rooms`: `[{ id, room_name, capacity, floor, is_active, slot_price? }]`
+- `GET /api/rooms/{id}/availability?date=YYYY-MM-DD`:
+  `{ slots: [{ slot_start: '08:00', slot_end: '10:00', available }] }`
+- `GET /api/room-bookings/my`: mảng (hoặc `{ items }`) gồm `id, room_id,
+  room_name?, booking_date, slot_start, slot_end, status, price?`
+- `POST /api/room-bookings` body `{ room_id, booking_date, slot_start }`;
+  `DELETE /api/room-bookings/{id}`
+- `GET /api/wallet`: `{ service_balance }`
+- Lỗi: 402 `detail: { message, shortfall }`; 403 khóa tài khoản; 409 trùng giờ
+  (detail có chữ "ngày" thì hiểu là quá một lượt/ngày); 400/422 ngày sai hoặc
+  hủy quá hạn.
+
 Trang Nạp tiền hiện chỉ thêm **tiền thử**, được ghi rõ trên màn hình. Khi
 4-13 xong thay trang đích này bằng WalletSection/TopUpModal thật. Không tự
 cộng tiền ở frontend khi dùng giao dịch thật.
