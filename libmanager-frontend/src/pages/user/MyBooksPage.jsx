@@ -54,8 +54,9 @@ export default function MyBooksPage() {
           <div className="w-9 h-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
             <BookOpen className="w-4 h-4" />
           </div>
-          <div className="flex flex-col max-w-sm">
-            <span className="font-semibold text-slate-900 line-clamp-1">{val}</span>
+          {/* Table dùng whitespace-nowrap; cột này cho xuống dòng để bảng không tràn ở 1440px */}
+          <div className="flex flex-col w-72 whitespace-normal">
+            <span className="font-semibold text-slate-900 line-clamp-2">{val}</span>
             <span className="text-xs text-slate-500 line-clamp-1">{row.author} • ISBN: {row.isbn}</span>
           </div>
         </div>

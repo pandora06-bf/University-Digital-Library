@@ -64,7 +64,7 @@ export default function ProtectedPDFViewer({ session, onBorrow, onReturn, busy =
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center rounded-xl border border-slate-700 px-1 py-1">
               <button type="button" aria-label="Trang trước" disabled={locked || page <= 1} onClick={() => setPage((value) => value - 1)} className="p-2 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-              <span aria-live="polite" className="text-xs px-2">{pages ? `${page} / ${allowedPages}` : 'Đang tải…'}</span>
+              <span aria-live="polite" className="text-xs px-2">{locked ? '—' : pages ? `${page} / ${allowedPages}` : 'Đang tải…'}</span>
               <button type="button" aria-label="Trang sau" disabled={locked || !pages || page >= allowedPages} onClick={() => setPage((value) => value + 1)} className="p-2 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
             </div>
             <div className="flex items-center rounded-xl border border-slate-700 px-1 py-1">
