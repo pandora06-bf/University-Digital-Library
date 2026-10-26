@@ -1,4 +1,6 @@
 import { INITIAL_BOOKS } from './books';
+import { getCurrentUser } from './auth';
+import { apiError } from '../utils/borrowErrors';
 
 /**
  * Quản lý kho sách và phiếu mượn tương tác trong phiên làm việc (Mock Store)
@@ -181,3 +183,71 @@ export const returnBookAction = (loanId) => {
 
   return { success: true, message: 'Trả tài liệu thành công!' };
 };
+
+// ---------------------------------------------------------------------------
+// 3-12.a: Đặt mượn sách vật lý (giữ chỗ chờ nhận tại quầy) và Hẹn đặt trước.
+// Mô phỏng Loan Engine 3-01.a và Waitlist 3-04.a; lỗi ném theo dạng lỗi Axios
+// để trang dùng chung đường xử lý với API thật.
+// ---------------------------------------------------------------------------
+const ACTIVE_STATUSES = ['Đang mượn', 'Chờ nhận'];
+const WAITLIST_KEY = 'libmanager_waitlists';
+const PICKUP_HOURS = 24;
+
+export const borrowLimitFor = (user) => (user?.apiRole === 'LECTURER' ? 5 : 3);
+export const borrowDaysFor = (user) => (user?.apiRole === 'LECTURER' ? 30 : 14);
+
+const getStoredWaitlists = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(WAITLIST_KEY) || '[]');
+  } catch {
+    return [];
+  }
+};
+const setStoredWaitlists = (items) => sessionStorage.setItem(WAITLIST_KEY, JSON.stringify(items));
+
+// Chốt chặn dùng chung theo thứ tự 3-01.a: khóa/nợ phạt -> hạn mức -> mượn trùng.
+function checkBorrower(user, bookId, loans) {
+  if (user?.is_locked || Number(user?.total_fines) > 0) throw apiError(403, 'Tài khoản bị khóa hoặc còn nợ phạt');
+  const active = loans.filter((loan) => ACTIVE_STATUSES.includes(loan.status));
+  if (active.length >= borrowLimitFor(user)) throw apiError(409, 'Đã đạt hạn mức mượn sách');
+  if (active.some((loan) => loan.bookId === bookId)) throw apiError(409, 'Bạn đang có phiếu mượn sách này');
+}
+
+export function requestPhysicalLoan(bookId, user = getCurrentUser()) {
+  const books = getStoredBooks();
+  const loans = getStoredLoans();
+  const book = books.find((item) => item.id === bookId);
+  if (!book) throw apiError(404, 'Không tìm thấy sách');
+  checkBorrower(user, bookId, loans);
+  if (book.availableCopies <= 0) throw apiError(409, 'Sách đã hết bản có thể mượn');
+
+  book.availableCopies -= 1;
+  setStoredBooks(books);
+  const now = new Date();
+  const loan = {
+    id: `loan_${now.getTime()}`,
+    loanCode: `PM-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    bookId: book.id, bookTitle: book.title, author: book.author, isbn: book.isbn,
+    borrowDate: now.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' }),
+    dueDate: 'Tính khi nhận sách',
+    pickupDeadline: new Date(now.getTime() + PICKUP_HOURS * 3600000).toISOString(),
+    location: book.location,
+    status: 'Chờ nhận', statusType: 'neutral', loanType: 'PHYSICAL', pdfAvailable: false,
+  };
+  setStoredLoans([loan, ...loans]);
+  return loan;
+}
+
+export function joinWaitlist(bookId, user = getCurrentUser()) {
+  const books = getStoredBooks();
+  const book = books.find((item) => item.id === bookId);
+  if (!book) throw apiError(404, 'Không tìm thấy sách');
+  checkBorrower(user, bookId, getStoredLoans());
+  const items = getStoredWaitlists();
+  if (items.some((item) => item.bookId === bookId)) throw apiError(409, 'Bạn đã đặt trước sách này');
+  if (book.availableCopies > 0) throw apiError(409, 'Sách vẫn còn bản có thể mượn, không thể đặt trước');
+  // Vị trí = số người đang chờ + 1; mock giả định đã có 2 độc giả khác chờ trước.
+  const entry = { id: `wl_${Date.now()}`, bookId, bookTitle: book.title, queuePosition: 3, status: 'WAITING' };
+  setStoredWaitlists([entry, ...items]);
+  return entry;
+}

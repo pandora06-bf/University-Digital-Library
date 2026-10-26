@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { BookOpen, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { CursorRipple } from '../../components/motion/CursorRipple';
 import { login } from '../../services/authService';
+import { getToken } from '../../services/axios_instance';
+import { getCurrentUser } from '../../mocks/auth';
+import { landingPathFor } from '../../utils/loginRedirect';
 
 /**
  * Màn hình Đăng nhập (Login Page)
@@ -16,13 +19,19 @@ import { login } from '../../services/authService';
  * - Mobile 390: Brand banner trên cao 320px, card form đè lên 72px (radius 24px),
  *   cuộn linh hoạt khi bàn phím ảo xuất hiện.
  */
-export default function Login({ onLogin }) {
+export default function LoginPage({ onLogin }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Đã đăng nhập thì không ở lại trang Đăng nhập
+  const current = getCurrentUser();
+  if (getToken() && current) return <Navigate to={landingPathFor(current, redirect)} replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,7 +48,8 @@ export default function Login({ onLogin }) {
     try {
       const user = await login(username.trim(), password);
       if (onLogin) onLogin(user);
-      navigate(user.role === 'admin' ? '/admin' : '/');
+      // Điều hướng theo vai trò; quay lại trang sách nếu khách bấm mượn trước đó (2B-14)
+      navigate(landingPathFor(user, redirect), { replace: true });
     } catch (err) {
       if (err.response?.status === 401) setErrorMsg('Sai tên đăng nhập hoặc mật khẩu');
       else if (err.response?.status === 403) setErrorMsg('Tài khoản đã bị khóa');

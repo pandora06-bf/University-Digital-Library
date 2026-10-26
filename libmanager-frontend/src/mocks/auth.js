@@ -22,21 +22,20 @@ export const DEMO_USERS = [
   },
 ];
 
-// Helper lấy người dùng hiện tại từ sessionStorage
+// Helper lấy người dùng hiện tại; lưu localStorage cùng token (2B-13)
 export const getCurrentUser = () => {
   try {
-    const data = sessionStorage.getItem('libmanager_user');
+    const data = localStorage.getItem('libmanager_user');
     return data ? JSON.parse(data) : null;
   } catch {
     return null;
   }
 };
 
-// Helper lưu người dùng vào sessionStorage
+// Helper lưu người dùng vào localStorage
 export const setCurrentUser = (user) => {
-  if (user) {
-    sessionStorage.setItem('libmanager_user', JSON.stringify(user));
-  } else {
-    sessionStorage.removeItem('libmanager_user');
-  }
+  try {
+    if (user) localStorage.setItem('libmanager_user', JSON.stringify(user));
+    else localStorage.removeItem('libmanager_user');
+  } catch { /* bộ nhớ bị chặn: bỏ qua */ }
 };

@@ -14,6 +14,19 @@ import { getStoredLoans, returnBookAction } from '../../mocks/loans';
  * - Mobile 390: Chuyển đổi linh hoạt sang dạng thẻ (Card list) tối ưu cho màn hình nhỏ.
  * - Tính năng: Đọc sách trực tuyến (/reader/:loanId), Trả sách, cập nhật realtime.
  */
+// "HH:mm dd/MM" theo giờ Việt Nam (ICU vi-VN tự in "dd-MM" khi bỏ năm, nên ghép tay).
+const shortDateTime = (value) => {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(value)).map((part) => [part.type, part.value]));
+  return `${parts.hour}:${parts.minute} ${parts.day}/${parts.month}`;
+};
+
+// Phiếu Chờ nhận (3-12.a): hạn trả tính khi nhận sách, nên hiện hạn nhận tại quầy.
+const dueText = (loan, dueDate) => (loan.status === 'Chờ nhận' && loan.pickupDeadline
+  ? `Nhận trước ${shortDateTime(loan.pickupDeadline)}`
+  : dueDate);
+
 export default function MyBooksPage() {
   const [loans, setLoans] = useState(getStoredLoans);
   const [toast, setToast] = useState(null);
@@ -33,8 +46,8 @@ export default function MyBooksPage() {
     }
   };
 
-  // Thống kê nhanh
-  const activeLoansCount = loans.filter((l) => l.status === 'Đang mượn').length;
+  // Thống kê nhanh (phiếu Chờ nhận cũng tính vào hạn mức, 3-01.a)
+  const activeLoansCount = loans.filter((l) => l.status === 'Đang mượn' || l.status === 'Chờ nhận').length;
   const returnedCount = loans.filter((l) => l.status === 'Đã trả').length;
 
   // Cấu hình Custom Columns cho Table của User Portal
@@ -74,7 +87,7 @@ export default function MyBooksPage() {
       align: 'left',
       render: (val, row) => (
         <span className={`font-semibold ${row.status === 'Đã trả' ? 'text-slate-400' : 'text-amber-700'}`}>
-          {val}
+          {dueText(row, val)}
         </span>
       ),
     },
@@ -108,7 +121,7 @@ export default function MyBooksPage() {
               Trả sách
             </Button>
           ) : (
-            <span className="text-xs text-slate-400 font-medium px-2 py-1">Đã hoàn tất</span>
+            <span className="text-xs text-slate-400 font-medium px-2 py-1">{row.status === 'Chờ nhận' ? 'Chờ nhận tại quầy' : 'Đã hoàn tất'}</span>
           )}
         </div>
       ),
@@ -209,7 +222,7 @@ export default function MyBooksPage() {
                 <div>
                   <span className="text-slate-400 block">Hạn trả:</span>
                   <span className={`font-semibold ${loan.status === 'Đã trả' ? 'text-slate-400' : 'text-amber-700'}`}>
-                    {loan.dueDate}
+                    {dueText(loan, loan.dueDate)}
                   </span>
                 </div>
               </div>

@@ -175,3 +175,28 @@ npm run build
 Kiểm tra giao diện tiếp theo: desktop/mobile 375px, chọn/hủy/nạp thử rồi đặt
 lại, đọc đến trang cuối preview, zoom, Ctrl/Cmd+P/S, context menu, để phiên
 hết hạn và thử 403 thật. Với email kiểm tra Gmail web/mobile và chế độ tối.
+
+## 2B-13, 2B-14, 3-12.a: đăng nhập, chi tiết sách, mượn sách vật lý (26/10/2026)
+
+- **2B-13** `pages/auth/LoginPage.jsx` (đổi tên từ Login.jsx), `components/ProtectedRoute.jsx`:
+  token và user lưu `localStorage`; điều hướng theo vai trò (ADMIN vào `/admin`,
+  độc giả về `/` hoặc trang đang xem); 401 xóa token + user rồi về
+  `/login?redirect=<trang>`; không có nút đăng ký. Trang cần đăng nhập:
+  Sách của tôi, Đặt phòng, Nạp tiền, Trình đọc. Khách vẫn xem trang chủ, danh mục,
+  chi tiết sách, bản xem trước. `redirect` chỉ nhận đường dẫn nội bộ (chặn open redirect).
+  Đăng xuất phía User trước đây không xóa token; đã sửa.
+- **2B-14** `BookDetailPage.jsx`: nút "Đặt mượn" (còn tồn), "Hẹn đặt trước" (hết tồn),
+  "Đọc/Mượn eBook" (có PDF). Khách bấm mượn -> Đăng nhập -> quay lại trang sách.
+- **3-12.a** `BorrowButton` trong `BookDetailPage.jsx`, `components/ToastAlertComponent.jsx`
+  (dùng lại Toast chung của Vân), `services/loanService.js`, `utils/borrowErrors.js`.
+
+API đặt trước (3-04.a, Nhất) đã có. API mượn `POST /api/loans/physical/request`
+(3-01.a, Đức) chưa có nên mặc định dùng mock đúng thứ tự chốt chặn: khóa/nợ phạt
+-> hạn mức (SV 3, GV 5, tính cả Chờ nhận) -> mượn trùng -> tồn kho. Bật API thật bằng
+`VITE_PHYSICAL_LOAN_API=true`. Frontend chờ:
+
+- Body `{ book_id }`; thành công trả `{ loan_id, loan_code, pickup_deadline, loan_status }`
+  (`pickup_deadline` có múi giờ hoặc UTC có `Z`).
+- 403 khi khóa tài khoản/nợ phạt; 409 với `detail` có chữ "hạn mức" (vượt hạn mức),
+  "đang có phiếu" (mượn trùng), "hết" (hết sách -> giao diện hỏi chuyển sang Hẹn đặt trước).
+  Giống câu lỗi của `waitlist_logic.py` để dùng chung một bộ đổi lỗi.

@@ -8,7 +8,8 @@ import MyBooksPage from './pages/user/MyBooksPage';
 const PdfReaderPage = lazy(() => import('./pages/user/PdfReaderPage'));
 import RoomBookingPage from './pages/user/RoomBookingPage';
 import WalletTopUpPage from './pages/user/WalletTopUpPage';
-import Login from './pages/auth/Login';
+import LoginPage from './pages/auth/LoginPage';
+import ProtectedRoute from './components/ProtectedRoute';
 import NotFoundPage from './pages/NotFoundPage';
 import UiKitPage from './pages/dev/UiKitPage';
 
@@ -31,20 +32,23 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Route Đăng nhập */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginPage />} />
 
         {/* Cổng Độc giả User Portal với Layout chung */}
         <Route path="/" element={<UserLayout />}>
           <Route index element={<HomePage />} />
           <Route path="catalog" element={<CatalogPage />} />
           <Route path="books/:bookId" element={<BookDetailPage />} />
-          <Route path="my-books" element={<MyBooksPage />} />
-          <Route path="rooms" element={<RoomBookingPage />} />
-          <Route path="wallet/top-up" element={<WalletTopUpPage />} />
+          {/* 2B-13: trang cá nhân cần đăng nhập; khách vẫn xem trang chủ, danh mục, chi tiết sách */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="my-books" element={<MyBooksPage />} />
+            <Route path="rooms" element={<RoomBookingPage />} />
+            <Route path="wallet/top-up" element={<WalletTopUpPage />} />
+          </Route>
         </Route>
 
         {/* Trình đọc Sách PDF toàn màn hình */}
-        <Route path="/reader/:loanId" element={<Suspense fallback={<p className="p-12 text-center">Đang mở trình đọc…</p>}><PdfReaderPage /></Suspense>} />
+        <Route path="/reader/:loanId" element={<ProtectedRoute><Suspense fallback={<p className="p-12 text-center">Đang mở trình đọc…</p>}><PdfReaderPage /></Suspense></ProtectedRoute>} />
         <Route path="/books/:bookId/preview" element={<Suspense fallback={<p className="p-12 text-center">Đang mở bản xem trước…</p>}><PdfReaderPage /></Suspense>} />
 
         {/* Trang kiểm thử Component Dev UI-Kit */}

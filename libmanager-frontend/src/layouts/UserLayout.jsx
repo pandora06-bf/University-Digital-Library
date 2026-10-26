@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays } from 'lucide-react';
-import { getCurrentUser, setCurrentUser } from '../mocks/auth';
+import { getCurrentUser } from '../mocks/auth';
+import { logout } from '../services/authService';
+import { loginPathFor } from '../utils/loginRedirect';
 import { Button } from '../components/Button';
 import { PageTransition } from '../components/motion/PageTransition';
 
@@ -13,7 +15,7 @@ export default function UserLayout() {
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleLogout = () => {
-    setCurrentUser(null);
+    logout(); // xóa cả token lẫn user (2B-13)
     navigate('/login');
   };
 
@@ -128,7 +130,7 @@ export default function UserLayout() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => navigate('/login')}
+                onClick={() => navigate(loginPathFor(location))}
               >
                 Đăng nhập
               </Button>

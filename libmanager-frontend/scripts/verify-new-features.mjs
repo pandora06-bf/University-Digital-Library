@@ -16,6 +16,8 @@ globalThis.sessionStorage = {
   setItem: (key, value) => storage.set(key, value),
   removeItem: (key) => storage.delete(key),
 };
+// Token và user lưu localStorage (2B-13); dùng chung kho giả với sessionStorage.
+Object.defineProperty(globalThis, 'localStorage', { value: globalThis.sessionStorage, configurable: true });
 const RealDate = Date;
 let clock = RealDate.parse('2026-10-13T08:00:00+07:00');
 globalThis.Date = class extends RealDate {
@@ -159,6 +161,52 @@ try {
     assert.throws(() => rooms.createRoomBooking({ roomId: 'room-03', date: '2026-10-14', slotId: '16' }), (e) => e.code === 'INSUFFICIENT_BALANCE' && /10\.000/.test(e.message));
     assert.deepEqual(rooms.getRoomSnapshot('2026-10-14').bookings.map((b) => b.status).sort(), ['COMPLETED', 'NO_SHOW']);
     sessionStorage.removeItem('libmanager_user');
+  });
+  const redirect = await import('../src/utils/loginRedirect.js');
+  await check('2B-13: quay lại trang cũ sau đăng nhập, điều hướng theo vai trò, chặn open redirect', () => {
+    assert.equal(redirect.loginPathFor({ pathname: '/books/b1', search: '' }), '/login?redirect=%2Fbooks%2Fb1');
+    assert.equal(redirect.landingPathFor({ role: 'user' }, '/books/b1'), '/books/b1');
+    assert.equal(redirect.landingPathFor({ role: 'user' }, null), '/');
+    assert.equal(redirect.landingPathFor({ role: 'user' }, '/admin/users'), '/');
+    assert.equal(redirect.landingPathFor({ role: 'admin' }, '/books/b1'), '/admin');
+    assert.equal(redirect.landingPathFor({ role: 'admin' }, '/admin/loans'), '/admin/loans');
+    for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', '/login?redirect=/']) assert.equal(redirect.safeRedirect(bad), null);
+  });
+  const borrowErr = await import('../src/utils/borrowErrors.js');
+  await check('3-12.a: lỗi 403/409 của API đổi đúng lý do; hết sách gợi ý Hẹn đặt trước', () => {
+    const err = (status, detail) => borrowErr.apiError(status, detail);
+    assert.equal(borrowErr.mapBorrowError(err(403, 'Tài khoản bị khóa hoặc còn nợ phạt')).code, 'BLOCKED');
+    assert.equal(borrowErr.mapBorrowError(err(409, 'Đã đạt hạn mức mượn sách')).code, 'LIMIT');
+    assert.equal(borrowErr.mapBorrowError(err(409, 'Bạn đang có phiếu mượn sách này')).code, 'DUPLICATE');
+    assert.equal(borrowErr.mapBorrowError(err(409, 'Bạn đã đặt trước sách này')).code, 'ALREADY_WAITLISTED');
+    const out = borrowErr.mapBorrowError(err(409, 'Sách đã hết bản có thể mượn'));
+    assert.equal(out.code, 'OUT_OF_STOCK'); assert.equal(out.offerWaitlist, true);
+    assert.equal(borrowErr.mapBorrowError(new Error('offline')).code, 'NETWORK');
+  });
+  await check('3-12.a mock: chốt chặn nợ phạt -> hạn mức -> tồn; thành công tạo phiếu Chờ nhận hạn 24 giờ', () => {
+    clock = RealDate.parse('2026-10-26T09:00:00+07:00');
+    sessionStorage.removeItem('libmanager_user_loans'); sessionStorage.removeItem('libmanager_books_data'); sessionStorage.removeItem('libmanager_waitlists');
+    const code = (fn) => { try { fn(); } catch (e) { return borrowErr.mapBorrowError(e).code; } return 'OK'; };
+    assert.equal(code(() => loans.requestPhysicalLoan('b2', { role: 'user', total_fines: 5000 })), 'BLOCKED');
+    const student = { role: 'user', apiRole: 'STUDENT' };
+    const before = loans.getStoredBooks().find((b) => b.id === 'b3').availableCopies;
+    const loan = loans.requestPhysicalLoan('b3', student);
+    assert.equal(loan.status, 'Chờ nhận');
+    assert.match(loan.loanCode, /^PM-2026-\d{4}$/);
+    assert.equal(RealDate.parse(loan.pickupDeadline) - clock, 24 * 3600000);
+    assert.equal(loans.getStoredBooks().find((b) => b.id === 'b3').availableCopies, before - 1);
+    // Mock có sẵn 2 phiếu Đang mượn + 1 Chờ nhận = 3 = hạn mức sinh viên
+    assert.equal(code(() => loans.requestPhysicalLoan('b5', student)), 'LIMIT');
+    assert.equal(code(() => loans.requestPhysicalLoan('b5', { role: 'user', apiRole: 'LECTURER' })), 'OK');
+    assert.equal(code(() => loans.requestPhysicalLoan('b4', { role: 'user', apiRole: 'LECTURER' })), 'OUT_OF_STOCK');
+  });
+  await check('3-12.a mock: Hẹn đặt trước chỉ khi hết sách, không đặt trùng', () => {
+    const lecturer = { role: 'user', apiRole: 'LECTURER' };
+    const code = (fn) => { try { fn(); } catch (e) { return borrowErr.mapBorrowError(e).code; } return 'OK'; };
+    assert.equal(code(() => loans.joinWaitlist('b6', lecturer)), 'STILL_AVAILABLE');
+    assert.equal(loans.joinWaitlist('b4', lecturer).status, 'WAITING');
+    assert.equal(code(() => loans.joinWaitlist('b4', lecturer)), 'ALREADY_WAITLISTED');
+    assert.equal(loans.borrowDaysFor(lecturer), 30); assert.equal(loans.borrowDaysFor({ apiRole: 'STUDENT' }), 14);
   });
   console.log(`${checks} kiểm tra nghiệp vụ đạt.`);
 } finally { globalThis.Date = RealDate; }

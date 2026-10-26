@@ -1,5 +1,5 @@
-﻿import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import ProtectedPDFViewer from '../../components/ProtectedPDFViewer';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Toast from '../../components/Toast';
@@ -7,6 +7,8 @@ import { Button } from '../../components/Button';
 import { ebookService } from '../../services/ebookService';
 import { getCurrentUser } from '../../mocks/auth';
 import { isForbidden } from '../../utils/ebookAccess';
+import { getToken } from '../../services/axios_instance';
+import { loginPathFor } from '../../utils/loginRedirect';
 
 export default function PdfReaderPage() {
   const { loanId, bookId } = useParams();
@@ -15,6 +17,7 @@ export default function PdfReaderPage() {
 
 function ReaderSession({ loanId, bookId }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [session, setSession] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,6 +34,8 @@ function ReaderSession({ loanId, bookId }) {
   }, [loanId, bookId]);
 
   const borrow = async () => {
+    // Khách xem trước rồi bấm mượn: đăng nhập xong quay lại bản xem trước (2B-14)
+    if (!getToken() || !getCurrentUser()) { navigate(loginPathFor(location)); return; }
     setBusy(true);
     try {
       const loan = await ebookService.borrow(session.bookId);

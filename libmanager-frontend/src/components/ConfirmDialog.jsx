@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { Button } from './Button';
 
-export default function ConfirmDialog({ title, children, onClose, onConfirm, loading = false, confirmLabel = 'Xác nhận', danger = false }) {
+export default function ConfirmDialog({ title, children, onClose, onConfirm, loading = false, confirmLabel = 'Xác nhận', cancelLabel = 'Quay lại', danger = false }) {
   const dialog = useRef(null);
   const heading = useId();
   useEffect(() => {
@@ -14,7 +14,7 @@ export default function ConfirmDialog({ title, children, onClose, onConfirm, loa
       <h2 id={heading} className="text-xl font-semibold text-slate-900">{title}</h2>
       <div className="my-5 text-sm leading-6 text-slate-600">{children}</div>
       <div className="flex justify-end gap-3">
-        <Button size="sm" variant="ghost" disabled={loading} onClick={onClose}>Quay lại</Button>
+        <Button size="sm" variant="ghost" disabled={loading} onClick={onClose}>{cancelLabel}</Button>
         <Button size="sm" variant={danger ? 'danger' : 'primary'} loading={loading} onClick={onConfirm}>{confirmLabel}</Button>
       </div>
     </dialog>

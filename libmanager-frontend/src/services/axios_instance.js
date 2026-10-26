@@ -1,12 +1,18 @@
 import axios from 'axios';
+import { setCurrentUser } from '../mocks/auth';
 
 const TOKEN_KEY = 'libmanager_token';
 
-// Helper đọc/ghi token (chỉ sửa ở đây nếu muốn đổi nơi lưu)
-export const getToken = () => sessionStorage.getItem(TOKEN_KEY);
+// Token lưu localStorage theo 2B-13 (giữ đăng nhập khi mở lại tab).
+// Bọc try/catch: trình duyệt chặn bộ nhớ (chế độ riêng tư) thì coi như chưa đăng nhập.
+export const getToken = () => {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+};
 export const setToken = (token) => {
-  if (token) sessionStorage.setItem(TOKEN_KEY, token);
-  else sessionStorage.removeItem(TOKEN_KEY);
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch { /* bộ nhớ bị chặn: bỏ qua */ }
 };
 
 // 1. Tạo instance: mọi request dùng chung baseURL
@@ -30,9 +36,11 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      // Token hết hạn hoặc sai: xóa token, quay về đăng nhập
+      // Token hết hạn hoặc sai: xóa token và user, quay về đăng nhập (giữ trang đang mở để quay lại)
       setToken(null);
-      window.location.href = '/login';
+      setCurrentUser(null);
+      const from = window.location.pathname + window.location.search;
+      window.location.href = `/login?redirect=${encodeURIComponent(from)}`;
     }
     return Promise.reject(error);
   },

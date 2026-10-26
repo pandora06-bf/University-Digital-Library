@@ -1,8 +1,119 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Bookmark, CheckCircle, XCircle, MapPin, Building, Calendar, Hash, FileText } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { ArrowLeft, BookOpen, Bookmark, CheckCircle, XCircle, MapPin, Building, Calendar, Hash, FileText, BellRing } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { getStoredBooks, borrowBookAction } from '../../mocks/loans';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import ToastAlertComponent from '../../components/ToastAlertComponent';
+import { getStoredBooks, borrowDaysFor } from '../../mocks/loans';
+import { getCurrentUser } from '../../mocks/auth';
+import { getToken } from '../../services/axios_instance';
+import { loanService } from '../../services/loanService';
+import { mapBorrowError } from '../../utils/borrowErrors';
+import { loginPathFor } from '../../utils/loginRedirect';
+
+const formatDateTime = (value) => new Date(value).toLocaleString('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
+});
+const formatDate = (value) => new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+/**
+ * BorrowButton (3-12.a): "Đặt mượn" khi còn tồn, "Hẹn đặt trước" khi hết tồn (2B-14).
+ * - Khách: chuyển sang Đăng nhập rồi quay lại trang sách.
+ * - Xác nhận: hiện vị trí kệ và hạn trả dự kiến; thành công hiện mã mượn và hạn nhận sách.
+ * - Lỗi 403/409: Toast đỏ nêu lý do; hết sách thì hỏi chuyển sang Hẹn đặt trước.
+ */
+function BorrowButton({ book, onChanged }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [dialog, setDialog] = useState(null); // 'borrow' | 'waitlist' | 'outOfStock' | { loan } | null
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [openedAt, setOpenedAt] = useState(0); // thời điểm bấm nút, để tính hạn trả dự kiến
+  const closeToast = useCallback(() => { setError(null); setNotice(null); }, []);
+  const available = book.availableCopies > 0;
+
+  const open = (kind) => {
+    if (!getToken() || !getCurrentUser()) {
+      navigate(loginPathFor(location));
+      return;
+    }
+    closeToast();
+    setOpenedAt(Date.now());
+    setDialog(kind);
+  };
+
+  const borrow = async () => {
+    setBusy(true);
+    try {
+      const loan = await loanService.requestPhysical(book.id);
+      setDialog({ loan });
+    } catch (failure) {
+      if (mapBorrowError(failure).offerWaitlist) setDialog('outOfStock');
+      else { setDialog(null); setError(failure); }
+    } finally {
+      setBusy(false);
+      onChanged();
+    }
+  };
+
+  const waitlist = async () => {
+    setBusy(true);
+    try {
+      const entry = await loanService.joinWaitlist(book.id);
+      setNotice({ type: 'success', message: `Đã hẹn đặt trước. Bạn đang ở vị trí số ${entry.queuePosition}; khi có sách, thư viện giữ chỗ cho bạn 24 giờ và gửi email báo.` });
+    } catch (failure) {
+      setError(failure);
+    } finally {
+      setBusy(false);
+      setDialog(null);
+    }
+  };
+
+  const user = getCurrentUser();
+  const borrowDays = borrowDaysFor(user);
+  const dueEstimate = openedAt + borrowDays * 86400000;
+
+  return (
+    <>
+      {available ? (
+        <Button variant="primary" size="lg" onClick={() => open('borrow')} icon={<Bookmark className="w-5 h-5" />} className="px-8">
+          Đặt mượn
+        </Button>
+      ) : (
+        <Button variant="outline" size="lg" onClick={() => open('waitlist')} icon={<BellRing className="w-5 h-5" />} className="px-8">
+          Hẹn đặt trước
+        </Button>
+      )}
+
+      {dialog === 'borrow' && (
+        <ConfirmDialog title="Xác nhận đặt mượn" confirmLabel="Đặt mượn" loading={busy} onClose={() => setDialog(null)} onConfirm={borrow}>
+          <p className="font-semibold text-slate-800">{book.title}</p>
+          <p>Vị trí kệ: <strong>{book.location}</strong></p>
+          <p>Hạn trả dự kiến: <strong>{formatDate(dueEstimate)}</strong> ({borrowDays} ngày nếu nhận sách hôm nay; hạn chính thức tính khi nhận tại quầy).</p>
+          <p>Sau khi đặt, bạn có 24 giờ để đến quầy nhận sách.</p>
+        </ConfirmDialog>
+      )}
+
+      {dialog?.loan && (
+        <ConfirmDialog title="Đặt mượn thành công" confirmLabel="Xem Sách của tôi" cancelLabel="Đóng" onClose={() => setDialog(null)} onConfirm={() => navigate('/my-books')}>
+          <p>Mã mượn: <strong className="font-mono text-indigo-700">{dialog.loan.loanCode}</strong></p>
+          <p>Hạn nhận sách: <strong>{formatDateTime(dialog.loan.pickupDeadline)}</strong></p>
+          <p>Vị trí kệ: <strong>{book.location}</strong>. Đưa mã mượn cho thủ thư khi nhận sách; quá hạn nhận, phiếu tự hủy.</p>
+        </ConfirmDialog>
+      )}
+
+      {(dialog === 'waitlist' || dialog === 'outOfStock') && (
+        <ConfirmDialog title={dialog === 'outOfStock' ? 'Sách vừa hết bản' : 'Hẹn đặt trước'} confirmLabel="Hẹn đặt trước" loading={busy} onClose={() => setDialog(null)} onConfirm={waitlist}>
+          {dialog === 'outOfStock' && <p>Bản cuối vừa được người khác đặt mượn. Bạn có muốn chuyển sang Hẹn đặt trước không?</p>}
+          <p>Khi có sách trả về, người đầu hàng chờ được giữ chỗ 24 giờ và nhận email thông báo.</p>
+        </ConfirmDialog>
+      )}
+
+      <ToastAlertComponent error={error} notice={notice} onClose={closeToast} />
+    </>
+  );
+}
 
 /**
  * Trang Chi tiết Sách (Book Detail Page)
@@ -10,12 +121,9 @@ import { getStoredBooks, borrowBookAction } from '../../mocks/loans';
  */
 export default function BookDetailPage() {
   const { bookId } = useParams();
-  const navigate = useNavigate();
-  const books = getStoredBooks();
-  const book = books.find((b) => b.id === bookId);
-
-  const [isBorrowing, setIsBorrowing] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const book = getStoredBooks().find((b) => b.id === bookId);
 
   if (!book) {
     return (
@@ -31,44 +139,9 @@ export default function BookDetailPage() {
 
   const isAvailable = book.availableCopies > 0;
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const handleBorrow = () => {
-    setIsBorrowing(true);
-    setTimeout(() => {
-      const res = borrowBookAction(book.id);
-      setIsBorrowing(false);
-      if (res.success) {
-        showToast(`Đã mượn thành công cuốn "${book.title}"!`, 'success');
-        setTimeout(() => navigate('/my-books'), 1200);
-      } else {
-        showToast(res.message, 'error');
-      }
-    }, 400);
-  };
-
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8 sm:py-12 space-y-8">
       
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
-          <div
-            className={`px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2 border ${
-              toast.type === 'success'
-                ? 'bg-emerald-600 text-white border-emerald-500'
-                : 'bg-rose-600 text-white border-rose-500'
-            }`}
-          >
-            <CheckCircle className="w-5 h-5" />
-            <span>{toast.message}</span>
-          </div>
-        </div>
-      )}
-
       {/* Back Button */}
       <Link
         to="/catalog"
@@ -144,17 +217,7 @@ export default function BookDetailPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-4 pt-2">
-            <Button
-              variant="primary"
-              size="lg"
-              loading={isBorrowing}
-              disabled={!isAvailable}
-              onClick={handleBorrow}
-              icon={<Bookmark className="w-5 h-5" />}
-              className="px-8"
-            >
-              {isAvailable ? 'Mượn tài liệu này' : 'Hết bản sao'}
-            </Button>
+            <BorrowButton book={book} onChanged={refresh} />
 
             {book.pdfAvailable && (
               <Link to={`/books/${book.id}/preview`}>
@@ -163,7 +226,7 @@ export default function BookDetailPage() {
                   size="lg"
                   icon={<FileText className="w-5 h-5" />}
                 >
-                  Xem trước eBook
+                  Đọc/Mượn eBook
                 </Button>
               </Link>
             )}
