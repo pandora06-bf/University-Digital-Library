@@ -1,0 +1,6 @@
+username,full_name,email,phone_number,department,user_type,academic_title
+sv_nguyen_van_x,Nguyễn Văn X,nguyen.van.x@tdtu.edu.vn,0901110001,Khoa Công nghệ thông tin,STUDENT,
+,Trần Không Username,,0912220002,Khoa Ngoại ngữ,STUDENT,
+sv_le_thi_z,Lê Thị Z,email_sai_dinh_dang,0923330003,Khoa Kinh tế,STUDENT,
+sv_pham_van_k,Phạm Văn K,pham.van.k@tdtu.edu.vn,0934440004,Khoa Công nghệ thông tin,INVALID_ROLE,
+gv_hoang_thi_m,Hoàng Thị M,,0945550005,Khoa Khoa học cơ bản,LECTURER,Thạc sĩ

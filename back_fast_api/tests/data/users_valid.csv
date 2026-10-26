@@ -1,0 +1,6 @@
+username,full_name,email,phone_number,department,user_type,academic_title
+sv_nguyen_van_a,Nguyễn Văn A,nguyen.van.a@tdtu.edu.vn,0901234567,Khoa Công nghệ thông tin,STUDENT,
+sv_tran_thi_b,Trần Thị B,tran.thi.b@tdtu.edu.vn,0912345678,Khoa Ngoại ngữ,STUDENT,
+gv_le_van_c,Lê Văn C,le.van.c@tdtu.edu.vn,0923456789,Khoa Khoa học cơ bản,LECTURER,Thạc sĩ
+sv_pham_thi_d,Phạm Thị D,pham.thi.d@tdtu.edu.vn,0934567890,Khoa Kinh tế,STUDENT,
+gv_hoang_van_e,Hoàng Văn E,hoang.van.e@tdtu.edu.vn,0945678901,Khoa Công nghệ thông tin,LECTURER,Tiến sĩ
