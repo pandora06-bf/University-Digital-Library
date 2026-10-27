@@ -16,6 +16,7 @@ import { getApiErrorMessage } from '../../services/errorHandler';
 import {
   getStoredIncidents,
   addStoredIncident,
+  updateStoredIncidentStatus,
   findMockActiveLoan,
   MOCK_ACTIVE_LOANS,
 } from '../../mocks/incidents';
@@ -342,7 +343,7 @@ export default function IncidentPage() {
       header: 'Thao Tác',
       align: 'right',
       render: (_, row) => (
-        <div className="flex items-center justify-end gap-1.5 min-w-[80px]">
+        <div className="flex items-center justify-end gap-1.5 min-w-[140px]">
           <button
             onClick={() => setDetailRow(row)}
             className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors cursor-pointer"
@@ -350,6 +351,33 @@ export default function IncidentPage() {
           >
             <Eye className="w-4 h-4" />
           </button>
+          {/* 4-15.c: chuyển trạng thái biên bản */}
+          {row.status === 'PENDING' && (
+            <button
+              type="button"
+              className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+              title="Ghi công nợ"
+              onClick={() => {
+                setIncidents(updateStoredIncidentStatus(row.id, 'RECORDED'));
+                showToast('Đã ghi công nợ bồi thường (RECORDED).', 'success');
+              }}
+            >
+              Ghi nợ
+            </button>
+          )}
+          {row.status === 'RECORDED' && (
+            <button
+              type="button"
+              className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              title="Xác nhận đã bồi thường"
+              onClick={() => {
+                setIncidents(updateStoredIncidentStatus(row.id, 'RESOLVED'));
+                showToast('Đã đánh dấu bồi thường xong (RESOLVED).', 'success');
+              }}
+            >
+              Đã TT
+            </button>
+          )}
         </div>
       )
     }
@@ -364,7 +392,7 @@ export default function IncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập biên bản sự cố tài liệu, ngừng lưu thông bản sao (DAMAGED / mất) và tính bồi thường theo giá bìa.
+            Lập biên bản, ghi công nợ và xác nhận bồi thường (4-15.a/b/c). Tra cứu phiếu BORROWED trước khi lưu.
           </p>
         </div>
         <div className="flex items-center gap-3">

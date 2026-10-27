@@ -250,3 +250,11 @@ export const addStoredIncident = (newIncident) => {
   setStoredIncidents(updated);
   return updated;
 };
+
+/** 4-15.c: cập nhật trạng thái biên bản (PENDING → RECORDED → RESOLVED). */
+export const updateStoredIncidentStatus = (id, status) => {
+  const current = getStoredIncidents();
+  const updated = current.map((item) => (item.id === id ? { ...item, status } : item));
+  setStoredIncidents(updated);
+  return updated;
+};

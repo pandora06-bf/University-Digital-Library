@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { BookOpen, Archive, Users, ShieldAlert, Filter } from 'lucide-react';
+import { BookOpen, Archive, Users, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Button } from '../../components/Button';
@@ -32,39 +31,13 @@ const recentActivities = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [filterOption, setFilterOption] = useState('Tuần qua');
-  const [timeRange, setTimeRange] = useState('7 ngày qua');
-
-  const timeRanges = ['7 ngày qua', 'Tháng này'];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Tổng quan </h1>
-          <p className="text-sm text-slate-500 mt-1">Thống kê tình hình hoạt động của toàn bộ thư viện số.</p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
-          <div className="bg-white border border-slate-200 rounded-lg p-1 flex text-sm font-medium shadow-sm gap-1 min-w-max">
-            {timeRanges.map(range => (
-              <Button 
-                key={range}
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setTimeRange(range)}
-                className={`!h-8 !px-3 !rounded-md transition-colors ${
-                  timeRange === range 
-                    ? '!bg-indigo-50 !text-indigo-600 !font-semibold border border-indigo-100 !shadow-sm hover:!bg-indigo-100' 
-                    : '!text-slate-600 hover:!text-indigo-600 hover:!bg-slate-50'
-                }`}
-              >
-                {range}
-              </Button>
-            ))}
-          </div>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-800">Tổng quan </h1>
+        <p className="text-sm text-slate-500 mt-1">Thống kê tình hình hoạt động của toàn bộ thư viện số.</p>
       </div>
 
       {/* 4 Stats Cards */}
@@ -143,37 +116,9 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Bar Chart (Takes 2 columns on Large screens) */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">Hoạt động mượn & trả theo thời gian</h3>
-              <p className="text-sm text-slate-500 mt-1">Số lượng sách mượn/trả trong {filterOption.toLowerCase()}</p>
-            </div>
-            <div className="relative">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                icon={<Filter className="w-4 h-4" />}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-              >
-                Lọc: {filterOption}
-              </Button>
-              {isFilterOpen && (
-                <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-lg border border-slate-100 py-1.5 z-10 text-sm">
-                  {['Hôm nay', 'Tuần qua', 'Tháng này', 'Năm nay'].map((option) => (
-                    <button
-                      key={option}
-                      className={`w-full text-left px-4 py-2 hover:bg-slate-50 transition-colors ${filterOption === option ? 'text-indigo-600 font-bold bg-indigo-50/50' : 'text-slate-600 font-medium'}`}
-                      onClick={() => {
-                        setFilterOption(option);
-                        setIsFilterOpen(false);
-                      }}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="mb-6">
+            <h3 className="text-lg font-bold text-slate-800">Hoạt động mượn & trả theo thời gian</h3>
+            <p className="text-sm text-slate-500 mt-1">Số lượng sách mượn/trả theo ngày trong tuần (dữ liệu minh họa)</p>
           </div>
           <div className="h-72 w-full text-sm mt-auto">
             <ResponsiveContainer width="100%" height="100%">

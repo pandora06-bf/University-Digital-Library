@@ -1066,21 +1066,6 @@ export default function CatalogManagement() {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!deletingBook}
-        onClose={() => setDeletingBook(null)}
-        title="Xác nhận xóa"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeletingBook(null)}>Hủy</Button>
-            <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={confirmDelete}>Xác nhận xóa</Button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-600">Bạn có chắc chắn muốn xóa cuốn sách <b>{deletingBook?.title}</b> không? Dữ liệu đã xóa sẽ không thể khôi phục.</p>
-      </Modal>
-
       {/* Add / Edit Modal */}
       <Modal
         isOpen={isAddingBook || !!editingBook}

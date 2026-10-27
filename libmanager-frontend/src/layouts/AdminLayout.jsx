@@ -29,8 +29,9 @@ const SEARCH_SUGGESTIONS = [
   { label: 'Thu phạt & Công nợ', desc: 'Phiếu phạt, dư nợ độc giả', path: '/admin/fines', icon: <FileWarning className="w-4 h-4" /> },
   { label: 'Báo mất / Hỏng sách', desc: 'Biên bản sự cố và bồi thường (UC15)', path: '/admin/incidents', icon: <AlertOctagon className="w-4 h-4" /> },
   { label: 'Quản lý Người dùng', desc: 'CRUD, khóa, đặt lại mật khẩu (2B-18)', path: '/admin/users', icon: <Users className="w-4 h-4" /> },
-  { label: 'Phòng học nhóm', desc: 'Đang phát triển — quản lý phòng & check-in (3-17)', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" /> },
-  { label: 'Giao dịch chưa khớp', desc: 'Đang phát triển — gán nạp tiền unmatched (4-16)', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
+  { label: 'Phòng học nhóm', desc: 'Danh mục phòng & check-in mã đặt (3-17)', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" /> },
+  { label: 'Check-in phòng', desc: 'Quầy nhập mã đặt trong ngày (3-17)', path: '/admin/rooms/checkin', icon: <DoorOpen className="w-4 h-4" /> },
+  { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền unmatched cho user (4-16)', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
 ];
 
 import { logout } from '../services/authService';
@@ -156,6 +157,11 @@ export default function AdminLayout() {
         { label: 'Quản trị viên', path: '/admin' },
         { label: 'Phòng học nhóm' }
       ],
+      '/admin/rooms/checkin': [
+        { label: 'Quản trị viên', path: '/admin' },
+        { label: 'Phòng học nhóm', path: '/admin/rooms' },
+        { label: 'Check-in mã đặt' }
+      ],
       '/admin/unmatched': [
         { label: 'Quản trị viên', path: '/admin' },
         { label: 'Giao dịch chưa khớp' }
@@ -201,8 +207,8 @@ export default function AdminLayout() {
     { path: '/admin/fines', icon: <FileWarning size={20} />, label: 'Thu phạt & Công nợ' },
     { path: '/admin/incidents', icon: <AlertOctagon size={20} />, label: 'Báo mất / Hỏng sách' },
     { path: '/admin/users', icon: <Users size={20} />, label: 'Người dùng' },
-    { path: '/admin/rooms', icon: <DoorOpen size={20} />, label: 'Phòng học nhóm', comingSoon: true },
-    { path: '/admin/unmatched', icon: <WalletCards size={20} />, label: 'GD chưa khớp', comingSoon: true },
+    { path: '/admin/rooms', icon: <DoorOpen size={20} />, label: 'Phòng học nhóm' },
+    { path: '/admin/unmatched', icon: <WalletCards size={20} />, label: 'GD chưa khớp' },
   ];
 
   return (

@@ -22,8 +22,10 @@ import LoanManagement from './pages/admin/LoanManagement';
 import FineManagement from './pages/admin/FineManagement';
 import EbookManagement from './pages/admin/EbookManagement';
 import IncidentPage from './pages/admin/IncidentPage';
-import AdminComingSoon from './pages/admin/AdminComingSoon';
 import UserManagement from './pages/admin/UserManagement';
+import RoomManagement from './pages/admin/RoomManagement';
+import RoomCheckin from './pages/admin/RoomCheckin';
+import UnmatchedTxPage from './pages/admin/UnmatchedTxPage';
 
 import AdminRoute from './components/AdminRoute';
 
@@ -69,8 +71,9 @@ export default function App() {
           <Route path="fines" element={<FineManagement />} />
           <Route path="incidents" element={<IncidentPage />} />
           <Route path="users" element={<UserManagement />} />
-          <Route path="rooms" element={<AdminComingSoon />} />
-          <Route path="unmatched" element={<AdminComingSoon />} />
+          <Route path="rooms" element={<RoomManagement />} />
+          <Route path="rooms/checkin" element={<RoomCheckin />} />
+          <Route path="unmatched" element={<UnmatchedTxPage />} />
         </Route>
 
         {/* 404 Route */}

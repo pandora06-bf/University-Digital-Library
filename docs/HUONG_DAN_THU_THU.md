@@ -55,14 +55,27 @@ Nếu hư hỏng / mất: chuyển **Thu phạt** (`/admin/fines`) hoặc **Biê
 
 ---
 
-## 5. Check-in phòng học nhóm (4-17.b / chờ 3-17)
+## 5. Phòng học nhóm & check-in (3-17)
 
-| | |
-|---|---|
-| Độc giả đặt / xem lượt | Cổng User **`/rooms`** (mock đặt phòng + số dư demo) |
-| Mục Admin **Phòng học nhóm** | Có trong menu (`/admin/rooms`) — hiện **Đang phát triển** (task 3-17) |
-| Màn quầy check-in mã đặt phòng | Chưa có UI thao tác; khi 3-17 xong sẽ bổ sung bước quét mã + xác nhận slot |
-| Cách làm tạm trong ca | Đối chiếu danh sách đặt trên `/rooms`; xác nhận miệng / ghi sổ khi SV đến giờ |
+### Danh mục phòng — `/admin/rooms`
+1. Xem bảng phòng (tên, tầng, sức chứa, giá khung 2h, đang hoạt động / ngừng).
+2. **Thêm phòng** / **Sửa**; thử **Ngừng** phòng còn booking tương lai → Toast nghiệp vụ (mock).
+3. Nút **Check-in mã đặt** → `/admin/rooms/checkin`.
+
+### Quầy check-in — `/admin/rooms/checkin`
+1. Ô mã đặt (**autoFocus**) → gõ/tít rồi **Enter** hoặc **Xác nhận check-in** (vd mock `RB-2026-1001`).
+2. Xem danh sách lượt đặt **trong ngày**; nút Check-in trên dòng `CONFIRMED`.
+
+> UI dùng **mock FE**; nối API phòng / check-in khi Hiền–Nhất mount BE.
+
+---
+
+## 5b. Giao dịch chưa khớp (4-16) — `/admin/unmatched`
+
+1. Lọc **Chưa khớp** → **Gán user** → chọn MSSV → Xác nhận.
+2. Dòng chuyển trạng thái **Đã gán**.
+
+> Mock FE; nối `GET/POST` wallet unmatched khi BE sẵn.
 
 ---
 
@@ -75,7 +88,9 @@ Nếu hư hỏng / mất: chuyển **Thu phạt** (`/admin/fines`) hoặc **Biê
 | Mượn–trả (quầy) | `/admin/loans` |
 | Thu phạt | `/admin/fines` |
 | Mất–hỏng | `/admin/incidents` |
-| Người dùng / Phòng / GD chưa khớp | Menu có — **Đang phát triển** (`/admin/users`, `/admin/rooms`, `/admin/unmatched`) |
+| Người dùng (khóa / reset MK) | `/admin/users` (mock tới khi có API) |
+| Phòng học nhóm / check-in mã đặt | `/admin/rooms`, `/admin/rooms/checkin` |
+| Giao dịch chưa khớp | `/admin/unmatched` |
 | Đặt phòng (User) | `/rooms` |
 
 ---

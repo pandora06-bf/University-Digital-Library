@@ -8,6 +8,13 @@ __pycache__/
 *.env
 *$py.class
 
+# Ghi chú / hướng dẫn local (không push)
+docs/LOCAL_*.md
+docs/**/LOCAL_*.md
+.cursor/
+docs/screens/_admin_sprint_test.js
+docs/.DS_Store
+
 back_fast_api/private_storage/ebooks/*
 !back_fast_api/private_storage/ebooks/.gitkeep
 back_fast_api/static/covers/*
