@@ -120,7 +120,7 @@ export default function RoomCheckin() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Check-in phòng học nhóm</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quầy nhập mã đặt phòng (Enter); danh sách lượt đặt trong ngày. Dữ liệu mẫu khi API check-in chưa sẵn.
+            Xác nhận check-in theo mã đặt phòng và theo dõi các lượt đặt trong ngày.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -139,6 +139,13 @@ export default function RoomCheckin() {
             Nạp lại mẫu
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+        <p className="text-amber-800/90 mt-0.5 text-[13px]">
+          API check-in phòng chưa sẵn sàng. Thao tác chỉ lưu trên trình duyệt, không ghi máy chủ.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

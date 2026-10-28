@@ -23,6 +23,7 @@ export default function InventoryManagement() {
   // State nạp danh sách đầu sách cho Combobox (NFR-PE-02: page_size ≤ 50)
   const [booksList, setBooksList] = useState([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(true);
+  const [usingMock, setUsingMock] = useState(false);
 
   const [tableData, setTableData] = useState([]);
   const [bookInfo, setBookInfo] = useState(null);
@@ -60,13 +61,16 @@ export default function InventoryManagement() {
       .then(res => {
         if (res.data?.items && res.data.items.length > 0) {
           setBooksList(res.data.items);
+          setUsingMock(false);
         } else {
           setBooksList(ADMIN_MOCK_BOOKS);
+          setUsingMock(true);
         }
       })
       .catch(err => {
         console.warn('API sách chưa sẵn sàng, nạp danh sách sách mock:', err?.message);
         setBooksList(ADMIN_MOCK_BOOKS);
+        setUsingMock(true);
       })
       .finally(() => {
         setIsLoadingBooks(false);
@@ -113,6 +117,7 @@ export default function InventoryManagement() {
   const fallbackMockCopies = (targetBookId, currentBookInfo) => {
     const rawCopies = ADMIN_MOCK_COPIES[parseInt(targetBookId)] || [];
     setTableData(rawCopies.map((c) => mapCopyRow(c, currentBookInfo)));
+    setUsingMock(true);
   };
 
   const fetchInventory = async (targetBookId, currentBookInfo) => {
@@ -123,6 +128,7 @@ export default function InventoryManagement() {
       const res = await axiosInstance.get(`/api/admin/books/${idToFetch}/copies`);
       if (Array.isArray(res.data)) {
         setTableData(res.data.map((c) => mapCopyRow(c, targetBook)));
+        setUsingMock(false);
       } else {
         fallbackMockCopies(idToFetch, targetBook);
       }
@@ -174,7 +180,7 @@ export default function InventoryManagement() {
     }
   };
 
-  const handleOpenEdit = (row) => {
+  const handleOpenEdit = async (row) => {
     setEditingRow(row);
     setEditFormErrors({});
     setEditForm({
@@ -184,6 +190,28 @@ export default function InventoryManagement() {
       status: row.rawStatus || 'AVAILABLE',
       condition: row.rawCondition || ''
     });
+    // Đồng bộ chi tiết mới nhất từ BE (GET /api/admin/copies/{barcode})
+    try {
+      const { data } = await axiosInstance.get(`/api/admin/copies/${encodeURIComponent(row.barcode)}`);
+      if (!data) return;
+      setEditForm({
+        zone: data.zone || '',
+        floor: data.floor || '',
+        shelf: data.shelf || '',
+        status: data.status || 'AVAILABLE',
+        condition: data.damage_notes || '',
+      });
+      setEditingRow((prev) => prev ? {
+        ...prev,
+        rawZone: data.zone,
+        rawFloor: data.floor,
+        rawShelf: data.shelf,
+        rawStatus: data.status,
+        rawCondition: data.damage_notes,
+      } : prev);
+    } catch {
+      /* giữ form từ hàng bảng nếu API lỗi */
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -235,7 +263,7 @@ export default function InventoryManagement() {
   const handleOpenRetire = (row) => {
     // Kiểm tra nghiệp vụ ngay khi bấm nút thanh lý (UC09 / BR-17)
     if (row.rawStatus === 'BORROWED') {
-      showToast('Không thể thanh lý: Bản sao đang trong trạng thái "Đang cho mượn" (Quy tắc UC09 / BR-17).', 'warning');
+      showToast('Không thể thanh lý: bản sao đang được mượn.', 'warning');
       return;
     }
     if (isCopyRetired(row.rawStatus)) {
@@ -256,7 +284,7 @@ export default function InventoryManagement() {
 
     // Kiểm tra nghiệp vụ phía Client: không thanh lý bản sao đang mượn (UC09 E4 / BR-17)
     if (retiringRow.rawStatus === 'BORROWED') {
-      showToast('Không thể thanh lý bản sao đang trong trạng thái "Đang cho mượn" (Quy tắc UC09 / BR-17).', 'warning');
+      showToast('Không thể thanh lý bản sao đang được mượn.', 'warning');
       return;
     }
     if (isCopyRetired(retiringRow.rawStatus)) {
@@ -435,7 +463,7 @@ export default function InventoryManagement() {
               }`}
               title={
                 isBorrowed
-                  ? 'Bản sao đang cho mượn, không thể thanh lý (UC09)'
+                  ? 'Bản sao đang cho mượn, không thể thanh lý'
                   : isRetired
                     ? 'Bản sao đã thanh lý'
                     : 'Thanh lý bản sao'
@@ -506,6 +534,15 @@ export default function InventoryManagement() {
           </div>
         </div>
       </div>
+
+      {usingMock && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+          <p className="text-amber-800/90 mt-0.5 text-[13px]">
+            Không lấy được tồn kho từ máy chủ. Danh sách bản sao hiện tại chỉ để xem giao diện.
+          </p>
+        </div>
+      )}
 
       {!bookId ? (
         /* Màn hình hướng dẫn chọn sách thân thiện (thay thế ngõ cụt cũ) */
@@ -946,7 +983,7 @@ export default function InventoryManagement() {
               {retiringRow.rawStatus === 'BORROWED' && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs font-medium text-rose-700 flex items-center gap-2">
                   <AlertOctagon className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>Bản sao đang được mượn. Quy tắc nghiệp vụ (UC09) không cho phép thanh lý bản sao đang lưu thông.</span>
+                  <span>Bản sao đang được mượn — không thể thanh lý khi còn trong lưu thông.</span>
                 </div>
               )}
 
@@ -965,7 +1002,7 @@ export default function InventoryManagement() {
 
               <p className="text-xs font-medium text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200/60 flex items-start gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0 mt-1.5"></span>
-                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>DAMAGED (Đã thanh lý / ngừng lưu thông)</strong> theo máy chủ, bị loại khỏi tồn khả dụng. Hành động này không thể hoàn tác dễ dàng.</span>
+                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>Đã thanh lý / ngừng lưu thông</strong>, bị loại khỏi tồn khả dụng. Hành động này không hoàn tác dễ dàng.</span>
               </p>
             </div>
           </div>

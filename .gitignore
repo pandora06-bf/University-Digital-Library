@@ -19,3 +19,9 @@ back_fast_api/private_storage/ebooks/*
 !back_fast_api/private_storage/ebooks/.gitkeep
 back_fast_api/static/covers/*
 !back_fast_api/static/covers/.gitkeep
+
+.DS_Store
+**/.DS_Store
+docs/screens/Baocao_Sprint3_Admin_UI_moi.docx
+docs/screens/uc14-admin-checkin.png
+docs/screens/uc11-admin-incidents.png

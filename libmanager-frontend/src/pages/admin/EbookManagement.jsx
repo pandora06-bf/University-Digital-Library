@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileText, Search, UploadCloud, Eye, Edit2,
   CheckCircle2, FilePlus, RotateCcw,
@@ -23,9 +23,29 @@ function formatSize(file) {
   return `${(file.size / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function mapApiEbook(book) {
+  return {
+    id: book.id,
+    title: book.title || `Sách #${book.id}`,
+    filename: book.filename || `ebook-${book.id}.pdf`,
+    size: book.size || '—',
+    uploadDate: book.uploadDate
+      || (book.updated_at
+        ? new Date(book.updated_at).toLocaleDateString('vi-VN')
+        : '—'),
+    status: 'Sẵn sàng',
+    previewPages: book.preview_pages ?? book.previewPages ?? 10,
+    isFree: Boolean(book.is_free ?? book.isFree),
+    fromApi: true,
+  };
+}
+
 export default function EbookManagement() {
   const { toast, showToast, hideToast } = useToast();
-  const [rows, setRows] = useState(() => getStoredAdminEbooks());
+  const [rows, setRows] = useState([]);
+  const [bookOptions, setBookOptions] = useState(DEMO_EBOOK_BOOK_OPTIONS);
+  const [usingMock, setUsingMock] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
@@ -39,12 +59,36 @@ export default function EbookManagement() {
 
   const readyCount = rows.filter((r) => r.status === 'Sẵn sàng').length;
 
-  const bookOptions = useMemo(() => {
-    const fromRows = rows.map((r) => ({ id: r.id, title: r.title }));
-    const map = new Map(DEMO_EBOOK_BOOK_OPTIONS.map((b) => [String(b.id), b]));
-    fromRows.forEach((b) => map.set(String(b.id), b));
-    return [...map.values()];
-  }, [rows]);
+  const loadFromApi = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axiosInstance.get('/api/books/search', {
+        params: { book_type: 'EBOOK', page: 1, page_size: 50 },
+      });
+      const items = res.data?.items || res.data?.data || [];
+      const mapped = items.map(mapApiEbook);
+      setRows(mapped);
+      setBookOptions(
+        mapped.length
+          ? mapped.map((r) => ({ id: r.id, title: r.title }))
+          : DEMO_EBOOK_BOOK_OPTIONS
+      );
+      setUsingMock(false);
+      return true;
+    } catch {
+      const mock = getStoredAdminEbooks();
+      setRows(mock);
+      setBookOptions(DEMO_EBOOK_BOOK_OPTIONS);
+      setUsingMock(true);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFromApi();
+  }, [loadFromApi]);
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -52,23 +96,44 @@ export default function EbookManagement() {
     return rows.filter(
       (item) =>
         item.title.toLowerCase().includes(q) ||
-        item.filename.toLowerCase().includes(q)
+        String(item.filename || '').toLowerCase().includes(q)
     );
   }, [rows, searchTerm]);
 
   const applyLocalUpload = (bookId, file, titleHint) => {
     const book = bookOptions.find((b) => String(b.id) === String(bookId));
     const pages = Math.min(10, Math.max(5, parseInt(previewPages, 10) || 10));
-    const next = upsertAdminEbook({
-      id: Number(bookId),
-      title: book?.title || titleHint || `Sách #${bookId}`,
-      filename: file.name,
-      size: formatSize(file),
-      uploadDate: new Date().toLocaleDateString('vi-VN'),
-      previewPages: pages,
-      isFree,
+    if (usingMock) {
+      const next = upsertAdminEbook({
+        id: Number(bookId),
+        title: book?.title || titleHint || `Sách #${bookId}`,
+        filename: file.name,
+        size: formatSize(file),
+        uploadDate: new Date().toLocaleDateString('vi-VN'),
+        previewPages: pages,
+        isFree,
+      });
+      setRows(next);
+      return;
+    }
+    setRows((prev) => {
+      const idx = prev.findIndex((r) => String(r.id) === String(bookId));
+      const nextRow = {
+        id: Number(bookId),
+        title: book?.title || titleHint || `Sách #${bookId}`,
+        filename: file.name,
+        size: formatSize(file),
+        uploadDate: new Date().toLocaleDateString('vi-VN'),
+        status: 'Sẵn sàng',
+        previewPages: pages,
+        isFree,
+        fromApi: true,
+      };
+      if (idx < 0) return [nextRow, ...prev];
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], ...nextRow };
+      return copy;
     });
-    setRows(next);
   };
 
   const tryApiUpload = async (bookId, file) => {
@@ -96,16 +161,34 @@ export default function EbookManagement() {
     }
     setBusy(true);
     try {
-      try {
-        await tryApiUpload(uploadBookId, uploadFile);
-        showToast('Đã tải PDF lên API.', 'success');
-      } catch {
-        showToast('API upload chưa dùng được — đã lưu trên giao diện mẫu.', 'warning');
-      }
+      await tryApiUpload(uploadBookId, uploadFile);
       applyLocalUpload(uploadBookId, uploadFile);
+      setUsingMock(false);
+      showToast('Đã tải PDF lên máy chủ thành công.', 'success');
       setShowUploadModal(false);
       setUploadBookId('');
       setUploadFile(null);
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404 || status === 409 || status === 422 || status === 400) {
+        showToast(
+          getApiErrorMessage(error, 'Máy chủ từ chối tải PDF. Kiểm tra đầu sách eBook và tệp PDF.'),
+          'error'
+        );
+      } else {
+        applyLocalUpload(uploadBookId, uploadFile);
+        setUsingMock(true);
+        showToast(
+          getApiErrorMessage(
+            error,
+            'Không kết nối được máy chủ. Đã lưu tạm trên giao diện (dữ liệu mẫu — không ghi máy chủ).'
+          ),
+          'warning'
+        );
+        setShowUploadModal(false);
+        setUploadBookId('');
+        setUploadFile(null);
+      }
     } finally {
       setBusy(false);
     }
@@ -119,16 +202,34 @@ export default function EbookManagement() {
     }
     setBusy(true);
     try {
-      try {
-        await tryApiUpload(selectedEbook.id, replaceFile);
-        showToast('Đã cập nhật PDF lên API.', 'success');
-      } catch {
-        showToast('API upload chưa dùng được — đã cập nhật giao diện mẫu.', 'warning');
-      }
+      await tryApiUpload(selectedEbook.id, replaceFile);
       applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
+      setUsingMock(false);
+      showToast('Đã cập nhật PDF trên máy chủ thành công.', 'success');
       setShowReplaceModal(false);
       setReplaceFile(null);
       setSelectedEbook(null);
+    } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404 || status === 409 || status === 422 || status === 400) {
+        showToast(
+          getApiErrorMessage(error, 'Máy chủ từ chối cập nhật PDF. Kiểm tra đầu sách và tệp.'),
+          'error'
+        );
+      } else {
+        applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
+        setUsingMock(true);
+        showToast(
+          getApiErrorMessage(
+            error,
+            'Không kết nối được máy chủ. Đã cập nhật tạm trên giao diện (dữ liệu mẫu).'
+          ),
+          'warning'
+        );
+        setShowReplaceModal(false);
+        setReplaceFile(null);
+        setSelectedEbook(null);
+      }
     } finally {
       setBusy(false);
     }
@@ -139,16 +240,36 @@ export default function EbookManagement() {
       const { data } = await axiosInstance.get(`/api/ebooks/${row.id}/preview`, {
         responseType: 'blob',
       });
+      // Một số BE trả JSON lỗi nhưng status 200 + blob — kiểm tra content-type
+      if (data?.type && data.type.includes('json')) {
+        showToast('Máy chủ chưa trả được PDF xem trước cho đầu sách này.', 'error');
+        return;
+      }
       const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
       window.open(url, '_blank', 'noopener,noreferrer');
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
+      const status = error?.response?.status;
+      if (status === 404) {
+        showToast(
+          'Xem trước PDF chưa khả dụng: endpoint chưa bật trên máy chủ hoặc đầu sách chưa có tệp PDF.',
+          'error'
+        );
+        return;
+      }
+      if (status === 409 || status === 422 || status === 400) {
+        showToast(
+          getApiErrorMessage(error, `Không xem trước được “${row.title}”.`),
+          'error'
+        );
+        return;
+      }
       showToast(
         getApiErrorMessage(
           error,
-          `Giao diện mẫu: “${row.filename}” — khi có dữ liệu thật, nút này mở bản xem trước.`
+          `Không tải được bản xem trước “${row.title}”. Kiểm tra kết nối máy chủ.`
         ),
-        'info'
+        'warning'
       );
     }
   };
@@ -175,7 +296,11 @@ export default function EbookManagement() {
       key: 'status',
       header: 'Trạng Thái',
       render: (val) => (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+          val === 'Sẵn sàng'
+            ? 'bg-emerald-50 text-emerald-600'
+            : 'bg-amber-50 text-amber-700'
+        }`}>
           <CheckCircle2 className="w-3.5 h-3.5" />
           {val}
         </span>
@@ -220,7 +345,7 @@ export default function EbookManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý eBook / PDF</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tải lên, xem trước và thay tệp PDF cho đầu sách eBook. Giao diện mẫu đầy đủ; nối DB/PDF khi sẵn.
+            Quản lý tài liệu điện tử: tải lên, xem trước và cập nhật tệp PDF cho từng đầu sách.
           </p>
         </div>
         <Button
@@ -236,6 +361,15 @@ export default function EbookManagement() {
         </Button>
       </div>
 
+      {usingMock && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Đang dùng dữ liệu mẫu / chế độ tạm</p>
+          <p className="text-amber-800/90 mt-0.5 text-[13px]">
+            Danh sách hoặc thao tác gần nhất chưa ghi máy chủ. Upload/preview lỗi sẽ báo rõ; thành công mới đồng bộ API.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng tài liệu</p>
@@ -243,7 +377,7 @@ export default function EbookManagement() {
             {rows.length} <span className="text-sm font-medium text-slate-500">cuốn</span>
           </p>
           <p className="mt-3 text-[11px] font-medium text-slate-500">
-            Đầu sách trong danh sách eBook / PDF
+            Số đầu sách điện tử đang quản lý
           </p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/40">
@@ -252,21 +386,27 @@ export default function EbookManagement() {
             {readyCount} <span className="text-sm font-medium text-emerald-500">cuốn</span>
           </p>
           <p className="mt-3 text-[11px] font-medium text-emerald-600">
-            Đã gắn tệp PDF, trạng thái Sẵn sàng
+            Đã gắn tệp PDF, sẵn sàng xem trước
           </p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dữ liệu mẫu</p>
-            <p className="text-sm text-slate-600">Khôi phục danh sách mẫu</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Làm mới</p>
+            <p className="text-sm text-slate-600">{loading ? 'Đang tải…' : 'Cập nhật danh sách mới nhất'}</p>
           </div>
           <Button
             variant="outline"
             size="sm"
             icon={<RotateCcw className="w-3.5 h-3.5" />}
-            onClick={() => {
-              setRows(resetAdminEbooks());
-              showToast('Đã nạp lại danh sách eBook mẫu.', 'success');
+            disabled={loading}
+            onClick={async () => {
+              const ok = await loadFromApi();
+              if (!ok) {
+                setRows(resetAdminEbooks());
+                showToast('API chưa sẵn — đã nạp danh sách eBook mẫu.', 'warning');
+              } else {
+                showToast('Đã đồng bộ danh sách eBook từ máy chủ.', 'success');
+              }
             }}
           >
             Nạp lại
@@ -291,7 +431,7 @@ export default function EbookManagement() {
         <Table
           columns={columns}
           data={filteredData}
-          emptyMessage="Chưa có tài liệu eBook trong danh sách mẫu."
+          emptyMessage={loading ? 'Đang tải danh sách eBook…' : 'Chưa có đầu sách điện tử trong danh mục.'}
           className="border-0 shadow-none rounded-none"
           pagination
           itemsPerPage={5}

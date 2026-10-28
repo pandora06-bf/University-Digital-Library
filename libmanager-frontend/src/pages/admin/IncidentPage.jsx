@@ -90,26 +90,34 @@ export default function IncidentPage() {
       return next;
     });
 
-    // 4-15.b: thử API quầy lookup; fallback mock
+    // UC15 / 4-15.b: API quầy lookup (MSSV | mã phiếu | barcode) → fallback mock
     try {
       const { data } = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: code } });
-      const loans = data?.loans || data?.items || [];
-      const user = data?.user || {};
-      const hit = loans.find((l) =>
+      const loans = Array.isArray(data?.data)
+        ? data.data
+        : (data?.loans || data?.items || []);
+      const active = loans.filter((l) =>
         ['BORROWED', 'OVERDUE'].includes(String(l.loan_status || l.status || '').toUpperCase())
-      ) || loans[0];
+      );
+      const hit = active[0] || null;
       if (hit) {
         applyLookupHit({
           ...hit,
           book_title: hit.book_title || hit.title,
           barcode: hit.copy_barcode || hit.barcode || code,
           loan_code: hit.loan_code || String(hit.id),
-          borrower_name: user.full_name || hit.borrower_name,
-          borrower_code: user.user_code || hit.user_code,
+          borrower_name: hit.full_name || hit.borrower_name,
+          borrower_code: hit.user_code || hit.borrower_code,
           book_price: hit.book_price ?? hit.price ?? 0,
         }, code, 'API');
         setIsSearchingBook(false);
         return;
+      }
+      if (loans.length > 0) {
+        showToast(
+          'Tìm thấy phiếu nhưng không ở trạng thái đang mượn hoặc quá hạn.',
+          'warning'
+        );
       }
     } catch {
       /* fallback mock */
@@ -182,32 +190,37 @@ export default function IncidentPage() {
     setFormErrors({});
 
     const isLost = createForm.incident_type === 'LOST';
-    let apiNote = '';
+    let apiOk = false;
+    let apiPenalty = compensation;
+    let apiLoanId = createForm.loan_code;
     try {
       if (createForm.barcode) {
-        await axiosInstance.post('/api/admin/loans/checkin', {
+        const { data } = await axiosInstance.post('/api/admin/loans/checkin', {
           copy_barcode: createForm.barcode,
           condition_notes: createForm.description.trim(),
           is_lost: isLost,
           is_damaged: !isLost,
           damage_penalty: compensation,
         });
-        apiNote = ' + check-in API';
+        apiOk = true;
+        if (data?.penalty_amount != null) apiPenalty = Number(data.penalty_amount);
+        if (data?.loan_id != null) apiLoanId = String(data.loan_id);
       }
     } catch (error) {
       const status = error?.response?.status;
-      const msg = getApiErrorMessage(error, 'Check-in API lỗi — vẫn lưu biên bản local.');
-      if (status === 409 || status === 422) {
+      const msg = getApiErrorMessage(error, 'Không ghi được sự cố lên máy chủ — vẫn lưu biên bản trên giao diện.');
+      if (status === 409 || status === 422 || status === 400 || status === 404) {
         showToast(msg, 'error');
         return;
       }
       showToast(msg, 'warning');
     }
 
+    // BE ghi incidents (BOOK_LOST/BOOK_DAMAGED, RESOLVED); FE giữ LOST/DAMAGED cho bộ lọc UI
     const newIncident = {
-      id: `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`,
-      incident_code: `BB-2026-${String(incidents.length + 1).padStart(3, '0')}`,
-      loan_code: createForm.loan_code,
+      id: apiOk && apiLoanId ? `INC-LOAN-${apiLoanId}` : `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`,
+      incident_code: apiOk && apiLoanId ? `BB-LOAN-${apiLoanId}` : `BB-2026-${String(incidents.length + 1).padStart(3, '0')}`,
+      loan_code: String(apiLoanId),
       barcode: createForm.barcode,
       book_title: createForm.book_title,
       borrower_name: createForm.borrower_name,
@@ -216,10 +229,11 @@ export default function IncidentPage() {
       incident_type: createForm.incident_type,
       description: createForm.description.trim(),
       book_price: compensation,
-      compensation_amount: compensation,
+      compensation_amount: apiPenalty,
       created_at: new Date().toLocaleDateString('vi-VN'),
-      created_by: 'Thủ thư Admin',
-      status: apiNote ? 'RECORDED' : 'PENDING',
+      created_by: 'Thủ thư',
+      status: apiOk ? 'RESOLVED' : 'PENDING',
+      synced_api: apiOk,
     };
 
     const updated = addStoredIncident(newIncident);
@@ -227,7 +241,12 @@ export default function IncidentPage() {
     setShowCreateModal(false);
     setLoanLookedUp(false);
     setCreateForm({ ...EMPTY_CREATE_FORM });
-    showToast(`Đã lập biên bản ${newIncident.incident_code}${apiNote}.`, 'success');
+    showToast(
+      apiOk
+        ? `Đã lập biên bản ${newIncident.incident_code} và ghi sự cố lên máy chủ.`
+        : `Đã lưu biên bản ${newIncident.incident_code} trên giao diện (chưa đồng bộ máy chủ).`,
+      'success'
+    );
   };
 
   // Cấu hình các cột cho bảng Table component
@@ -311,7 +330,7 @@ export default function IncidentPage() {
           <span className="font-bold text-slate-800 block text-sm">
             {formatVND(val)}
           </span>
-          <span className="text-[10px] text-slate-400 block mt-0.5">Giá bìa (BR-28)</span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Theo giá bìa</span>
         </div>
       )
     },
@@ -392,7 +411,7 @@ export default function IncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập biên bản, ghi công nợ và xác nhận bồi thường. Tra cứu phiếu đang mượn trước khi lưu.
+            Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -418,6 +437,13 @@ export default function IncidentPage() {
         </div>
       </div>
 
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-semibold">Danh sách biên bản đang lưu trên trình duyệt</p>
+        <p className="text-amber-800/90 mt-0.5 text-[13px]">
+          Lập biên bản có thể ghi sự cố lên máy chủ qua nhận trả sách; bảng danh sách chưa có API đồng bộ toàn bộ.
+        </p>
+      </div>
+
       {/* 4 Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Tổng biên bản */}
@@ -432,7 +458,7 @@ export default function IncidentPage() {
             </h3>
           </div>
           <div className="mt-3 text-[11px] font-medium text-slate-500">
-            Dữ liệu mẫu kiểm thử giao diện quản trị
+            Trên danh sách hiện tại
           </div>
         </div>
 
@@ -480,7 +506,7 @@ export default function IncidentPage() {
             </h3>
           </div>
           <div className="mt-3 text-[11px] font-medium text-slate-500">
-            Theo nguyên tắc giá bìa (BR-28)
+            Theo nguyên tắc giá bìa
           </div>
         </div>
       </div>
@@ -622,7 +648,7 @@ export default function IncidentPage() {
                 <p>Họ tên độc giả: <strong className="text-slate-800">{detailRow.borrower_name}</strong></p>
                 <p>Mã số sinh viên/cán bộ: <strong className="font-mono text-slate-800">{detailRow.borrower_code}</strong></p>
                 <p>Lớp / Khoa: <strong className="text-slate-800">{detailRow.borrower_class}</strong></p>
-                <p>Trạng thái tài khoản: <strong className="text-rose-600">Khóa mượn (is_locked = TRUE)</strong></p>
+                <p>Trạng thái tài khoản: <strong className="text-rose-600">Đã khóa quyền mượn</strong></p>
               </div>
             </div>
 
@@ -637,8 +663,8 @@ export default function IncidentPage() {
             {/* Bồi thường */}
             <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold text-amber-800 uppercase">Khoản tiền bồi thường (BR-28)</p>
-                <p className="text-xs text-amber-600 mt-0.5">Cộng vào Total_Fines, độc giả nộp tại quầy hoặc ví dịch vụ</p>
+                <p className="text-xs font-bold text-amber-800 uppercase">Khoản tiền bồi thường</p>
+                <p className="text-xs text-amber-600 mt-0.5">Cộng vào công nợ; độc giả nộp tại quầy hoặc ví dịch vụ</p>
               </div>
               <div className="text-right">
                 <span className="text-xl font-extrabold text-amber-700">
@@ -710,7 +736,7 @@ export default function IncidentPage() {
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Ưu tiên API lookup; fallback mẫu — thử: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
+              Tra cứu phiếu đang mượn. Nếu máy chủ lỗi, có thể thử mã mẫu: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
             </p>
           </div>
 
@@ -801,14 +827,14 @@ export default function IncidentPage() {
             min={0}
             value={createForm.book_price || ''}
             error={formErrors.book_price}
-            helperText="Mặc định = giá bìa (BR-28). Thiếu giá thì nhập thủ công."
+            helperText="Mặc định theo giá bìa. Thiếu giá thì nhập thủ công."
             onChange={(e) => {
               setCreateForm({ ...createForm, book_price: Number(e.target.value) || 0 });
               if (formErrors.book_price) setFormErrors({ ...formErrors, book_price: '' });
             }}
           />
           <p className="text-[11px] text-slate-400 -mt-2">
-            Lưu: ghi biên bản local; nếu có barcode sẽ thử check-in API. API từ chối sẽ hiện Toast lỗi.
+            Lưu biên bản trên giao diện; nếu có mã vạch sẽ thử ghi sự cố lên máy chủ. Máy chủ từ chối sẽ hiện thông báo lỗi.
           </p>
         </div>
       </Modal>

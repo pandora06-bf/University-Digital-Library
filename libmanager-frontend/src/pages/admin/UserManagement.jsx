@@ -419,8 +419,7 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tìm kiếm, phân trang, tạo/sửa tài khoản; khóa/mở khóa và đặt lại mật khẩu tạm (hiện một lần).
-            {useMock ? ' Dữ liệu mẫu khi API admin users chưa sẵn.' : ' Đã nối API.'}
+            Quản lý tài khoản bạn đọc: tìm kiếm, tạo/sửa hồ sơ, khóa–mở khóa và đặt lại mật khẩu tạm.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -432,6 +431,15 @@ export default function UserManagement() {
           </Button>
         </div>
       </div>
+
+      {useMock && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+          <p className="text-amber-800/90 mt-0.5 text-[13px]">
+            API quản trị người dùng chưa sẵn sàng. Thao tác chỉ lưu trên trình duyệt, không ghi máy chủ.
+          </p>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -635,7 +643,7 @@ export default function UserManagement() {
           <span className="font-mono text-xs text-indigo-600">({lockTarget?.user_code})</span>
           {Number(lockTarget?.total_fines) > 0 && (
             <span className="block mt-2 text-rose-600 font-medium">
-              Đang nợ {Number(lockTarget.total_fines).toLocaleString('vi-VN')} ₫ — mở khóa sẽ bị từ chối nếu còn nợ (BR-16).
+              Đang nợ {Number(lockTarget.total_fines).toLocaleString('vi-VN')} ₫ — không mở khóa khi còn công nợ.
             </span>
           )}
         </p>

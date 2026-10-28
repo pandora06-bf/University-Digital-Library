@@ -235,6 +235,8 @@ export default function CatalogManagement() {
   const [isAddingBook, setIsAddingBook] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [categoryFormName, setCategoryFormName] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [deletingCategory, setDeletingCategory] = useState(null);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [deletingBook, setDeletingBook] = useState(null);
   
@@ -708,17 +710,40 @@ export default function CatalogManagement() {
     }
     setIsSavingCategory(true);
     try {
-      await axiosInstance.post('/api/admin/categories', {
-        category_name: categoryFormName.trim()
-      });
-      showToast('Thêm thể loại mới thành công!', 'success');
-      await fetchCategories(); // Cập nhật lại danh sách thể loại ngay lập tức
+      if (editingCategory?.id != null) {
+        await axiosInstance.put(`/api/admin/categories/${editingCategory.id}`, {
+          category_name: categoryFormName.trim(),
+        });
+        showToast('Cập nhật thể loại thành công!', 'success');
+      } else {
+        await axiosInstance.post('/api/admin/categories', {
+          category_name: categoryFormName.trim(),
+        });
+        showToast('Thêm thể loại mới thành công!', 'success');
+      }
+      fetchCategories();
       setIsAddingCategory(false);
+      setEditingCategory(null);
       setCategoryFormName('');
     } catch (error) {
-      console.error('Lỗi thêm thể loại:', error);
-      const errorMsg = getApiErrorMessage(error, 'Không thể thêm thể loại.');
+      console.error('Lỗi lưu thể loại:', error);
+      const errorMsg = getApiErrorMessage(error, 'Không thể lưu thể loại.');
       showToast(errorMsg, 'error');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const handleConfirmDeleteCategory = async () => {
+    if (!deletingCategory?.id) return;
+    setIsSavingCategory(true);
+    try {
+      await axiosInstance.delete(`/api/admin/categories/${deletingCategory.id}`);
+      showToast(`Đã xóa thể loại «${deletingCategory.category_name}».`, 'success');
+      setDeletingCategory(null);
+      fetchCategories();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không thể xóa thể loại (có thể đang được dùng bởi sách).'), 'error');
     } finally {
       setIsSavingCategory(false);
     }
@@ -743,15 +768,21 @@ export default function CatalogManagement() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Danh mục Sách</h1>
-          <p className="text-sm text-slate-500 mt-1">Quản lý thông tin đầu sách, danh mục thể loại, tác giả và nhà xuất bản học thuật.</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Quản lý đầu sách, thể loại, tác giả và nhà xuất bản trong thư viện số.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
             variant="outline" 
             icon={<Plus className="w-4 h-4" />}
-            onClick={() => setIsAddingCategory(true)}
+            onClick={() => {
+              setEditingCategory(null);
+              setCategoryFormName('');
+              setIsAddingCategory(true);
+            }}
           >
-            Thêm thể loại
+            Quản lý thể loại
           </Button>
           <Button 
             variant="primary" 
@@ -762,6 +793,15 @@ export default function CatalogManagement() {
           </Button>
         </div>
       </div>
+
+      {useMockCatalog && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+          <p className="text-amber-800/90 mt-0.5 text-[13px]">
+            Không kết nối được danh mục trên máy chủ. Danh sách hiện tại chỉ để xem giao diện.
+          </p>
+        </div>
+      )}
 
       {/* 3 Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -809,7 +849,9 @@ export default function CatalogManagement() {
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Circle className="w-2 h-2 fill-indigo-400 text-indigo-400" />
-              <span className="text-[11px] font-medium text-slate-500">Đã đồng bộ thành công</span>
+              <span className="text-[11px] font-medium text-slate-500">
+                {useMockCatalog ? 'Hiển thị dữ liệu mẫu' : 'Trên trang hiện tại'}
+              </span>
             </div>
           </div>
         </div>
@@ -1034,19 +1076,54 @@ export default function CatalogManagement() {
 
       </div>
 
-      {/* Modal Thêm Thể Loại */}
+      {/* Modal Quản lý thể loại — GET/POST/PUT/DELETE /api/admin/categories */}
       <Modal 
         isOpen={isAddingCategory} 
         onClose={() => {
           setIsAddingCategory(false);
+          setEditingCategory(null);
           setCategoryFormName('');
         }}
-        title="Thêm thể loại mới"
+        title={editingCategory ? 'Sửa thể loại' : 'Quản lý thể loại'}
         width="max-w-md"
       >
         <div className="space-y-4">
+          <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-100 divide-y divide-slate-100">
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+                <span className="font-medium text-slate-700 truncate">{cat.category_name}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50"
+                    title="Sửa"
+                    onClick={() => {
+                      setEditingCategory(cat);
+                      setCategoryFormName(cat.category_name || '');
+                    }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
+                    title="Xóa"
+                    onClick={() => setDeletingCategory(cat)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <p className="px-3 py-4 text-sm text-slate-400 text-center">Chưa có thể loại.</p>
+            )}
+          </div>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên thể loại <span className="text-rose-500">*</span></label>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+              {editingCategory ? 'Tên thể loại (sửa)' : 'Thêm thể loại mới'}{' '}
+              <span className="text-rose-500">*</span>
+            </label>
             <Input 
               value={categoryFormName}
               onChange={(e) => setCategoryFormName(e.target.value)}
@@ -1056,11 +1133,48 @@ export default function CatalogManagement() {
             />
           </div>
           <div className="pt-2 flex justify-end gap-3 border-t border-slate-100">
-            <Button variant="outline" onClick={() => setIsAddingCategory(false)} disabled={isSavingCategory}>
-              Hủy
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (editingCategory) {
+                  setEditingCategory(null);
+                  setCategoryFormName('');
+                } else {
+                  setIsAddingCategory(false);
+                }
+              }}
+              disabled={isSavingCategory}
+            >
+              {editingCategory ? 'Hủy sửa' : 'Đóng'}
             </Button>
             <Button variant="primary" onClick={handleSaveCategory} isLoading={isSavingCategory} disabled={!categoryFormName.trim()}>
-              Lưu Thể Loại
+              {editingCategory ? 'Cập nhật' : 'Thêm thể loại'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!deletingCategory}
+        onClose={() => setDeletingCategory(null)}
+        title="Xóa thể loại"
+        width="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Xóa thể loại <strong>«{deletingCategory?.category_name}»</strong>? Không xóa được nếu còn sách đang dùng.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDeletingCategory(null)} disabled={isSavingCategory}>
+              Hủy
+            </Button>
+            <Button
+              variant="primary"
+              className="!bg-rose-600 hover:!bg-rose-700"
+              onClick={handleConfirmDeleteCategory}
+              isLoading={isSavingCategory}
+            >
+              Xóa
             </Button>
           </div>
         </div>
@@ -1152,7 +1266,7 @@ export default function CatalogManagement() {
                 className="w-full"
                 placeholder="VD: 150000"
                 error={formErrors.price}
-                helperText={!formErrors.price ? 'Lưu cùng đầu sách qua API (giá bìa).' : undefined}
+                helperText={!formErrors.price ? 'Lưu cùng đầu sách (giá bìa).' : undefined}
               />
             </div>
 

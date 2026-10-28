@@ -2,105 +2,140 @@
 
 | | |
 |---|---|
-| **Sprint / task** | 4-17.a (phần 1/2) — bàn giao **23/10/2026** |
+| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **28/10/2026** |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **URL (Docker)** | http://localhost:5174 |
 | **Đăng nhập demo** | `admin` / `Admin@123` |
 | **File nguồn** | `docs/HUONG_DAN_THU_THU.md` |
 
-Tài liệu ngắn cho ca trực: Check-out, Check-in, thu phạt, báo mất/hỏng, check-in phòng.
+Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đã đủ các mục quản trị (không còn trang Tổng quan riêng).
 
-**Máy quét barcode:** ô quét **tự focus** (`autoFocus`); tít mã hoặc gõ rồi **Enter** — hạn chế chuột. Toast Admin hiện **giữa phía trên**.
+**Máy quét barcode:** ô quét **tự focus**; tít mã hoặc gõ rồi **Enter**. Toast Admin hiện **giữa phía trên**.
+
+**Banner vàng «Đang dùng dữ liệu mẫu»:** hiện khi trang chưa nối máy chủ (Users / Rooms / Unmatched / …) hoặc khi API tạm lỗi (Catalog / Inventory / eBook).
+
+---
+
+## Trạng thái nhanh theo màn hình
+
+| Màn hình | Đường dẫn | Máy chủ |
+|----------|-----------|---------|
+| Danh mục sách | `/admin/catalog` | **Đã nối** (CRUD + thể loại + upload) |
+| eBook / PDF | `/admin/ebooks` | **List + upload** đã nối; xem trước cần BE bật preview |
+| Tồn kho | `/admin/inventory` | **Đã nối** (bản sao / thanh lý) |
+| Mượn / Trả | `/admin/loans` | **Đã nối** quầy lookup / checkout / check-in |
+| Thu phạt | `/admin/fines` | **Đã nối** lookup MSSV + thu đủ nợ |
+| Báo mất / Hỏng | `/admin/incidents` | **Tạo** qua nhận trả; **danh sách** lưu trình duyệt |
+| Người dùng | `/admin/users` | **Mẫu FE** (chờ API admin users) |
+| Phòng học nhóm | `/admin/rooms` | **Mẫu FE** |
+| Check-in phòng | `/admin/rooms/checkin` | **Mẫu FE** |
+| GD chưa khớp | `/admin/unmatched` | **Mẫu FE** |
 
 ---
 
 ## 1. Check-out (xuất mượn) — `/admin/loans`
 
-1. Cột **Quầy Xuất Phiếu Mượn**: nhập **MSSV / mã độc giả** → **Enter** (gọi `GET /api/admin/loans/lookup`).
-2. Kiểm tra thẻ **Người mượn + danh sách phiếu** (mã phiếu, tên sách, trạng thái, hạn).
-3. (Tuỳ chọn) Điền **condition_notes** — ghi chú tình trạng sách khi giao (BR-03).
-4. Quét barcode sách (`FastBarcodeScanner`, tự xóa sau mỗi lần quét) → thêm vào phiếu.
-5. **Xác nhận xuất phiếu mượn** → API `POST /api/admin/loans/checkout` → Toast thành công / lỗi.
+1. Cột **Quầy Xuất Phiếu Mượn**: nhập **MSSV / mã độc giả** → **Enter**.
+2. Kiểm tra thẻ người mượn + danh sách phiếu (trạng thái, hạn).
+3. (Tuỳ chọn) ghi chú tình trạng sách khi giao.
+4. Quét barcode sách (**tít liên tục** — ô tự xóa sau mỗi lần) → thêm vào phiếu.
+5. **Xác nhận xuất phiếu mượn** → Toast thành công / lỗi.
 
-> Check-out thành công khi có phiếu `REQUESTED` hoặc `PENDING_PICKUP` và barcode khớp đúng đầu sách của phiếu.
+> Thành công khi có phiếu chờ xuất / chờ nhận và barcode khớp đúng đầu sách.
+
+Thống kê góc trên = **phiên làm việc hiện tại** (không phải số liệu cả ngày từ máy chủ).
 
 ---
 
 ## 2. Check-in (nhận trả) — `/admin/loans`
 
-1. Cột **Quầy Nhận Trả Sách Nhanh**: quét barcode sách trả → **Enter** (ô đã autoFocus).
-2. Chọn tình trạng: **Nguyên vẹn** hoặc **Hư hỏng / Mất sách** (có thể ghi chú chi tiết trong modal).
-3. **Xác nhận trả sách** → API `POST /api/admin/loans/checkin` → Toast thành công / lỗi nghiệp vụ.
+1. Cột **Quầy Nhận Trả Sách Nhanh**: quét barcode sách trả → **Enter** (ô giữ mã để xác nhận).
+2. Chọn tình trạng: **Nguyên vẹn** hoặc **Hư hỏng / Mất sách**.
+3. **Xác nhận trả sách** → Toast thành công / lỗi nghiệp vụ.
 
-Nếu hư hỏng / mất: chuyển **Thu phạt** (`/admin/fines`) hoặc **Biên bản** (`/admin/incidents`).
+Nếu hư hỏng / mất: sang **Thu phạt** (`/admin/fines`) hoặc **Biên bản** (`/admin/incidents`).
 
 ---
 
 ## 3. Thu phạt — `/admin/fines`
 
-1. Ô tìm: nhập **MSSV** → **Enter** (`GET /api/admin/fines/lookup`).
-2. Toast báo số khoản UNPAID / tổng nợ (hoặc không còn nợ).
-3. **Thu tiền** → **Xác nhận Đã Thu** → `POST /api/admin/fines/collect`.
-
-> API chỉ cho phép **thu đủ toàn bộ** `total_fines` (không thu một phần).
+1. Nhập **MSSV** → **Enter** để tra cứu công nợ.
+2. Xem các khoản chưa thu / tổng nợ.
+3. **Thu tiền** → **Xác nhận Đã Thu** (tiền mặt; **thu đủ toàn bộ** nợ).
 
 ---
 
 ## 4. Báo mất / hỏng — `/admin/incidents`
 
-1. Tra cứu barcode / mã phiếu (UI mock hỗ trợ ca trực) nếu cần xác minh phiếu đang mượn.
-2. **Lập biên bản sự cố** → chọn loại (mất / hỏng), ghi chú → lưu.
-3. Toast xác nhận; theo dõi công nợ tại `/admin/fines` nếu cần.
+1. **Lập biên bản** → nhập mã vạch / mã phiếu → **Tra cứu**.
+2. Chọn loại (mất / hỏng), mô tả, tiền bồi thường → Lưu.
+3. Nếu máy chủ nhận được: sự cố được ghi qua luồng nhận trả; bảng danh sách vẫn chủ yếu trên trình duyệt.
 
 ---
 
-## 5. Phòng học nhóm & check-in (3-17)
+## 5. Danh mục & tồn kho & eBook (UC09)
 
-### Danh mục phòng — `/admin/rooms`
-1. Xem bảng phòng (tên, tầng, sức chứa, giá khung 2h, đang hoạt động / ngừng).
-2. **Thêm phòng** / **Sửa**; thử **Ngừng** phòng còn booking tương lai → Toast nghiệp vụ (mock).
-3. Nút **Check-in mã đặt** → `/admin/rooms/checkin`.
+### `/admin/catalog`
+- Tìm (debounce) + phân trang; thêm/sửa/xóa đầu sách; upload bìa/PDF.
+- **Quản lý thể loại**: thêm / sửa / xóa.
 
-### Quầy check-in — `/admin/rooms/checkin`
-1. Ô mã đặt (**autoFocus**) → gõ/tít rồi **Enter** hoặc **Xác nhận check-in** (vd mock `RB-2026-1001`).
-2. Xem danh sách lượt đặt **trong ngày**; nút Check-in trên dòng `CONFIRMED`.
+### `/admin/inventory`
+- Chọn đầu sách → xem barcode, vị trí kệ, tình trạng.
+- Thêm / sửa / xóa bản sao; **không thanh lý** khi đang mượn.
 
-> UI dùng **mock FE**; nối API phòng / check-in khi Hiền–Nhất mount BE.
-
----
-
-## 5b. Giao dịch chưa khớp (4-16) — `/admin/unmatched`
-
-1. Lọc **Chưa khớp** → **Gán user** → chọn MSSV → Xác nhận.
-2. Dòng chuyển trạng thái **Đã gán**.
-
-> Mock FE; nối `GET/POST` wallet unmatched khi BE sẵn.
+### `/admin/ebooks`
+- Danh sách đầu sách điện tử; tải lên / thay PDF; xem trước khi máy chủ hỗ trợ.
 
 ---
 
-## 6. Sơ đồ ca trực (Admin)
+## 6. Phòng học nhóm & check-in
+
+### `/admin/rooms`
+1. Xem / thêm / sửa phòng; ngừng phòng còn lịch đặt tương lai → Toast nghiệp vụ.
+2. **Check-in mã đặt** → `/admin/rooms/checkin`.
+
+### `/admin/rooms/checkin`
+1. Nhập mã đặt → Enter / xác nhận (vd mẫu `RB-2026-1001`).
+2. Xem lượt đặt trong ngày.
+
+> Đang dùng **dữ liệu mẫu** trên trình duyệt.
+
+---
+
+## 7. Người dùng & giao dịch chưa khớp
+
+### `/admin/users`
+CRUD, khóa/mở khóa, đặt lại mật khẩu tạm (hiện một lần) — **mẫu FE**.
+
+### `/admin/unmatched`
+Gán giao dịch nạp tiền chưa khớp cho bạn đọc — **mẫu FE** (không cộng ví thật).
+
+---
+
+## 8. Sơ đồ ca trực
 
 | Việc | Đường dẫn |
 |------|-----------|
-| Danh mục / giá bìa (debounce + phân trang server) | `/admin/catalog` |
-| Tồn kho / thanh lý bản sao | `/admin/inventory` |
+| Danh mục / thể loại | `/admin/catalog` |
+| eBook / PDF | `/admin/ebooks` |
+| Tồn kho / thanh lý | `/admin/inventory` |
 | Mượn–trả (quầy) | `/admin/loans` |
 | Thu phạt | `/admin/fines` |
 | Mất–hỏng | `/admin/incidents` |
-| Người dùng (khóa / reset MK) | `/admin/users` (mock tới khi có API) |
-| Phòng học nhóm / check-in mã đặt | `/admin/rooms`, `/admin/rooms/checkin` |
+| Người dùng | `/admin/users` |
+| Phòng / check-in mã đặt | `/admin/rooms`, `/admin/rooms/checkin` |
 | Giao dịch chưa khớp | `/admin/unmatched` |
-| Đặt phòng (User) | `/rooms` |
 
 ---
 
-## 7. API quầy liên quan (đã mount BE)
+## 9. API quầy đã mount (tham chiếu kỹ thuật)
 
 - `GET /api/admin/loans/lookup`
 - `POST /api/admin/loans/checkout`
 - `POST /api/admin/loans/checkin`
 - `GET /api/admin/fines/lookup`
 - `POST /api/admin/fines/collect`
+- Admin books / categories / inventory (UC09)
 
-Swagger: http://localhost:8010/docs (đăng nhập JWT admin trước khi thử).
+Swagger: http://localhost:8010/docs (JWT admin trước khi thử).

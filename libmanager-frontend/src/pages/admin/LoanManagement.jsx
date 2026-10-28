@@ -163,7 +163,7 @@ export default function LoanManagement() {
     }
     setReturnBarcode(targetCode);
     setReturnBookScanned(true);
-    showToast(`Đã nhận barcode trả: ${targetCode}. Bấm xác nhận để check-in API.`, 'success');
+    showToast(`Đã nhận mã vạch trả: ${targetCode}. Bấm xác nhận để nhận sách.`, 'success');
   };
 
   const handleUserScan = async () => {
@@ -319,19 +319,22 @@ export default function LoanManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Mượn / Trả Sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quầy Check-out / Check-in — quét barcode + Enter. Đã nối API `/api/admin/loans/*`.
+            Quầy xuất mượn và nhận trả sách: quét mã vạch rồi xác nhận giao / nhận sách cho bạn đọc.
           </p>
         </div>
         
-        {/* Top Stats */}
+        {/* Thống kê phiên làm việc (không có API báo cáo ngày) */}
         <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full lg:w-auto hide-scrollbar">
           <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
               <ArrowUpFromLine className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Mượn hôm nay</p>
-              <p className="text-lg font-extrabold text-emerald-800 leading-none mt-0.5">142 <span className="text-xs font-semibold text-emerald-600">phiếu</span></p>
+              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Mượn (phiên này)</p>
+              <p className="text-lg font-extrabold text-emerald-800 leading-none mt-0.5">
+                {historyData.filter((h) => h.type === 'Mượn').length}{' '}
+                <span className="text-xs font-semibold text-emerald-600">phiếu</span>
+              </p>
             </div>
           </div>
           
@@ -340,8 +343,11 @@ export default function LoanManagement() {
               <ArrowDownToLine className="w-4 h-4 text-blue-600" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Trả hôm nay</p>
-              <p className="text-lg font-extrabold text-blue-800 leading-none mt-0.5">105 <span className="text-xs font-semibold text-blue-600">phiếu</span></p>
+              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Trả (phiên này)</p>
+              <p className="text-lg font-extrabold text-blue-800 leading-none mt-0.5">
+                {historyData.filter((h) => h.type === 'Trả').length}{' '}
+                <span className="text-xs font-semibold text-blue-600">phiếu</span>
+              </p>
             </div>
           </div>
           
@@ -350,8 +356,11 @@ export default function LoanManagement() {
               <AlertCircle className="w-4 h-4 text-rose-600" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Chờ xử lý / Quá hạn</p>
-              <p className="text-lg font-extrabold text-rose-800 leading-none mt-0.5">12 <span className="text-xs font-semibold text-rose-600">phiếu</span></p>
+              <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Chờ xuất trên quầy</p>
+              <p className="text-lg font-extrabold text-rose-800 leading-none mt-0.5">
+                {borrowBooks.length}{' '}
+                <span className="text-xs font-semibold text-rose-600">cuốn</span>
+              </p>
             </div>
           </div>
         </div>
@@ -402,7 +411,7 @@ export default function LoanManagement() {
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 shrink-0">Chờ check-in</span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1 font-mono">Barcode: {returnBarcode}</p>
-                  <p className="text-xs text-slate-500 mt-2">Xác nhận sẽ gọi API check-in (phiếu BORROWED/OVERDUE).</p>
+                  <p className="text-xs text-slate-500 mt-2">Xác nhận sẽ nhận trả sách đang mượn hoặc quá hạn theo mã vạch này.</p>
                 </div>
               </div>
             </div>
@@ -538,7 +547,7 @@ export default function LoanManagement() {
                     </div>
                   ) : (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      Không có phiếu trong kết quả tra cứu. Checkout vẫn thử được nếu BE có phiếu PENDING khớp barcode.
+                      Không có phiếu trong kết quả tra cứu. Vẫn có thể thử xuất mượn nếu có phiếu chờ nhận khớp mã vạch.
                     </p>
                   )}
                 </div>
@@ -557,7 +566,7 @@ export default function LoanManagement() {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Ghi chú tình trạng khi giao (condition_notes)
+                    Ghi chú tình trạng khi giao
                   </label>
                   <Input
                     type="text"
@@ -566,7 +575,7 @@ export default function LoanManagement() {
                     value={checkoutConditionNotes}
                     onChange={(e) => setCheckoutConditionNotes(e.target.value)}
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">Gửi kèm API check-out (BR-03). Để trống nếu sách nguyên vẹn.</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Ghi kèm khi xuất mượn. Để trống nếu sách nguyên vẹn.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -675,7 +684,7 @@ export default function LoanManagement() {
             <h4 className="text-sm font-bold text-slate-800 mb-1">Check-in bản sao</h4>
             <div className="text-xs text-slate-500 space-y-1 font-medium">
               <p>Mã vạch: <span className="text-slate-700 font-mono">{returnBarcode}</span></p>
-              <p>API sẽ tìm phiếu BORROWED/OVERDUE theo barcode này.</p>
+              <p>Hệ thống sẽ tìm phiếu đang mượn hoặc quá hạn theo mã vạch này.</p>
             </div>
           </div>
 
@@ -759,7 +768,7 @@ export default function LoanManagement() {
           </>
         }
       >
-        <p className="text-sm text-slate-600 mb-4">Gọi API check-out từng barcode (cần phiếu REQUESTED/PENDING_PICKUP khớp đầu sách):</p>
+        <p className="text-sm text-slate-600 mb-4">Xuất mượn từng mã vạch (cần phiếu chờ xuất / chờ nhận khớp đầu sách):</p>
         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-3 flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xs">
             {(borrowUserId || 'U').slice(0, 2).toUpperCase()}
@@ -772,7 +781,7 @@ export default function LoanManagement() {
         <p className="text-sm font-semibold text-slate-700 mb-2">Số lượng tài liệu: <span className="text-indigo-600 font-bold">{borrowBooks.length} cuốn</span></p>
         {checkoutConditionNotes.trim() && (
           <p className="text-xs text-slate-500 mb-3 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-            condition_notes: <span className="text-slate-700 font-medium">{checkoutConditionNotes.trim()}</span>
+            Ghi chú tình trạng: <span className="text-slate-700 font-medium">{checkoutConditionNotes.trim()}</span>
           </p>
         )}
         <div className="space-y-2 max-h-40 overflow-y-auto pr-2">

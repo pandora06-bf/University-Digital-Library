@@ -2,26 +2,58 @@ import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 're
 import { ScanLine, X, Loader2, Sparkles } from 'lucide-react';
 
 /**
+ * Một AudioContext dùng chung + resume() khi suspended.
+ * Đặc tả âm: sine 880Hz ~80ms (giữ nguyên). Chỉ sửa phần trình duyệt chặn autoplay.
+ */
+let sharedAudioCtx = null;
+
+function getScannerAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+    sharedAudioCtx = new AudioContextClass();
+  }
+  return sharedAudioCtx;
+}
+
+function unlockScannerAudio() {
+  try {
+    const ctx = getScannerAudioContext();
+    if (ctx?.state === 'suspended') void ctx.resume();
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Phát âm thanh beep ngắn (880Hz, 70ms) mô phỏng máy tít mã vạch chuyên dụng tại quầy thư viện
  */
 function playScannerBeep() {
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    const ctx = getScannerAudioContext();
+    if (!ctx) return;
 
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); // Nốt A5 chuẩn máy POS
-    gain.gain.setValueAtTime(0.12, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    const play = () => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // Nốt A5 chuẩn máy POS
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+    };
+
+    if (ctx.state === 'suspended') {
+      void ctx.resume().then(play).catch(() => {});
+    } else {
+      play();
+    }
   } catch {
     // Trình duyệt có thể chặn autoplay audio nếu chưa có tương tác người dùng, bỏ qua an toàn
   }
@@ -171,6 +203,8 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
             value={currentValue}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onFocus={unlockScannerAudio}
+            onPointerDown={unlockScannerAudio}
             disabled={disabled || loading}
             placeholder={placeholder}
             className={`w-full h-11 pl-11 pr-10 bg-white rounded-xl text-sm font-mono text-slate-800 border transition-all duration-200 focus:outline-none ${
@@ -204,7 +238,10 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
         {showButton && (
           <button
             type="button"
-            onClick={() => triggerScan()}
+            onClick={() => {
+              unlockScannerAudio();
+              triggerScan();
+            }}
             disabled={disabled || loading || !currentValue}
             className={`h-11 px-5 rounded-xl font-semibold text-sm transition-all duration-200 shrink-0 flex items-center gap-1.5 select-none ${
               currentValue && !disabled && !loading

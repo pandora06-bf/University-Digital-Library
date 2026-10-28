@@ -32,11 +32,64 @@ const SEARCH_SUGGESTIONS = [
   { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền chưa khớp cho người dùng', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
 ];
 
-import { logout } from '../services/authService';
+import { logout, getMe } from '../services/authService';
+import { getCurrentUser, setCurrentUser } from '../mocks/auth';
+
+function roleLabel(user) {
+  const role = String(user?.apiRole || user?.role || '').toUpperCase();
+  if (role === 'ADMIN' || role === 'LIBRARIAN' || user?.role === 'admin') {
+    return 'Thủ thư / Quản trị viên';
+  }
+  if (role === 'LECTURER') return 'Giảng viên';
+  if (role === 'STUDENT') return 'Sinh viên';
+  return 'Tài khoản';
+}
+
+function displayName(user) {
+  return user?.full_name || user?.name || user?.username || 'Admin';
+}
+
+function avatarInitials(user) {
+  const name = displayName(user).trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase() || 'AD';
+}
+
+function avatarUrl(user) {
+  if (user?.avatar) return user.avatar;
+  const name = encodeURIComponent(displayName(user));
+  return `https://ui-avatars.com/api/?name=${name}&background=4F46E5&color=fff`;
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [authUser, setAuthUser] = useState(() => getCurrentUser());
+
+  useEffect(() => {
+    let cancelled = false;
+    getMe()
+      .then((me) => {
+        if (cancelled || !me) return;
+        const merged = {
+          ...(getCurrentUser() || {}),
+          id: me.id,
+          username: me.username,
+          name: me.username,
+          apiRole: me.role,
+          role: String(me.role || '').toUpperCase() === 'ADMIN' ? 'admin' : 'user',
+        };
+        setCurrentUser(merged);
+        setAuthUser(merged);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthUser(getCurrentUser());
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -238,7 +291,7 @@ export default function AdminLayout() {
         </NavLink>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 flex flex-col gap-1 px-3 overflow-y-auto">
+        <nav className="flex-1 py-5 flex flex-col gap-2.5 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink
               key={item.path}
@@ -251,7 +304,7 @@ export default function AdminLayout() {
               }}
               className={({ isActive }) => {
                 const active = isItemActive(item.path, isActive);
-                return `flex items-center gap-3 px-3 py-2.5 rounded-xl text-lg font-semibold transition-colors relative ${
+                return `flex items-center gap-3 px-3.5 py-3 rounded-xl text-lg font-semibold transition-colors relative ${
                   active 
                     ? 'bg-white/20 text-white shadow-sm' 
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -286,10 +339,10 @@ export default function AdminLayout() {
             className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/10 cursor-pointer hover:bg-white/10 transition-colors group"
           >
             <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-sm shrink-0 text-indigo-600">
-              TV
+              {avatarInitials(authUser)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate text-white">Thùy Vân</p>
+              <p className="text-sm font-semibold truncate text-white">{displayName(authUser)}</p>
               <p className="text-xs text-rose-400 font-medium truncate group-hover:text-rose-300 transition-colors">Đăng xuất</p>
             </div>
             <LogOut className="w-5 h-5 text-rose-400 group-hover:text-rose-300 transition-colors" />
@@ -402,13 +455,13 @@ export default function AdminLayout() {
             {/* User Avatar */}
             <div className="flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-slate-50 p-1 sm:p-1.5 sm:pr-3 rounded-full transition-colors">
               <img 
-                src="https://ui-avatars.com/api/?name=Thuy+Van&background=4F46E5&color=fff" 
-                alt="Avatar" 
+                src={avatarUrl(authUser)} 
+                alt={displayName(authUser)} 
                 className="w-8 h-8 rounded-full ring-2 ring-indigo-50"
               />
               <div className="hidden sm:block text-right">
-                <p className="text-sm font-bold text-slate-800 leading-tight">Thùy Vân</p>
-                <p className="text-[11px] text-slate-500 font-medium">Thủ thư / Quản trị viên</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight">{displayName(authUser)}</p>
+                <p className="text-[11px] text-slate-500 font-medium">{roleLabel(authUser)}</p>
               </div>
             </div>
           </div>

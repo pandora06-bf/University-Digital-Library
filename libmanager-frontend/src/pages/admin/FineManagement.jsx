@@ -14,74 +14,12 @@ import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 
-// Dữ liệu giả lập cho Bảng Thu phạt
-const initialFinesData = [
-  {
-    id: 'FIN-2026-081',
-    date: '15/09/2026',
-    user: 'Trần Quốc Bảo',
-    mssv: '50214569',
-    reason: 'Trễ hạn 5 ngày: Cấu trúc dữ liệu và Giải thuật',
-    amount: '25,000 ₫',
-    amountNum: 25000,
-    status: 'Chưa thu',
-    statusColor: 'rose',
-    action: 'Thu tiền'
-  },
-  {
-    id: 'FIN-2026-080',
-    date: '14/09/2026',
-    user: 'Lê Thị Mai Hương',
-    mssv: '50221320',
-    reason: 'Làm rách gáy sách: Nhập môn AI',
-    amount: '50,000 ₫',
-    amountNum: 50000,
-    status: 'Chưa thu',
-    statusColor: 'rose',
-    action: 'Thu tiền'
-  },
-  {
-    id: 'FIN-2026-079',
-    date: '10/09/2026',
-    user: 'Hoàng Minh Đức',
-    mssv: '50198822',
-    reason: 'Báo mất sách: Kỹ thuật Lập trình Hệ thống',
-    amount: '120,000 ₫',
-    amountNum: 120000,
-    status: 'Chưa thu',
-    statusColor: 'rose',
-    action: 'Thu tiền'
-  },
-  {
-    id: 'FIN-2026-075',
-    date: '01/09/2026',
-    user: 'Phạm Thúy Vy',
-    mssv: '50201111',
-    reason: 'Trễ hạn 2 ngày: Thiết kế Cơ sở Dữ liệu',
-    amount: '10,000 ₫',
-    amountNum: 10000,
-    status: 'Đã hoàn tất',
-    statusColor: 'emerald',
-    action: 'Chi tiết'
-  },
-  {
-    id: 'FIN-2026-070',
-    date: '25/08/2026',
-    user: 'Nguyễn Văn A',
-    mssv: '50210001',
-    reason: 'Làm ướt sách: Giải tích 1',
-    amount: '40,000 ₫',
-    amountNum: 40000,
-    status: 'Đã hoàn tất',
-    statusColor: 'emerald',
-    action: 'Chi tiết'
-  }
-];
-
 export default function FineManagement() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
-  const [finesData, setFinesData] = useState(initialFinesData);
+  // UC10: bảng trống đến khi tra cứu MSSV qua /api/admin/fines/lookup
+  const [finesData, setFinesData] = useState([]);
+  const [lookedUpName, setLookedUpName] = useState('');
   const [collectingRow, setCollectingRow] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -89,6 +27,10 @@ export default function FineManagement() {
   const [statusFilter, setStatusFilter] = useState('Trạng thái (Tất cả)');
   const [isProcessing, setIsProcessing] = useState(false);
   const [lookupTotal, setLookupTotal] = useState(null);
+
+  const unpaidRows = finesData.filter((r) => r.status === 'Chưa thu');
+  const unpaidSum = unpaidRows.reduce((s, r) => s + (Number(r.amountNum) || 0), 0);
+  const displayDebt = lookupTotal != null ? Number(lookupTotal) : unpaidSum;
 
   const handleCollect = async (row) => {
     if (!row) {
@@ -137,12 +79,13 @@ export default function FineManagement() {
       });
       const data = res.data || {};
       const fines = data.fines || [];
+      setLookedUpName(data.full_name || q);
       setLookupTotal(data.total_fines != null ? Number(data.total_fines) : null);
       if (fines.length === 0) {
         setFinesData([]);
         showToast(
           data.total_fines > 0
-            ? `${data.full_name || q}: tổng nợ ${data.total_fines} nhưng không có dòng UNPAID.`
+            ? `${data.full_name || q}: tổng nợ ${Number(data.total_fines).toLocaleString('vi-VN')} ₫ nhưng chưa có khoản chưa thu.`
             : `${data.full_name || q}: không còn công nợ.`,
           'warning'
         );
@@ -164,27 +107,14 @@ export default function FineManagement() {
       }));
       setFinesData(mapped);
       showToast(
-        `Tìm thấy ${mapped.length} khoản UNPAID · Tổng nợ ${Number(data.total_fines || 0).toLocaleString('vi-VN')} ₫`,
+        `Tìm thấy ${mapped.length} khoản chưa thu · Tổng nợ ${Number(data.total_fines || 0).toLocaleString('vi-VN')} ₫`,
         'success'
       );
     } catch (error) {
-      // Fallback lọc mock nếu API lỗi / không có user
-      const hits = initialFinesData.filter(
-        (item) =>
-          item.user.toLowerCase().includes(q.toLowerCase()) ||
-          item.mssv.includes(q) ||
-          item.id.toLowerCase().includes(q.toLowerCase())
-      );
-      if (hits.length) {
-        setFinesData(hits);
-        setLookupTotal(null);
-        showToast(
-          `${getApiErrorMessage(error, 'Lỗi máy chủ')} — hiển thị ${hits.length} dòng mẫu.`,
-          'warning'
-        );
-      } else {
-        showToast(getApiErrorMessage(error, `Không tìm thấy công nợ cho «${q}».`), 'error');
-      }
+      setFinesData([]);
+      setLookupTotal(null);
+      setLookedUpName('');
+      showToast(getApiErrorMessage(error, `Không tra được công nợ cho «${q}».`), 'error');
     }
   };
 
@@ -313,7 +243,7 @@ export default function FineManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Thu phạt &amp; Công nợ</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tra MSSV (Enter) + «Xác nhận Đã Thu» — đã nối API `/api/admin/fines/*` (thu đủ toàn bộ nợ).
+            Tra cứu công nợ theo MSSV và xác nhận thu phạt tại quầy cho bạn đọc.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -343,10 +273,15 @@ export default function FineManagement() {
               <ShieldAlert className="w-6 h-6 text-rose-600" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Tổng dư nợ chưa thu</p>
-          <h3 className="text-3xl font-extrabold text-rose-600">1,250,000 <span className="text-lg font-bold text-rose-400">₫</span></h3>
+          <p className="text-sm font-bold text-slate-500 mb-2">Tổng dư nợ</p>
+          <h3 className="text-3xl font-extrabold text-rose-600">
+            {displayDebt > 0 ? displayDebt.toLocaleString('vi-VN') : '—'}{' '}
+            <span className="text-lg font-bold text-rose-400">₫</span>
+          </h3>
           <div className="mt-3 text-sm font-medium text-slate-500">
-            Từ <span className="text-slate-700 font-bold">42</span> độc giả đang nợ phí
+            {lookedUpName
+              ? <>Độc giả <span className="text-slate-700 font-bold">{lookedUpName}</span></>
+              : 'Nhập MSSV + Enter để tra cứu'}
           </div>
         </div>
 
@@ -357,11 +292,12 @@ export default function FineManagement() {
               <Wallet className="w-6 h-6 text-emerald-600" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Đã thu trong tháng</p>
-          <h3 className="text-3xl font-extrabold text-emerald-600">450,000 <span className="text-lg font-bold text-emerald-400">₫</span></h3>
-          <div className="mt-3 text-sm font-medium flex items-center gap-2">
-            <span className="text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded font-bold">+15%</span>
-            <span className="text-slate-500">so với tháng trước</span>
+          <p className="text-sm font-bold text-slate-500 mb-2">Khoản chưa thu</p>
+          <h3 className="text-3xl font-extrabold text-emerald-600">
+            {unpaidRows.length} <span className="text-lg font-bold text-emerald-400">dòng</span>
+          </h3>
+          <div className="mt-3 text-sm font-medium text-slate-500">
+            Thu đủ toàn bộ số nợ một lần
           </div>
         </div>
 
@@ -372,10 +308,12 @@ export default function FineManagement() {
               <Receipt className="w-6 h-6 text-amber-600" />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Phiếu chờ xử lý</p>
-          <h3 className="text-3xl font-extrabold text-amber-600">15 <span className="text-lg font-bold text-amber-400">phiếu</span></h3>
+          <p className="text-sm font-bold text-slate-500 mb-2">Phiếu trên bảng</p>
+          <h3 className="text-3xl font-extrabold text-amber-600">
+            {finesData.length} <span className="text-lg font-bold text-amber-400">phiếu</span>
+          </h3>
           <div className="mt-3 text-sm font-medium text-slate-500">
-            Cần rà soát và gửi thông báo nhắc nhở
+            Kết quả tra cứu hiện tại
           </div>
         </div>
       </div>
@@ -420,7 +358,12 @@ export default function FineManagement() {
         </div>
 
         {/* Table */}
-        <Table columns={fineColumns} data={filteredData} className="border-0 shadow-none rounded-none rounded-b-2xl" />
+        <Table
+          columns={fineColumns}
+          data={filteredData}
+          emptyMessage="Nhập MSSV rồi nhấn Enter để tra cứu công nợ chưa thu."
+          className="border-0 shadow-none rounded-none rounded-b-2xl"
+        />
       </div>
 
       {/* Modal Thu tiền */}
@@ -459,16 +402,18 @@ export default function FineManagement() {
                 <span className="font-medium text-slate-700 text-right max-w-[200px]">{collectingRow.reason}</span>
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-slate-200">
-                <span className="text-slate-500 font-bold">Số tiền cần thu</span>
-                <span className="text-xl font-extrabold text-indigo-600">{collectingRow.amount}</span>
+                <span className="text-slate-500 font-bold">Số tiền cần thu (đủ nợ)</span>
+                <span className="text-xl font-extrabold text-indigo-600">
+                  {(lookupTotal != null ? Number(lookupTotal) : collectingRow.amountNum).toLocaleString('vi-VN')} ₫
+                </span>
               </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Phương thức thanh toán</label>
               <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer">
                 <option>Tiền mặt</option>
-                <option>Chuyển khoản</option>
               </select>
+              <p className="text-[11px] text-slate-400 mt-1">Thu tại quầy bằng tiền mặt; cần thu đủ toàn bộ số nợ.</p>
             </div>
           </div>
         )}
