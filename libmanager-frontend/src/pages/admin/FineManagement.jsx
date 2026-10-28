@@ -98,7 +98,7 @@ export default function FineManagement() {
     const userCode = row.mssv;
     const amount = lookupTotal != null ? Number(lookupTotal) : row.amountNum;
     if (!userCode || !amount || amount <= 0) {
-      showToast('Thiếu MSSV hoặc số tiền thu (API chỉ thu đủ toàn bộ nợ).', 'error');
+      showToast('Thiếu MSSV hoặc số tiền thu (chỉ thu đủ toàn bộ nợ).', 'error');
       return;
     }
     setIsProcessing(true);
@@ -128,7 +128,7 @@ export default function FineManagement() {
   const handleSearchSubmit = async () => {
     const q = searchTerm.trim();
     if (!q) {
-      showToast('Nhập MSSV rồi Enter để tra cứu API công nợ.', 'warning');
+      showToast('Nhập MSSV rồi nhấn phím Enter để tra cứu công nợ.', 'warning');
       return;
     }
     try {
@@ -179,7 +179,7 @@ export default function FineManagement() {
         setFinesData(hits);
         setLookupTotal(null);
         showToast(
-          `${getApiErrorMessage(error, 'API lỗi')} — hiển thị ${hits.length} dòng mock.`,
+          `${getApiErrorMessage(error, 'Lỗi máy chủ')} — hiển thị ${hits.length} dòng mẫu.`,
           'warning'
         );
       } else {
@@ -388,7 +388,7 @@ export default function FineManagement() {
             <div className="w-full sm:w-80">
               <Input
                 type="text"
-                placeholder="Tìm MSSV, Tên độc giả hoặc Mã phiếu... (Enter)"
+                placeholder="Tìm MSSV, tên độc giả hoặc mã phiếu… (nhấn phím Enter)"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}

@@ -40,6 +40,7 @@ export default function RoomManagement() {
   }, [rooms, q]);
 
   const activeCount = rooms.filter((r) => r.is_active).length;
+  const inactiveCount = rooms.length - activeCount;
 
   const openCreate = () => {
     setEditing(null);
@@ -171,7 +172,7 @@ export default function RoomManagement() {
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Phòng học nhóm</h1>
           <p className="text-sm text-slate-500 mt-1">
             Thêm/sửa phòng, sức chứa, giá khung giờ; ngừng sử dụng nếu không còn lượt đặt tương lai (3-17).
-            Dữ liệu mock khi API admin rooms chưa sẵn.
+            Dữ liệu mẫu khi API admin rooms chưa sẵn.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -184,19 +185,41 @@ export default function RoomManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-4 right-4">
+            <DoorOpen className="w-6 h-6 text-indigo-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng phòng</p>
-          <p className="text-3xl font-extrabold text-slate-800">{rooms.length}</p>
+          <p className="text-3xl font-extrabold text-slate-800 leading-none">
+            {rooms.length} <span className="text-sm font-medium text-slate-500">phòng</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">
+            Danh mục phòng học nhóm trong hệ thống
+          </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/40">
+        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đang hoạt động</p>
-          <p className="text-3xl font-extrabold text-emerald-600">{activeCount}</p>
+          <p className="text-3xl font-extrabold text-emerald-600 leading-none">
+            {activeCount} <span className="text-sm font-medium text-emerald-500">phòng</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">
+            Cho phép đặt lịch khung giờ 2 giờ
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Ngừng sử dụng</p>
+          <p className="text-3xl font-extrabold text-rose-600 leading-none">
+            {inactiveCount} <span className="text-sm font-medium text-rose-400">phòng</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-rose-600">
+            Không còn hiện trên lịch đặt của người dùng
+          </p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mock test</p>
-            <p className="text-sm text-slate-600">Nạp lại danh sách phòng mẫu</p>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Dữ liệu mẫu</p>
+            <p className="text-sm text-slate-600">Khôi phục danh sách phòng mẫu</p>
           </div>
           <Button
             variant="outline"
@@ -204,7 +227,7 @@ export default function RoomManagement() {
             icon={<RotateCcw className="w-3.5 h-3.5" />}
             onClick={() => {
               setRooms(resetAdminRooms());
-              showToast('Đã nạp lại dữ liệu mock phòng.', 'success');
+              showToast('Đã nạp lại dữ liệu mẫu phòng.', 'success');
             }}
           >
             Nạp lại

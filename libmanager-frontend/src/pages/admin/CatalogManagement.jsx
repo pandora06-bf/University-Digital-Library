@@ -825,7 +825,7 @@ export default function CatalogManagement() {
             <div className="w-full">
               <Input
                 type="text"
-                placeholder="Tìm tên sách, tác giả, ISBN… (debounce 350ms → API)"
+                placeholder="Tìm tên sách, tác giả, ISBN… (tự tìm sau 0,35 giây)"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg"
                 value={searchTerm}
@@ -1152,7 +1152,7 @@ export default function CatalogManagement() {
                 className="w-full"
                 placeholder="VD: 150000"
                 error={formErrors.price}
-                helperText={!formErrors.price ? 'Lưu cùng đầu sách qua API (field price).' : undefined}
+                helperText={!formErrors.price ? 'Lưu cùng đầu sách qua API (giá bìa).' : undefined}
               />
             </div>
 
@@ -1286,20 +1286,28 @@ export default function CatalogManagement() {
               )}
             </div>
 
-            {/* Khu vực Upload Files */}
+            {/* Khu vực tải tệp */}
             <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4 mt-2">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
                 <Upload className="w-3.5 h-3.5" />
-                Tải lên Ảnh bìa
+                Tải lên ảnh bìa
               </label>
-              <input 
-                type="file" 
-                accept="image/*"
-                onChange={(e) => setCoverFile(e.target.files[0])}
-                className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-              />
+              <label className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition-colors">
+                <span className="text-sm font-medium text-slate-700 truncate">
+                  {coverFile ? coverFile.name : 'Chọn ảnh bìa từ máy tính'}
+                </span>
+                <span className="shrink-0 text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
+                  Chọn ảnh
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                />
+              </label>
               {editingBook && editingBook.cover_image_path && !coverFile && (
-                <p className="text-[11px] text-slate-500 mt-2">Đang sử dụng ảnh bìa hiện tại. Chọn file mới để thay đổi.</p>
+                <p className="text-[11px] text-slate-500 mt-2">Đang dùng ảnh bìa hiện tại. Chọn ảnh mới để thay đổi.</p>
               )}
             </div>
 
@@ -1307,14 +1315,22 @@ export default function CatalogManagement() {
               <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4">
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
                   <Upload className="w-3.5 h-3.5 text-rose-500" />
-                  Tải lên file PDF (eBook)
+                  Tải lên tệp PDF (eBook)
                 </label>
-                <input 
-                  type="file" 
-                  accept="application/pdf"
-                  onChange={(e) => setPdfFile(e.target.files[0])}
-                  className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100 cursor-pointer"
-                />
+                <label className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-rose-400 transition-colors">
+                  <span className="text-sm font-medium text-slate-700 truncate">
+                    {pdfFile ? pdfFile.name : 'Chọn tệp PDF từ máy tính'}
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg">
+                    Chọn tệp
+                  </span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => setPdfFile(e.target.files?.[0] || null)}
+                  />
+                </label>
               </div>
             )}
           </div>

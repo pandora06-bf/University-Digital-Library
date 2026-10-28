@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import UserLayout from './layouts/UserLayout';
 import HomePage from './pages/user/HomePage';
 import CatalogPage from './pages/user/CatalogPage';
@@ -15,7 +15,6 @@ import UiKitPage from './pages/dev/UiKitPage';
 
 // Admin Portal
 import AdminLayout from './layouts/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
 import CatalogManagement from './pages/admin/CatalogManagement';
 import InventoryManagement from './pages/admin/InventoryManagement';
 import LoanManagement from './pages/admin/LoanManagement';
@@ -60,7 +59,7 @@ export default function App() {
 
         {/* Cổng Quản trị Admin Portal (2B-17: AdminRoute chặn non-ADMIN) */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<AdminDashboard />} />
+          <Route index element={<Navigate to="catalog" replace />} />
           <Route path="catalog" element={<CatalogManagement />} />
           <Route path="inventory" element={<InventoryManagement />} />
           <Route path="inventory/:bookId" element={<InventoryManagement />} />

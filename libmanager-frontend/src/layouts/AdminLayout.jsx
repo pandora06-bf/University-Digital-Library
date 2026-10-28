@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Book, 
   Archive, 
   ArrowLeftRight, 
@@ -21,17 +20,16 @@ import {
 
 // Quick search data để navigate (2B-17: đủ mục Admin)
 const SEARCH_SUGGESTIONS = [
-  { label: 'Tổng quan', desc: 'Bảng tổng quan báo cáo nhanh', path: '/admin', icon: <LayoutDashboard className="w-4 h-4" /> },
   { label: 'Quản lý Danh mục Sách', desc: 'Quản lý đầu sách và thể loại', path: '/admin/catalog', icon: <Book className="w-4 h-4" /> },
   { label: 'Quản lý eBook / PDF', desc: 'Tài liệu số, PDF và xem trước', path: '/admin/ebooks', icon: <FileText className="w-4 h-4" /> },
   { label: 'Quản lý Tồn kho', desc: 'Bản sao vật lý, vị trí kệ', path: '/admin/inventory', icon: <Archive className="w-4 h-4" /> },
   { label: 'Quản lý Mượn / Trả', desc: 'Quầy giao dịch thủ thư', path: '/admin/loans', icon: <ArrowLeftRight className="w-4 h-4" /> },
   { label: 'Thu phạt & Công nợ', desc: 'Phiếu phạt, dư nợ độc giả', path: '/admin/fines', icon: <FileWarning className="w-4 h-4" /> },
-  { label: 'Báo mất / Hỏng sách', desc: 'Biên bản sự cố và bồi thường (UC15)', path: '/admin/incidents', icon: <AlertOctagon className="w-4 h-4" /> },
-  { label: 'Quản lý Người dùng', desc: 'CRUD, khóa, đặt lại mật khẩu (2B-18)', path: '/admin/users', icon: <Users className="w-4 h-4" /> },
-  { label: 'Phòng học nhóm', desc: 'Danh mục phòng & check-in mã đặt (3-17)', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" /> },
-  { label: 'Check-in phòng', desc: 'Quầy nhập mã đặt trong ngày (3-17)', path: '/admin/rooms/checkin', icon: <DoorOpen className="w-4 h-4" /> },
-  { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền unmatched cho user (4-16)', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
+  { label: 'Báo mất / Hỏng sách', desc: 'Biên bản sự cố và bồi thường', path: '/admin/incidents', icon: <AlertOctagon className="w-4 h-4" /> },
+  { label: 'Quản lý Người dùng', desc: 'Tạo/sửa, khóa, đặt lại mật khẩu', path: '/admin/users', icon: <Users className="w-4 h-4" /> },
+  { label: 'Phòng học nhóm', desc: 'Danh mục phòng & check-in mã đặt', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" /> },
+  { label: 'Check-in phòng', desc: 'Quầy nhập mã đặt trong ngày', path: '/admin/rooms/checkin', icon: <DoorOpen className="w-4 h-4" /> },
+  { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền chưa khớp cho người dùng', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" /> },
 ];
 
 import { logout } from '../services/authService';
@@ -91,19 +89,17 @@ export default function AdminLayout() {
     navigate(path);
   };
 
+  const ADMIN_HOME = '/admin/catalog';
+
   const getBreadcrumbs = () => {
     const pathname = location.pathname;
-
-    // Trang gốc Quản trị
-    if (pathname === '/admin' || pathname === '/admin/') {
-      return [{ label: 'Quản trị viên', path: '/admin' }, { label: 'Tổng quan' }];
-    }
+    const root = { label: 'Quản trị viên', path: ADMIN_HOME };
 
     // Dynamic routes: /admin/inventory/:bookId
     if (pathname.startsWith('/admin/inventory/')) {
       const bookId = pathname.replace('/admin/inventory/', '').split('/')[0];
       return [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý Tồn kho', path: '/admin/inventory' },
         { label: bookId ? `Tồn kho đầu sách #${bookId}` : 'Chi tiết bản sao' }
       ];
@@ -113,7 +109,7 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/books/')) {
       const bookId = pathname.replace('/admin/books/', '').split('/')[0];
       return [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Danh mục Sách', path: '/admin/catalog' },
         { label: bookId ? `Tồn kho đầu sách #${bookId}` : 'Chi tiết bản sao' }
       ];
@@ -122,48 +118,48 @@ export default function AdminLayout() {
     // Static Admin Routes
     const STATIC_CRUMBS = {
       '/admin/catalog': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Danh mục Sách' }
       ],
       '/admin/ebooks': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý eBook / PDF' }
       ],
       '/admin/inventory': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý Tồn kho' }
       ],
       '/admin/books': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý Tồn kho' }
       ],
       '/admin/loans': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý Mượn / Trả' }
       ],
       '/admin/fines': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Thu phạt & Công nợ' }
       ],
       '/admin/incidents': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Báo mất / Hỏng sách' }
       ],
       '/admin/users': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Quản lý Người dùng' }
       ],
       '/admin/rooms': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Phòng học nhóm' }
       ],
       '/admin/rooms/checkin': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Phòng học nhóm', path: '/admin/rooms' },
         { label: 'Check-in mã đặt' }
       ],
       '/admin/unmatched': [
-        { label: 'Quản trị viên', path: '/admin' },
+        root,
         { label: 'Giao dịch chưa khớp' }
       ],
     };
@@ -173,18 +169,12 @@ export default function AdminLayout() {
     }
 
     // Fallback an toàn cho route con phát sinh
-    return [
-      { label: 'Quản trị viên', path: '/admin' },
-      { label: 'Trang quản trị' }
-    ];
+    return [root, { label: 'Trang quản trị' }];
   };
 
   const breadcrumbs = getBreadcrumbs();
 
   const isItemActive = (itemPath, isExactActive) => {
-    if (itemPath === '/admin') {
-      return location.pathname === '/admin' || location.pathname === '/admin/';
-    }
     if (isExactActive) return true;
     if (itemPath === '/admin/inventory') {
       return (
@@ -197,9 +187,8 @@ export default function AdminLayout() {
     return location.pathname === itemPath || location.pathname.startsWith(itemPath + '/');
   };
 
-  // 2B-17: khung menu đủ; mục chưa làm gắn badge "Đang phát triển"
+  // 2B-17: khung menu đủ các mục chức năng Admin
   const navItems = [
-    { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Tổng quan' },
     { path: '/admin/catalog', icon: <Book size={20} />, label: 'Quản lý Danh mục Sách' },
     { path: '/admin/ebooks', icon: <FileText size={20} />, label: 'Quản lý eBook / PDF' },
     { path: '/admin/inventory', icon: <Archive size={20} />, label: 'Quản lý Tồn kho' },
@@ -208,7 +197,7 @@ export default function AdminLayout() {
     { path: '/admin/incidents', icon: <AlertOctagon size={20} />, label: 'Báo mất / Hỏng sách' },
     { path: '/admin/users', icon: <Users size={20} />, label: 'Người dùng' },
     { path: '/admin/rooms', icon: <DoorOpen size={20} />, label: 'Phòng học nhóm' },
-    { path: '/admin/unmatched', icon: <WalletCards size={20} />, label: 'GD chưa khớp' },
+    { path: '/admin/unmatched', icon: <WalletCards size={20} />, label: 'Giao dịch chưa khớp' },
   ];
 
   return (
@@ -225,9 +214,9 @@ export default function AdminLayout() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 h-full w-64 bg-gradient-to-b from-[#312E81] via-[#4F46E5] to-[#0E7490] text-white flex flex-col shrink-0 transition-all duration-300 overflow-hidden ${isSidebarOpen ? 'translate-x-0 lg:w-64' : '-translate-x-full lg:translate-x-0 lg:w-0'}`}>
         {/* Logo */}
         <NavLink
-          to="/admin"
-          aria-label="Về trang tổng quan quản trị LibManager"
-          title="Về trang Tổng quan Quản trị"
+          to="/admin/catalog"
+          aria-label="Về Cổng Quản trị LibManager"
+          title="Về Cổng Quản trị"
           onClick={() => {
             if (window.innerWidth < 1024) {
               setIsSidebarOpen(false);
@@ -254,7 +243,7 @@ export default function AdminLayout() {
             <NavLink
               key={item.path}
               to={item.path}
-              end={item.path === '/admin'}
+              end={item.path === '/admin/catalog'}
               onClick={() => {
                 if (window.innerWidth < 1024) {
                   setIsSidebarOpen(false);

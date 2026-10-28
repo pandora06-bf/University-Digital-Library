@@ -78,8 +78,8 @@ export default function IncidentPage() {
   const handleLookupLoan = async () => {
     const code = createForm.code.trim();
     if (!code) {
-      setFormErrors((prev) => ({ ...prev, code: 'Mã barcode hoặc mã phiếu không được để trống' }));
-      showToast('Vui lòng nhập mã barcode hoặc mã phiếu trước khi tra cứu.', 'warning');
+      setFormErrors((prev) => ({ ...prev, code: 'Mã vạch hoặc mã phiếu không được để trống' }));
+      showToast('Vui lòng nhập mã vạch hoặc mã phiếu trước khi tra cứu.', 'warning');
       return;
     }
 
@@ -130,12 +130,12 @@ export default function IncidentPage() {
         borrower_class: '',
       }));
       showToast(
-        `Không tìm thấy phiếu BORROWED cho "${code}". Thử mock: ${MOCK_ACTIVE_LOANS[0].barcode}.`,
+        `Không tìm thấy phiếu đang mượn cho "${code}". Thử mẫu: ${MOCK_ACTIVE_LOANS[0].barcode}.`,
         'error'
       );
       return;
     }
-    applyLookupHit(found, code, 'mock');
+    applyLookupHit(found, code, 'mẫu');
   };
 
   // Lọc dữ liệu
@@ -164,9 +164,9 @@ export default function IncidentPage() {
   // 4-15.b: lưu local + thử check-in API (is_lost / is_damaged) khi có barcode
   const handleSaveIncident = async () => {
     const errors = {};
-    if (!createForm.code.trim()) errors.code = 'Mã barcode hoặc mã phiếu không được để trống';
+    if (!createForm.code.trim()) errors.code = 'Mã vạch hoặc mã phiếu không được để trống';
     if (!loanLookedUp || !createForm.loan_code) {
-      errors.code = errors.code || 'Vui lòng bấm Tra cứu và chọn phiếu BORROWED hợp lệ';
+      errors.code = errors.code || 'Vui lòng bấm Tra cứu và chọn phiếu đang mượn hợp lệ';
     }
     if (!createForm.description.trim()) errors.description = 'Mô tả chi tiết sự cố không được để trống';
     const compensation = Number(createForm.book_price);
@@ -218,7 +218,7 @@ export default function IncidentPage() {
       book_price: compensation,
       compensation_amount: compensation,
       created_at: new Date().toLocaleDateString('vi-VN'),
-      created_by: 'Thủ thư Quản trị viên',
+      created_by: 'Thủ thư Admin',
       status: apiNote ? 'RECORDED' : 'PENDING',
     };
 
@@ -255,7 +255,7 @@ export default function IncidentPage() {
             {val}
           </p>
           <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 font-mono">
-            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">BC: {row.barcode}</span>
+            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">MV: {row.barcode}</span>
             <span>•</span>
             <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">Phiếu: {row.loan_code}</span>
           </div>
@@ -359,7 +359,7 @@ export default function IncidentPage() {
               title="Ghi công nợ"
               onClick={() => {
                 setIncidents(updateStoredIncidentStatus(row.id, 'RECORDED'));
-                showToast('Đã ghi công nợ bồi thường (RECORDED).', 'success');
+                showToast('Đã ghi công nợ bồi thường.', 'success');
               }}
             >
               Ghi nợ
@@ -372,7 +372,7 @@ export default function IncidentPage() {
               title="Xác nhận đã bồi thường"
               onClick={() => {
                 setIncidents(updateStoredIncidentStatus(row.id, 'RESOLVED'));
-                showToast('Đã đánh dấu bồi thường xong (RESOLVED).', 'success');
+                showToast('Đã đánh dấu bồi thường xong.', 'success');
               }}
             >
               Đã TT
@@ -392,7 +392,7 @@ export default function IncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lập biên bản, ghi công nợ và xác nhận bồi thường (4-15.a/b/c). Tra cứu phiếu BORROWED trước khi lưu.
+            Lập biên bản, ghi công nợ và xác nhận bồi thường. Tra cứu phiếu đang mượn trước khi lưu.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -432,7 +432,7 @@ export default function IncidentPage() {
             </h3>
           </div>
           <div className="mt-3 text-[11px] font-medium text-slate-500">
-            Dữ liệu mẫu kiểm thử giao diện Admin
+            Dữ liệu mẫu kiểm thử giao diện quản trị
           </div>
         </div>
 
@@ -448,7 +448,7 @@ export default function IncidentPage() {
             </h3>
           </div>
           <div className="mt-3 text-[11px] font-medium text-rose-600 flex items-center gap-1">
-            <span>Ngừng lưu thông, bản sao chuyển RETIRED</span>
+            <span>Ngừng lưu thông, bản sao chuyển sang ngừng dùng</span>
           </div>
         </div>
 
@@ -494,7 +494,7 @@ export default function IncidentPage() {
             <div className="w-full sm:w-80">
               <Input
                 type="text"
-                placeholder="Tìm mã biên bản, barcode, tên sách, độc giả..."
+                placeholder="Tìm mã biên bản, mã vạch, tên sách, độc giả…"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg placeholder:font-sans"
                 value={searchTerm}
@@ -605,7 +605,7 @@ export default function IncidentPage() {
               </h4>
               <p className="font-bold text-slate-900 text-sm">{detailRow.book_title}</p>
               <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 pt-1">
-                <p>Mã vạch (Barcode): <strong className="font-mono text-slate-800">{detailRow.barcode}</strong></p>
+                <p>Mã vạch: <strong className="font-mono text-slate-800">{detailRow.barcode}</strong></p>
                 <p>Mã phiếu mượn: <strong className="font-mono text-slate-800">{detailRow.loan_code}</strong></p>
                 <p>Giá bìa gốc: <strong className="text-slate-800">{formatVND(detailRow.book_price)}</strong></p>
                 <p>Người lập biên bản: <strong className="text-slate-800">{detailRow.created_by}</strong></p>
@@ -671,13 +671,13 @@ export default function IncidentPage() {
       >
         <div className="space-y-4">
           <p className="text-xs text-slate-500">
-            Nhập mã Barcode hoặc mã phiếu mượn để hệ thống tra cứu phiếu BORROWED tương ứng.
+            Nhập mã vạch hoặc mã phiếu mượn để hệ thống tra cứu phiếu đang mượn tương ứng.
           </p>
 
           {/* Ô quét mã */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Mã Barcode hoặc Mã Phiếu mượn <span className="text-rose-500">*</span>
+              Mã vạch hoặc mã phiếu mượn <span className="text-rose-500">*</span>
             </label>
             <div className="flex gap-2">
               <div className="flex-1">
@@ -710,7 +710,7 @@ export default function IncidentPage() {
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Ưu tiên API lookup; fallback mock — thử: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
+              Ưu tiên API lookup; fallback mẫu — thử: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
             </p>
           </div>
 
@@ -719,14 +719,14 @@ export default function IncidentPage() {
             <div className="bg-emerald-50/70 rounded-xl p-3.5 border border-emerald-200 text-xs space-y-1.5">
               <p className="font-bold text-slate-800 text-sm">{createForm.book_title}</p>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600">
-                <p>Barcode: <span className="font-mono font-semibold text-slate-800">{createForm.barcode}</span></p>
+                <p>Mã vạch: <span className="font-mono font-semibold text-slate-800">{createForm.barcode}</span></p>
                 <p>Phiếu: <span className="font-mono font-semibold text-slate-800">{createForm.loan_code}</span></p>
                 <p>Độc giả: <span className="font-semibold text-slate-800">{createForm.borrower_name} ({createForm.borrower_code})</span></p>
               </div>
             </div>
           ) : (
             <div className="bg-slate-50 rounded-xl p-3.5 border border-dashed border-slate-200 text-xs text-slate-500">
-              Chưa có phiếu. Nhập mã rồi bấm <strong>Tra cứu</strong> (hoặc Enter) để hiện sách, độc giả và giá bồi thường.
+              Chưa có phiếu. Nhập mã rồi bấm <strong>Tra cứu</strong> (hoặc nhấn phím Enter) để hiện sách, độc giả và giá bồi thường.
             </div>
           )}
 
@@ -750,7 +750,7 @@ export default function IncidentPage() {
                 />
                 <div>
                   <p className="text-sm font-bold">Mất sách</p>
-                  <p className="text-[11px] opacity-80">Chuyển RETIRED, bồi thường giá bìa</p>
+                  <p className="text-[11px] opacity-80">Ngừng dùng bản sao, bồi thường giá bìa</p>
                 </div>
               </label>
 
@@ -808,7 +808,7 @@ export default function IncidentPage() {
             }}
           />
           <p className="text-[11px] text-slate-400 -mt-2">
-            Lưu: ghi biên bản local; nếu có barcode sẽ thử <code>POST /api/admin/loans/checkin</code> (is_lost / is_damaged). API từ chối sẽ hiện Toast lỗi.
+            Lưu: ghi biên bản local; nếu có barcode sẽ thử check-in API. API từ chối sẽ hiện Toast lỗi.
           </p>
         </div>
       </Modal>

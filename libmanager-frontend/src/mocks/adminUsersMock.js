@@ -132,10 +132,10 @@ export const INITIAL_ADMIN_USERS = [
 
 /** Gợi ý nhanh trên UI / docs */
 export const MOCK_TEST_HINTS = [
-  'Trùng mã: Thêm user với MSSV TEST409DUP hoặc 50214569',
+  'Trùng mã: Thêm người dùng với MSSV TEST409DUP hoặc 50214569',
   'Còn nợ: Mở khóa TEST409DEBT hoặc 50221320',
-  'Không khóa ADMIN: thử khóa admin hoặc TESTADMIN',
-  'Form sai: họ tên "kkk", SĐT "ii", email "abc", khoa "x"',
+  'Không khóa quản trị viên: thử khóa admin hoặc TESTADMIN',
+  'Biểu mẫu sai: họ tên "kkk", số điện thoại "ii", email "abc", khoa "x"',
 ];
 
 function load() {

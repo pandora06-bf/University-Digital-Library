@@ -19,7 +19,7 @@ const formatVND = (n) =>
 const statusMeta = (s) => {
   if (s === 'CHECKED_IN') return { label: 'Đã check-in', type: 'success' };
   if (s === 'CONFIRMED') return { label: 'Chờ check-in', type: 'warning' };
-  if (s === 'NO_SHOW') return { label: 'No-show', type: 'danger' };
+  if (s === 'NO_SHOW') return { label: 'Vắng mặt', type: 'danger' };
   if (s === 'CANCELLED') return { label: 'Đã hủy', type: 'neutral' };
   return { label: s, type: 'neutral' };
 };
@@ -105,8 +105,7 @@ export default function RoomCheckin() {
       render: (_, row) =>
         row.status === 'CONFIRMED' ? (
           <Button size="sm" variant="primary" onClick={() => handleCheckin(row.booking_code)}>
-            Check-in
-          </Button>
+            Check-in</Button>
         ) : (
           <span className="text-xs text-slate-400">—</span>
         ),
@@ -121,7 +120,7 @@ export default function RoomCheckin() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Check-in phòng học nhóm</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quầy nhập mã đặt phòng (Enter); danh sách lượt đặt trong ngày. Mock FE — nối API check-in khi BE sẵn.
+            Quầy nhập mã đặt phòng (Enter); danh sách lượt đặt trong ngày. Dữ liệu mẫu khi API check-in chưa sẵn.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -134,26 +133,47 @@ export default function RoomCheckin() {
             onClick={() => {
               resetAdminRooms();
               refresh();
-              showToast('Đã nạp lại mock phòng & booking.', 'success');
+              showToast('Đã nạp lại mẫu phòng & booking.', 'success');
             }}
           >
-            Nạp lại mock
+            Nạp lại mẫu
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-4 right-4">
+            <DoorOpen className="w-6 h-6 text-indigo-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Hôm nay</p>
-          <p className="text-3xl font-extrabold text-slate-800">{todayList.length}</p>
+          <p className="text-3xl font-extrabold text-slate-800 leading-none">
+            {todayList.length} <span className="text-sm font-medium text-slate-500">lượt đặt</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">
+            Tất cả đặt phòng trong ngày hiện tại
+          </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chờ check-in</p>
-          <p className="text-3xl font-extrabold text-amber-600">{waiting}</p>
+          <p className="text-3xl font-extrabold text-amber-600 leading-none">
+            {waiting} <span className="text-sm font-medium text-amber-500">lượt đặt</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">
+            Đã xác nhận, chờ quầy check-in mã đặt phòng
+          </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm">
+        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40">
+          <div className="absolute top-4 right-4">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã check-in</p>
-          <p className="text-3xl font-extrabold text-emerald-600">{checked}</p>
+          <p className="text-3xl font-extrabold text-emerald-600 leading-none">
+            {checked} <span className="text-sm font-medium text-emerald-500">lượt đặt</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">
+            Đã xác nhận có mặt tại phòng học nhóm
+          </p>
         </div>
       </div>
 
@@ -187,7 +207,7 @@ export default function RoomCheckin() {
           </Button>
         </form>
         <p className="text-xs text-slate-500 mt-3">
-          Gợi ý mock: <code className="bg-slate-100 px-1 rounded">RB-2026-1001</code>,{' '}
+          Gợi ý mẫu: <code className="bg-slate-100 px-1 rounded">RB-2026-1001</code>,{' '}
           <code className="bg-slate-100 px-1 rounded">RB-2026-1002</code>
           {getStoredAdminBookings().length ? '' : ''}
         </p>

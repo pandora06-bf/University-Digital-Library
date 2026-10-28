@@ -49,6 +49,10 @@ export default function UnmatchedTxPage() {
   }, [rows, statusFilter, q]);
 
   const openCount = rows.filter((r) => r.status === 'UNRESOLVED').length;
+  const assignedCount = rows.filter((r) => r.status === 'ASSIGNED').length;
+  const openAmount = rows
+    .filter((r) => r.status === 'UNRESOLVED')
+    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
   const openAssign = (row) => {
     setAssignTarget(row);
@@ -61,7 +65,7 @@ export default function UnmatchedTxPage() {
       assignUnmatched(assignTarget.id, userCode, notes);
       setRows(getStoredUnmatched());
       setAssignTarget(null);
-      showToast(`Đã gán ${assignTarget.bank_tx_id} → ${userCode} và cộng số dư (mock).`, 'success');
+      showToast(`Đã gán ${assignTarget.bank_tx_id} → ${userCode} và cộng số dư (mẫu).`, 'success');
     } catch (e) {
       showToast(e.message || 'Gán thất bại.', 'error');
     }
@@ -109,7 +113,7 @@ export default function UnmatchedTxPage() {
       render: (_, row) =>
         row.status === 'UNRESOLVED' ? (
           <Button size="sm" variant="primary" icon={<Link2 className="w-3.5 h-3.5" />} onClick={() => openAssign(row)}>
-            Gán user
+            Gán người dùng
           </Button>
         ) : (
           <span className="text-xs text-slate-400">—</span>
@@ -125,7 +129,7 @@ export default function UnmatchedTxPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Giao dịch chưa khớp</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Liệt kê UnmatchedTx chưa gán; thủ thư chọn user để cộng số dư ví (4-16 / UC16). Mock khi API 4-07 chưa sẵn.
+            Liệt kê giao dịch nạp tiền chưa gán; thủ thư chọn người dùng để cộng số dư ví. Đang dùng dữ liệu mẫu.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -137,34 +141,60 @@ export default function UnmatchedTxPage() {
             icon={<RotateCcw className="w-4 h-4" />}
             onClick={() => {
               setRows(resetUnmatched());
-              showToast('Đã nạp lại mock giao dịch chưa khớp.', 'success');
+              showToast('Đã nạp lại dữ liệu mẫu giao dịch chưa khớp.', 'success');
             }}
           >
-            Nạp lại mock
+            Nạp lại mẫu
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chưa gán</p>
-              <p className="text-3xl font-extrabold text-amber-600">{openCount}</p>
-            </div>
-            <WalletCards className="w-8 h-8 text-amber-500 opacity-30" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-4 right-4">
+            <WalletCards className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng giao dịch</p>
-          <p className="text-3xl font-extrabold text-slate-800">{rows.length}</p>
+          <p className="text-3xl font-extrabold text-slate-800 leading-none">
+            {rows.length} <span className="text-sm font-medium text-slate-500">giao dịch</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">
+            Nạp tiền ngân hàng cần đối chiếu thủ công
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chưa khớp</p>
+          <p className="text-3xl font-extrabold text-amber-600 leading-none">
+            {openCount} <span className="text-sm font-medium text-amber-500">giao dịch</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">
+            Chưa gán cho tài khoản người dùng
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã gán</p>
+          <p className="text-3xl font-extrabold text-emerald-600 leading-none">
+            {assignedCount} <span className="text-sm font-medium text-emerald-500">giao dịch</span>
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">
+            Đã cộng số dư ví cho người dùng tương ứng
+          </p>
+        </div>
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Số tiền chưa khớp</p>
+          <p className="text-2xl font-extrabold text-slate-800 leading-none">
+            {formatVND(openAmount)}
+          </p>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">
+            Tổng giá trị các giao dịch còn chờ gán
+          </p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <Input
-            placeholder="Tìm mã NH, nội dung CK, MSSV đã gán…"
+            placeholder="Tìm mã ngân hàng, nội dung chuyển khoản, MSSV đã gán…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />

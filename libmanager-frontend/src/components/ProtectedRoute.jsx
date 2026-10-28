@@ -14,7 +14,7 @@ export default function ProtectedRoute({ children, roles }) {
   const user = getCurrentUser();
 
   if (!getToken() || !user) return <Navigate to={loginPathFor(location)} replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />;
+  if (roles && !roles.includes(user.role)) return <Navigate to={user.role === 'admin' ? '/admin/catalog' : '/'} replace />;
 
   return children ?? <Outlet />;
 }

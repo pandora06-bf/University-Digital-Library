@@ -13,6 +13,6 @@ export function safeRedirect(value) {
 // Trang sau đăng nhập: quay lại trang cũ nếu hợp lệ với vai trò, nếu không thì về trang mặc định.
 export function landingPathFor(user, redirect) {
   const target = safeRedirect(redirect);
-  if (user?.role === 'admin') return target?.startsWith('/admin') ? target : '/admin';
+  if (user?.role === 'admin') return target?.startsWith('/admin') ? target : '/admin/catalog';
   return target && !target.startsWith('/admin') ? target : '/';
 }

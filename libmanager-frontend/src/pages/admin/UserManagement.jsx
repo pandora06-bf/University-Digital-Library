@@ -240,7 +240,7 @@ export default function UserManagement() {
         max_borrow_limit: payload.role === 'LECTURER' ? 5 : payload.role === 'ADMIN' ? 0 : 3,
       });
       refreshMock();
-      showToast(editing ? 'Đã cập nhật (mock).' : 'Đã tạo người dùng (mock).', 'success');
+      showToast(editing ? 'Đã cập nhật (dữ liệu mẫu).' : 'Đã tạo người dùng (dữ liệu mẫu).', 'success');
       setFormOpen(false);
     } catch (error) {
       const status = error?.response?.status;
@@ -280,7 +280,7 @@ export default function UserManagement() {
       }
       setStoredUserLock(lockTarget.user_code, nextLocked);
       refreshMock();
-      showToast(nextLocked ? 'Đã khóa (mock).' : 'Đã mở khóa (mock).', 'success');
+      showToast(nextLocked ? 'Đã khóa (dữ liệu mẫu).' : 'Đã mở khóa (dữ liệu mẫu).', 'success');
       setLockTarget(null);
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đổi trạng thái khóa.'), 'error');
@@ -296,7 +296,7 @@ export default function UserManagement() {
         );
         const temp = data?.temporary_password || data?.temp_password || data?.password;
         if (!temp) {
-          showToast('API không trả mật khẩu tạm.', 'warning');
+          showToast('Máy chủ không trả mật khẩu tạm.', 'warning');
           return;
         }
         setTempPassword({ user_code: row.user_code, password: temp });
@@ -305,7 +305,7 @@ export default function UserManagement() {
       }
       const temp = issueTempPassword(row.user_code);
       setTempPassword({ user_code: row.user_code, password: temp });
-      showToast('Mật khẩu tạm (mock) — chỉ hiện một lần.', 'success');
+      showToast('Mật khẩu tạm (dữ liệu mẫu) — chỉ hiện một lần.', 'success');
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đặt lại mật khẩu.'), 'error');
     }
@@ -420,7 +420,7 @@ export default function UserManagement() {
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
             Tìm kiếm, phân trang, tạo/sửa tài khoản; khóa/mở khóa và đặt lại mật khẩu tạm (hiện một lần).
-            {useMock ? ' Dữ liệu mock khi API admin users chưa sẵn.' : ' Đã nối API.'}
+            {useMock ? ' Dữ liệu mẫu khi API admin users chưa sẵn.' : ' Đã nối API.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -441,7 +441,7 @@ export default function UserManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng tài khoản</p>
           <h3 className="text-3xl font-extrabold text-slate-800 leading-none">
-            {totalUsers} <span className="text-sm font-medium text-slate-500">người</span>
+            {totalUsers} <span className="text-sm font-medium text-slate-500">tài khoản</span>
           </h3>
           <p className="mt-3 text-[11px] font-medium text-slate-500">SV / GV / Admin trong danh sách</p>
         </div>
@@ -451,7 +451,7 @@ export default function UserManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sinh viên</p>
           <h3 className="text-3xl font-extrabold text-indigo-600 leading-none">
-            {studentCount} <span className="text-sm font-medium text-indigo-400">TK</span>
+            {studentCount} <span className="text-sm font-medium text-indigo-400">tài khoản</span>
           </h3>
           <p className="mt-3 text-[11px] font-medium text-indigo-600">Hạn mức mượn mặc định 3 cuốn</p>
         </div>
@@ -461,7 +461,7 @@ export default function UserManagement() {
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đang khóa</p>
           <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
-            {lockedCount} <span className="text-sm font-medium text-rose-400">TK</span>
+            {lockedCount} <span className="text-sm font-medium text-rose-400">tài khoản</span>
           </h3>
           <p className="mt-3 text-[11px] font-medium text-rose-600">Không mở khóa nếu còn công nợ</p>
         </div>
@@ -473,7 +473,7 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-amber-600 leading-none">
             {debtCount} <span className="text-sm font-medium text-amber-400">người</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-amber-600">Thu tại quầy `/admin/fines`</p>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Thu tại quầy Thu phạt & Công nợ</p>
         </div>
       </div>
 
@@ -531,10 +531,10 @@ export default function UserManagement() {
                   setDebouncedQ('');
                   setRoleFilter('ALL');
                   setPage(1);
-                  showToast('Đã nạp lại dữ liệu mock để kiểm thử.', 'success');
+                  showToast('Đã nạp lại dữ liệu mẫu để kiểm thử.', 'success');
                 }}
               >
-                Nạp lại mock test
+                Nạp lại dữ liệu mẫu
               </Button>
             )}
           </div>
@@ -542,7 +542,7 @@ export default function UserManagement() {
 
         {useMock && (
           <div className="px-4 py-2.5 border-b border-amber-100 bg-amber-50/60 text-[11px] text-amber-900 space-y-0.5">
-            <p className="font-bold uppercase tracking-wide text-amber-800">Gợi ý test mock</p>
+            <p className="font-bold uppercase tracking-wide text-amber-800">Gợi ý kiểm thử mẫu</p>
             {MOCK_TEST_HINTS.map((h) => (
               <p key={h}>• {h}</p>
             ))}

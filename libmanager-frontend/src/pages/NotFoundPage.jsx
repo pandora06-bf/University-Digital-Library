@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BookX, ArrowLeft, LayoutDashboard, Home } from 'lucide-react';
+import { BookX, ArrowLeft, Book, Home } from 'lucide-react';
 import { Button } from '../components/Button';
 import { getCurrentUser } from '../mocks/auth';
 
@@ -22,9 +22,9 @@ export default function NotFoundPage() {
       <div className="flex flex-wrap items-center justify-center gap-3">
         {isAdminPath || isAdminUser ? (
           <>
-            <Link to="/admin">
-              <Button variant="primary" icon={<LayoutDashboard className="w-4 h-4" />}>
-                Về Tổng quan Quản trị
+            <Link to="/admin/catalog">
+              <Button variant="primary" icon={<Book className="w-4 h-4" />}>
+                Về Cổng Quản trị
               </Button>
             </Link>
             <Link to="/">

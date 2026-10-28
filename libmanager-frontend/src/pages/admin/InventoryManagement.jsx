@@ -290,7 +290,7 @@ export default function InventoryManagement() {
 
   const handleSaveCopy = async () => {
     const errors = {};
-    if (!addForm.barcode.trim()) errors.barcode = 'Mã Barcode không được để trống';
+    if (!addForm.barcode.trim()) errors.barcode = 'Mã vạch không được để trống';
     if (!addForm.zone.trim()) errors.zone = 'Khu vực không được để trống';
     if (!addForm.floor.trim()) errors.floor = 'Tầng không được để trống';
     if (!addForm.shelf.trim()) errors.shelf = 'Kệ không được để trống';
@@ -348,7 +348,7 @@ export default function InventoryManagement() {
   const inventoryColumns = [
     {
       key: 'barcode',
-      header: 'Mã Barcode',
+      header: 'Mã vạch',
       render: (val) => (
         <span className="bg-indigo-50 px-2 py-1 rounded-md text-xs font-mono text-indigo-600 font-semibold">
           {val}
@@ -627,7 +627,7 @@ export default function InventoryManagement() {
             <div className="w-full sm:w-80">
               <Input
                 type="text"
-                placeholder="Lọc theo Barcode hoặc Tên sách..."
+                placeholder="Lọc theo mã vạch hoặc tên sách…"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}
@@ -710,7 +710,7 @@ export default function InventoryManagement() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã Barcode <span className="text-rose-500">*</span></label>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã vạch <span className="text-rose-500">*</span></label>
             <Input 
               placeholder="VD: BC-2026-9999" 
               className="w-full font-mono" 
@@ -800,7 +800,7 @@ export default function InventoryManagement() {
         {editingRow && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã Barcode</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã vạch</label>
               <Input defaultValue={editingRow.barcode} disabled className="w-full font-mono bg-slate-50 text-slate-500" />
             </div>
             <div>
@@ -891,7 +891,7 @@ export default function InventoryManagement() {
             <h3 className="text-sm font-bold text-slate-800">Bạn có chắc chắn muốn xóa bản sao này không?</h3>
             <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
               <p className="font-bold text-slate-800 text-sm">{deletingRow?.title}</p>
-              <p className="text-xs font-mono text-slate-500">Barcode: {deletingRow?.barcode}</p>
+              <p className="text-xs font-mono text-slate-500">Mã vạch: {deletingRow?.barcode}</p>
               <p className="text-xs text-slate-500">Vị trí: {deletingRow?.location}</p>
             </div>
             <p className="text-xs font-medium text-rose-600 mt-3 flex items-center gap-1">
@@ -933,7 +933,7 @@ export default function InventoryManagement() {
               <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
                 <p className="font-bold text-slate-800 text-sm">{retiringRow.title}</p>
                 <p className="text-xs font-mono text-slate-600">
-                  <span className="font-semibold text-slate-700">Mã Barcode:</span> {retiringRow.barcode}
+                  <span className="font-semibold text-slate-700">Mã vạch:</span> {retiringRow.barcode}
                 </p>
                 <p className="text-xs text-slate-600">
                   <span className="font-semibold text-slate-700">Vị trí lưu kho:</span> {retiringRow.location}
@@ -965,7 +965,7 @@ export default function InventoryManagement() {
 
               <p className="text-xs font-medium text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200/60 flex items-start gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-600 shrink-0 mt-1.5"></span>
-                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>DAMAGED (Đã thanh lý / ngừng lưu thông)</strong> theo API Backend, bị loại khỏi tồn khả dụng. Hành động này không thể hoàn tác dễ dàng.</span>
+                <span>Bản sao sau khi thanh lý sẽ chuyển sang trạng thái <strong>DAMAGED (Đã thanh lý / ngừng lưu thông)</strong> theo máy chủ, bị loại khỏi tồn khả dụng. Hành động này không thể hoàn tác dễ dàng.</span>
               </p>
             </div>
           </div>

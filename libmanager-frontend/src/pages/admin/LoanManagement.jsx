@@ -158,7 +158,7 @@ export default function LoanManagement() {
   const handleReturnScan = (code) => {
     const targetCode = (typeof code === 'string' ? code : returnBarcode).trim();
     if (!targetCode) {
-      showToast('Vui lòng quét hoặc nhập barcode sách trả rồi nhấn Enter.', 'warning');
+      showToast('Vui lòng quét hoặc nhập mã vạch sách trả rồi nhấn phím Enter.', 'warning');
       return;
     }
     setReturnBarcode(targetCode);
@@ -169,7 +169,7 @@ export default function LoanManagement() {
   const handleUserScan = async () => {
     const mssv = borrowUserId.trim();
     if (!mssv) {
-      showToast('Vui lòng nhập MSSV / thẻ độc giả rồi nhấn Enter.', 'warning');
+      showToast('Vui lòng nhập MSSV / thẻ độc giả rồi nhấn phím Enter.', 'warning');
       return;
     }
     setIsUserLoading(true);
@@ -186,7 +186,7 @@ export default function LoanManagement() {
       showToast(
         pending.length
           ? `MSSV ${mssv}: ${pending.length} phiếu chờ xuất mượn.`
-          : `MSSV ${mssv}: ${loans.length} phiếu (không có PENDING). Vẫn có thể thử checkout.`,
+          : `MSSV ${mssv}: ${loans.length} phiếu (không có phiếu chờ nhận). Vẫn có thể thử xuất mượn.`,
         pending.length ? 'success' : 'warning'
       );
     } catch (error) {
@@ -199,7 +199,7 @@ export default function LoanManagement() {
   const handleBorrowScan = (code) => {
     const targetCode = (typeof code === 'string' ? code : borrowBarcode).trim();
     if (!targetCode) {
-      showToast('Vui lòng quét barcode sách mượn rồi nhấn Enter.', 'warning');
+      showToast('Vui lòng quét mã vạch sách mượn rồi nhấn phím Enter.', 'warning');
       return;
     }
     if (borrowBooks.some((b) => b.barcode === targetCode)) {
@@ -247,7 +247,7 @@ export default function LoanManagement() {
         book: `${barcode}`,
         user: '—',
         time: new Date().toLocaleString('vi-VN'),
-        staff: 'Quầy Admin',
+        staff: 'Quầy thủ thư',
         status: 'Đã trả',
       });
       setShowReturnModal(false);
@@ -286,10 +286,10 @@ export default function LoanManagement() {
         pushHistory({
           id: `OUT-${d.loan_id || book.barcode}`,
           type: 'Mượn',
-          book: `${d.book_id ? `Book#${d.book_id}` : book.title} (${book.barcode})`,
+          book: `${d.book_id ? `Sách #${d.book_id}` : book.title} (${book.barcode})`,
           user: `${mssv}`,
           time: new Date().toLocaleString('vi-VN'),
-          staff: 'Quầy Admin',
+          staff: 'Quầy thủ thư',
           status: 'Đang mượn',
         });
       } catch (error) {
@@ -374,7 +374,7 @@ export default function LoanManagement() {
             {/* Fast Barcode Scanner Component cho sách trả */}
             <FastBarcodeScanner
               label="Quét Barcode sách trả"
-              placeholder="Quét mã vạch sách trả (VD: BC-2024-0891)..."
+              placeholder="Quét Barcode sách trả (VD: BC-2024-0891)..."
               value={returnBarcode}
               onChange={(e) => setReturnBarcode(e.target.value)}
               onScan={(scannedCode) => {
@@ -386,7 +386,7 @@ export default function LoanManagement() {
               autoFocus
               autoClear={false}
               autoRefocus
-              helperText="Tự focus ô nhập — tít mã hoặc Enter để nhận diện sách trả."
+              helperText="Tự focus ô nhập — tít mã hoặc nhấn phím Enter để nhận diện sách trả."
             />
 
             {/* Scanned Book Info Card */}
@@ -475,7 +475,7 @@ export default function LoanManagement() {
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="Nhập và nhấn Enter..."
+                  placeholder="Nhập và nhấn phím Enter…"
                   leftIcon={<User className="w-5 h-5" />}
                   className="!h-11 font-mono"
                   value={borrowUserId}
@@ -504,7 +504,7 @@ export default function LoanManagement() {
                       </p>
                       <p className="text-xs text-slate-600 font-mono mt-0.5">MSSV / mã: {borrowUserId}</p>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        {pendingLoans.length} phiếu từ API lookup
+                        {pendingLoans.length} phiếu từ kết quả tra cứu
                         {' · '}
                         {pendingLoans.filter((l) => ['REQUESTED', 'PENDING_PICKUP'].includes(l.loan_status)).length} chờ xuất
                       </p>
@@ -538,7 +538,7 @@ export default function LoanManagement() {
                     </div>
                   ) : (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      Không có phiếu trong kết quả lookup. Checkout vẫn thử được nếu BE có phiếu PENDING khớp barcode.
+                      Không có phiếu trong kết quả tra cứu. Checkout vẫn thử được nếu BE có phiếu PENDING khớp barcode.
                     </p>
                   )}
                 </div>
@@ -674,7 +674,7 @@ export default function LoanManagement() {
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <h4 className="text-sm font-bold text-slate-800 mb-1">Check-in bản sao</h4>
             <div className="text-xs text-slate-500 space-y-1 font-medium">
-              <p>Barcode: <span className="text-slate-700 font-mono">{returnBarcode}</span></p>
+              <p>Mã vạch: <span className="text-slate-700 font-mono">{returnBarcode}</span></p>
               <p>API sẽ tìm phiếu BORROWED/OVERDUE theo barcode này.</p>
             </div>
           </div>
@@ -734,7 +734,11 @@ export default function LoanManagement() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Ảnh tình trạng</label>
-                <input type="file" accept="image/*" className="block w-full text-xs text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors" />
+                <label className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100">
+                  <span className="text-xs text-slate-600">Chọn ảnh tình trạng (tuỳ chọn)</span>
+                  <span className="text-[11px] font-semibold text-indigo-600">Chọn ảnh</span>
+                  <input type="file" accept="image/*" className="hidden" />
+                </label>
               </div>
             </div>
           )}
