@@ -13,5 +13,6 @@ test('mock login routes an admin account into the admin portal', async ({ page }
   await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
   await page.getByPlaceholder('Nhập mật khẩu').fill('Admin@123');
   await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  // Admin login lands on catalog index (/admin → /admin/catalog)
+  await expect(page).toHaveURL(/\/admin(\/catalog)?$/);
 });
