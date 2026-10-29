@@ -126,9 +126,13 @@ def configure_scheduler():
     scheduler.add_job(run_due_reminder_job, "cron", hour=8, id="JOB-03", replace_existing=True, misfire_grace_time=None)
     scheduler.add_job(run_ebook_expiry_job, "interval", minutes=5, id="JOB-05", replace_existing=True)
     for job_id, module, func in [
-        ("JOB-04", "app.services.waitlist_logic", "run_hold_expiry_job"),
+        ("JOB-04", "app.services.job_hold_expiry", "job_hold_expiry"),
         ("JOB-06", "app.services.qr_service", "run_qr_expiry_job"),
-        ("JOB-07", "app.services.wallet_service", "run_topup_expiry_job")]:
+        ("JOB-07", "app.services.wallet_service", "run_topup_expiry_job"),
+        # SRS gọi đây là JOB-03, nhưng id đó đã dùng cho run_due_reminder_job ở
+        # trên nên hủy phiếu PENDING_PICKUP quá hạn nhận sách (3-01.a / UC05)
+        # được đăng ký dưới JOB-08.
+        ("JOB-08", "app.services.loan_service", "run_pickup_expiry_job")]:
         job = _optional_job(module, func)
         if job:
             scheduler.add_job(job, "interval", minutes=5, id=job_id, replace_existing=True)

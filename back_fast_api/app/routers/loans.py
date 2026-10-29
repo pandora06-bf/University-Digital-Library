@@ -1,35 +1,14 @@
-# from fastapi import APIRouter
-
-# router = APIRouter(
-#     prefix="/api/loans",
-#     tags=["Loans"],
-# )
-
-
-# @router.get("")
-# def get_loans():
-#     return {
-#         "message": "Get loans API",
-#         "data": [],
-#     }
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_account
-from app.models.book import Book
+from app.models.loan import Loan
 from app.models.user import Account
-
-# Import model Loan tương ứng trong project
-try:
-    from app.models.loan import Loan
-except ImportError:
-    try:
-        from app.models.loan import Loan
-    except ImportError:
-        from app.models.book import Loan
+from app.schemas.loan import LoanResponse, PhysicalLoanRequest
+from app.services.loan_service import request_physical_loan_service
 
 router = APIRouter(
     prefix="/api/loans",
@@ -41,21 +20,45 @@ def format_loan_response(loan: Loan):
     """Hàm định dạng dữ liệu trả về kèm thông tin cơ bản của cuốn sách."""
     return {
         "id": loan.id,
-        "user_code": getattr(loan, "user_code", getattr(loan, "student_code", None)),
+        "user_code": loan.user_code,
         "book_id": loan.book_id,
-        "book_title": loan.book.title if hasattr(loan, "book") and loan.book else None,
-        "book_author": loan.book.author if hasattr(loan, "book") and loan.book else None,
+        "book_title": loan.book.title if loan.book else None,
+        "book_author": loan.book.author if loan.book else None,
         "copy_barcode": loan.copy_barcode,
+        "loan_code": loan.loan_code,
         "loan_type": loan.loan_type,
         "loan_status": loan.loan_status,
         "borrow_date": loan.borrow_date,
         "due_date": loan.due_date,
+        "pickup_deadline": loan.pickup_deadline,
         "return_date": loan.return_date,
         "renewal_count": loan.renewal_count,
         "checkout_condition": loan.checkout_condition,
         "checkin_condition": loan.checkin_condition,
         "ebook_access_token": loan.ebook_access_token,
     }
+
+
+# ----------------------------------------------------------------------
+# Đặt mượn sách vật lý — giữ chỗ 24h tới quầy nhận (3-01.a)
+# ----------------------------------------------------------------------
+@router.post(
+    "/physical/request",
+    response_model=LoanResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Đặt mượn sách vật lý (giữ chỗ tới quầy nhận trong 24 giờ)",
+)
+def request_physical_loan(
+    payload: PhysicalLoanRequest,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> Loan:
+    if not account.user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
+        )
+    return request_physical_loan_service(db, account.user.user_code, payload.book_id)
 
 
 @router.get("/me")
@@ -75,9 +78,7 @@ def get_my_loans(
 
     current_code = account.user.user_code
 
-    # Xác định tên thuộc tính trong model (user_code hoặc student_code)
-    code_attr = getattr(Loan, "user_code", getattr(Loan, "student_code", None))
-    query = select(Loan).where(code_attr == current_code)
+    query = select(Loan).where(Loan.user_code == current_code)
 
     if loan_status:
         query = query.where(Loan.loan_status == loan_status.upper())
@@ -110,11 +111,10 @@ def get_all_loans(
             detail="Bạn không có quyền thực hiện tra cứu này",
         )
 
-    code_attr = getattr(Loan, "user_code", getattr(Loan, "student_code", None))
     query = select(Loan)
 
     if user_code:
-        query = query.where(code_attr == user_code)
+        query = query.where(Loan.user_code == user_code)
     if loan_status:
         query = query.where(Loan.loan_status == loan_status.upper())
 

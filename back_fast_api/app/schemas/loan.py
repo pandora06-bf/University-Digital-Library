@@ -10,12 +10,20 @@ class LoanResponse(BaseModel):
     user_code: str
     book_id: int
     copy_barcode: Optional[str] = None
+    loan_code: Optional[str] = None
     borrow_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
+    pickup_deadline: Optional[datetime] = None
     loan_status: str
     checkout_condition: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PhysicalLoanRequest(BaseModel):
+    """Input: Đặt mượn sách vật lý, giữ chỗ tới quầy nhận trong 24 giờ (UC05 / 3-01.a)."""
+
+    book_id: int = Field(..., gt=0, description="Mã đầu sách vật lý cần mượn")
 
 
 class LoanCheckoutRequest(BaseModel):
