@@ -2,13 +2,27 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 from fastapi import BackgroundTasks, HTTPException, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.book import Book, BookCopy
 from app.models.fine import Fine, FinePayment
-from app.models.loan import Incident, Loan
+from app.models.loan import Incident, Loan, Waitlist
 from app.models.user import User
+
+
+def get_user_max_borrow_limit(user: User) -> int:
+    """
+    Xác định hạn mức mượn sách tối đa cùng lúc theo đối tượng bạn đọc (BR-01 / UC05):
+    - Sinh viên (STUDENT): tối đa 3 cuốn
+    - Giảng viên, viên chức (LECTURER, STAFF): tối đa 5 cuốn
+    """
+    user_role = (user.user_type or (user.account.role if user.account else "STUDENT")).strip().upper()
+    if user_role in ("LECTURER", "STAFF"):
+        return 5
+    if user_role == "STUDENT":
+        return 3
+    return user.max_borrow_limit if (user.max_borrow_limit and user.max_borrow_limit > 0) else 3
 
 
 def send_checkout_receipt_email(user_email: str, loan_id: int, title: str, due_date: datetime):
@@ -46,6 +60,9 @@ def lookup_loans_service(db: Session, q: str) -> List[Loan]:
 
 # ----------------------------------------------------------------------
 # 2. Check-out tại quầy (POST /api/admin/loans/checkout)
+#    Hỗ trợ cả 2 trường hợp:
+#    - TH1: Đã đăng ký mượn sách trước trên Web (có loan_id hoặc phiếu REQUESTED/PENDING_PICKUP)
+#    - TH2: Không đăng ký trước, tới trực tiếp quầy lấy sách mượn (nhập user_code + copy_barcode + condition_notes)
 # ----------------------------------------------------------------------
 def checkout_at_counter_service(
     db: Session,
@@ -55,45 +72,20 @@ def checkout_at_counter_service(
     user_code: Optional[str] = None,
     condition_notes: Optional[str] = None,
 ) -> Loan:
-    # 1. Tìm phiếu mượn đang chờ nhận sách (REQUESTED hoặc PENDING_PICKUP)
-    query = select(Loan).with_for_update()
-    if loan_id:
-        query = query.where(Loan.id == loan_id)
-    elif user_code:
-        query = query.where(
-            Loan.user_code == user_code,
-            Loan.loan_status.in_(["REQUESTED", "PENDING_PICKUP"])
-        ).order_by(Loan.borrow_date.desc())
-    else:
+    if not loan_id and not user_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cần cung cấp mã phiếu mượn (loan_id) hoặc MSSV (user_code)"
         )
 
-    loan = db.scalar(query)
-    if not loan:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy phiếu mượn hợp lệ để check-out (E1)"
-        )
-
-    if loan.loan_status not in ["REQUESTED", "PENDING_PICKUP"]:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Phiếu mượn đang ở trạng thái {loan.loan_status}, không thể xuất mượn"
-        )
-
-    # 2. Kiểm tra bản sao sách vật lý (BookCopy)
-    copy = db.scalar(select(BookCopy).where(BookCopy.copy_barcode == copy_barcode).with_for_update())
+    # 1. Kiểm tra bản sao sách vật lý (BookCopy) và đầu sách (Book)
+    copy = db.scalar(
+        select(BookCopy).where(BookCopy.copy_barcode == copy_barcode).with_for_update()
+    )
     if not copy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy bản sao sách có mã vạch {copy_barcode} (E1)"
-        )
-    if copy.book_id != loan.book_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Bản sao sách này không thuộc đúng đầu sách của phiếu mượn"
         )
     if copy.status != "AVAILABLE":
         raise HTTPException(
@@ -101,35 +93,181 @@ def checkout_at_counter_service(
             detail=f"Bản sao sách đang ở trạng thái {copy.status}, không khả dụng (E1)"
         )
 
-    # 3. Chốt chặn người dùng: không bị khóa và Total_Fines = 0 (BR-01, BR-10, E2)
-    user = db.scalar(select(User).where(User.user_code == loan.user_code).with_for_update())
+    book = db.scalar(select(Book).where(Book.id == copy.book_id).with_for_update())
+    if not book:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thông tin đầu sách của bản sao này (E1)"
+        )
+
+    # 2. Xác định phiếu mượn (nếu có đặt trước) hoặc chuẩn bị tạo mới (mượn trực tiếp tại quầy)
+    loan: Optional[Loan] = None
+
+    if loan_id:
+        # Trường hợp thủ thư nhập/quét trực tiếp mã phiếu mượn (đã đăng ký trước trên Web)
+        loan = db.scalar(select(Loan).where(Loan.id == loan_id).with_for_update())
+        if not loan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy phiếu mượn hợp lệ để check-out (E1)"
+            )
+        if loan.loan_status not in ["REQUESTED", "PENDING_PICKUP"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Phiếu mượn đang ở trạng thái {loan.loan_status}, không thể xuất mượn (E1)"
+            )
+        if user_code and loan.user_code != user_code:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Mã bạn đọc (user_code) không khớp với phiếu mượn đã đăng ký"
+            )
+        if copy.book_id != loan.book_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bản sao sách này không thuộc đúng đầu sách của phiếu mượn"
+            )
+    elif user_code:
+        # Kiểm tra xem sinh viên có phiếu đăng ký trước cho đúng đầu sách này không
+        loan = db.scalar(
+            select(Loan)
+            .where(
+                Loan.user_code == user_code,
+                Loan.book_id == copy.book_id,
+                Loan.loan_status.in_(["REQUESTED", "PENDING_PICKUP"]),
+            )
+            .order_by(Loan.borrow_date.desc())
+            .with_for_update()
+        )
+
+    # 3. Chốt chặn người dùng (UC05 / BR-01, BR-10, E1, E2):
+    #    - MSSV phải tồn tại (E1 -> 404)
+    #    - Không bị khóa thẻ, không nợ phạt, chưa vượt hạn mức mượn (E2 -> 403)
+    target_user_code = loan.user_code if loan else user_code
+    user = db.scalar(select(User).where(User.user_code == target_user_code).with_for_update())
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy hồ sơ bạn đọc (E1)"
+            detail=f"Không tìm thấy hồ sơ bạn đọc với mã {target_user_code} (E1)"
         )
-    if user.is_borrowing_blocked or user.total_fines > 0:
+
+    if user.is_borrowing_blocked or user.total_fines > 0 or (user.account and not user.account.is_active):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Người mượn đang bị khóa tài khoản hoặc có dư nợ phạt (E2)"
         )
 
-    # 4. Cập nhật phiếu mượn & bản sao
+    # Hạn mức mượn tối đa cùng lúc: Sinh viên = 3 cuốn, Giảng viên/Viên chức = 5 cuốn (BR-01)
+    max_limit = get_user_max_borrow_limit(user)
+
     now = datetime.now()
+    borrow_days = user.max_borrow_days if (user.max_borrow_days and user.max_borrow_days > 0) else 14
+    due_date = now + timedelta(days=borrow_days)  # GĐ-04 / BR-17 (Mặc định 14 ngày)
+
+    # 4. Xử lý theo từng trường hợp
+    if loan:
+        # ------------------------------------------------------------------
+        # TRƯỜNG HỢP A: Đã đăng ký mượn trước trên Web -> Cập nhật phiếu mượn
+        # ------------------------------------------------------------------
+        active_borrowed_count = db.scalar(
+            select(func.count(Loan.id)).where(
+                Loan.user_code == user.user_code,
+                Loan.id != loan.id,
+                Loan.loan_status.in_(["BORROWED", "OVERDUE"]),
+            )
+        ) or 0
+        if active_borrowed_count >= max_limit:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Người mượn đã đạt hạn mức mượn tối đa cùng lúc ({max_limit} cuốn) (E2)"
+            )
+
+        if book.available_stock <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Đầu sách này hiện không còn tồn kho khả dụng để xuất mượn (E1)"
+            )
+        book.available_stock -= 1
+
+        loan.copy_barcode = copy_barcode
+        loan.loan_status = "BORROWED"
+        loan.borrow_date = now
+        loan.due_date = due_date
+        loan.checkout_condition = condition_notes  # BR-03 đồng kiểm tình trạng
+    else:
+        # ------------------------------------------------------------------
+        # TRƯỜNG HỢP B: Không đăng ký trước -> Mượn trực tiếp tại quầy
+        #               (Tạo bản ghi Loan mới với id tự tăng)
+        # ------------------------------------------------------------------
+        # Kiểm tra hạn mức mượn tối đa cùng lúc (SV: 3 cuốn, GV/VC: 5 cuốn - BR-01 / E2)
+        active_loans_count = db.scalar(
+            select(func.count(Loan.id)).where(
+                Loan.user_code == user.user_code,
+                Loan.loan_status.in_(["REQUESTED", "PENDING_PICKUP", "BORROWED", "OVERDUE"]),
+            )
+        ) or 0
+        if active_loans_count >= max_limit:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Người mượn đã đạt hạn mức mượn tối đa cùng lúc ({max_limit} cuốn) (E2)"
+            )
+
+        # Kiểm tra xem bạn đọc có đang mượn một cuốn khác của cùng đầu sách này không
+        duplicate_loan = db.scalar(
+            select(Loan.id).where(
+                Loan.user_code == user.user_code,
+                Loan.book_id == copy.book_id,
+                Loan.loan_status.in_(["BORROWED", "OVERDUE"]),
+            ).limit(1)
+        )
+        if duplicate_loan:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Bạn đọc đang mượn một bản sao của đầu sách này và chưa trả"
+            )
+
+        # Kiểm tra tồn kho khả dụng của đầu sách
+        if book.available_stock <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Đầu sách này hiện không còn tồn kho khả dụng để xuất mượn (E1)"
+            )
+
+        # Nếu bạn đọc có trong hàng đợi (Waitlist) của đầu sách này thì xóa khỏi hàng đợi
+        waitlist_entry = db.scalar(
+            select(Waitlist).where(
+                Waitlist.user_code == user.user_code,
+                Waitlist.book_id == copy.book_id,
+                Waitlist.status.in_(["WAITING", "HELD"]),
+            )
+        )
+        if waitlist_entry:
+            db.delete(waitlist_entry)
+
+        # Giảm số lượng tồn kho khả dụng của đầu sách đi 1 khi mượn trực tiếp
+        book.available_stock -= 1
+
+        # Tạo bản ghi phiếu mượn mới (id tự động tăng)
+        loan = Loan(
+            user_code=user.user_code,
+            book_id=copy.book_id,
+            copy_barcode=copy_barcode,
+            loan_type="PHYSICAL",
+            loan_status="BORROWED",
+            borrow_date=now,
+            due_date=due_date,
+            renewal_count=0,
+            checkout_condition=condition_notes,  # BR-03 đồng kiểm tình trạng
+        )
+        db.add(loan)
+
+    # 5. Cập nhật trạng thái bản sao vật lý (BookCopy)
     copy.status = "BORROWED"
     copy.damage_notes = condition_notes
-
-    loan.copy_barcode = copy_barcode
-    loan.loan_status = "BORROWED"
-    loan.borrow_date = now
-    loan.due_date = now + timedelta(days=14)  # GĐ-04 / BR-17 (Hạn 14 ngày)
-    loan.checkout_condition = condition_notes  # BR-03 đồng kiểm tình trạng
 
     db.commit()
     db.refresh(loan)
 
-    # Gửi email biên lai mượn sách ở chế độ nền (UC12 / AC2)
-    book = db.scalar(select(Book).where(Book.id == loan.book_id))
+    # 6. Gửi email biên lai mượn sách ở chế độ nền (UC12 / AC2)
     background_tasks.add_task(
         send_checkout_receipt_email,
         user_email=user.email,
