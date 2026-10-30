@@ -3,27 +3,40 @@ from decimal import Decimal
 from typing import Optional, List, Dict, Any
 from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.book import Book, BookCopy
 from app.models.fine import Fine, FinePayment
-from app.models.loan import Incident, Loan
+from app.models.loan import Incident, Loan, Waitlist
 from app.models.user import User
 
 
-def send_checkout_receipt_email(user_email: str, loan_id: int, title: str, due_date: datetime):
-    """
-    Gửi email biên lai ở chế độ nền (BackgroundTasks - UC12 / NFR-PE-03 / AC2)
-    """
-    # Tích hợp SMTP/fastapi-mail
-    pass
+def send_checkout_receipt_email(user_email, loan_id, title, due_date, user_name="", author="", borrow_date=None):
+    from app.services.email_notifier import send_receipt
+    return send_receipt(user_email, user_name, loan_id, title, author, borrow_date, due_date)
 
 
 def promote_waitlist_stub(db: Session, book_id: int):
-    """
-    Kích hoạt kiểm tra và đôn bạn đọc đầu hàng đợi sang HELD (UC07 / BR-04, BR-08)
-    """
-    pass
+    """Promote only after check-in; persist before any email is dispatched."""
+    from app.services.waitlist_logic import promote_waitlist
+    from app.services.email_notifier import send_hold
+    from app.models.loan import Waitlist
+    try:
+        item = promote_waitlist(db, book_id)
+        if item is None:
+            db.commit()
+            return None
+        hold_id, code, expiry = item.id, item.user_code, item.hold_expires_at
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    user = db.get(User, code)
+    book = db.get(Book, book_id)
+    if user and user.email and book:
+        # Outside the database transaction: SMTP failures may not undo check-in.
+        send_hold(user.email, user.full_name, book.title, hold_id, expiry)
+    return hold_id
 
 
 # ----------------------------------------------------------------------
@@ -34,6 +47,7 @@ def lookup_loans_service(db: Session, q: str) -> List[Loan]:
         select(Loan)
         .join(User, Loan.user_code == User.user_code)
         .join(Book, Loan.book_id == Book.id)
+        .options(joinedload(Loan.book))
     )
 
     if q.isdigit():
@@ -114,8 +128,32 @@ def checkout_at_counter_service(
             detail="Người mượn đang bị khóa tài khoản hoặc có dư nợ phạt (E2)"
         )
 
-    # 4. Cập nhật phiếu mượn & bản sao
-    now = datetime.now()
+    # Serialize checkout with waitlist promotions and check-in on the same book.
+    # Available stock includes logically reserved (HELD) copies.
+    book = db.scalar(select(Book).where(Book.id == loan.book_id).with_for_update())
+    if book is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đầu sách")
+    now = datetime.utcnow()
+    active_holds = list(db.scalars(
+        select(Waitlist).where(
+            Waitlist.book_id == loan.book_id,
+            Waitlist.status == "HELD",
+            Waitlist.hold_expires_at > now,
+        ).order_by(Waitlist.queue_position, Waitlist.id)
+    ).all())
+    own_hold = next((item for item in active_holds if item.user_code == loan.user_code), None)
+    if own_hold is None and book.available_stock <= len(active_holds):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách đang được giữ cho người đặt trước khác (Waitlist HELD)",
+        )
+    if book.available_stock <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách đã hết bản có thể giao",
+        )
+
+    # 4. Cập nhật phiếu mượn & bản sao và giải phóng lượt giữ trong một transaction.
     copy.status = "BORROWED"
     copy.damage_notes = condition_notes
 
@@ -124,6 +162,12 @@ def checkout_at_counter_service(
     loan.borrow_date = now
     loan.due_date = now + timedelta(days=14)  # GĐ-04 / BR-17 (Hạn 14 ngày)
     loan.checkout_condition = condition_notes  # BR-03 đồng kiểm tình trạng
+    book.available_stock -= 1
+    if own_hold is not None:
+        db.delete(own_hold)
+        db.flush()
+        from app.services.waitlist_logic import compact_queue
+        compact_queue(db, loan.book_id)
 
     db.commit()
     db.refresh(loan)
@@ -135,7 +179,10 @@ def checkout_at_counter_service(
         user_email=user.email,
         loan_id=loan.id,
         title=book.title if book else "",
-        due_date=loan.due_date
+        due_date=loan.due_date,
+        user_name=user.full_name,
+        author=book.author if book else "",
+        borrow_date=loan.borrow_date
     )
 
     return loan
@@ -167,7 +214,7 @@ def checkin_at_counter_service(
     copy = db.scalar(select(BookCopy).where(BookCopy.copy_barcode == copy_barcode).with_for_update())
     book = db.scalar(select(Book).where(Book.id == loan.book_id).with_for_update())
     user = db.scalar(select(User).where(User.user_code == loan.user_code).with_for_update())
-    now = datetime.now()
+    now = datetime.utcnow()
 
     # TRƯỜNG HỢP 1: Sách mất hoặc hỏng nặng -> Chuyển sang biên bản UC15
     if is_lost or is_damaged:
@@ -362,7 +409,7 @@ def collect_counter_fines_service(
     user.is_borrowing_blocked = False
 
     # 7. Xử lý ngoại lệ E5: Kiểm tra xem bạn đọc còn sách quá hạn nào chưa trả không
-    now = datetime.now()
+    now = datetime.utcnow()
     has_unreturned_overdue = db.scalar(
         select(Loan.id)
         .where(

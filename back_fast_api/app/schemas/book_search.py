@@ -1,5 +1,6 @@
+
 from typing import Generic, List, Optional, TypeVar
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
 
@@ -11,7 +12,10 @@ class BookSearchItemResponse(BaseModel):
     isbn: Optional[str] = None
     publisher: Optional[str] = None
     price: int
-    published_year: Optional[int] = None
+    published_year: Optional[int] = Field(
+        default=None,
+        validation_alias="publication_year"
+    )
     category_id: Optional[int] = None
     subject_id: Optional[int] = None
 
