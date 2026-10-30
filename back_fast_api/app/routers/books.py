@@ -22,13 +22,11 @@ def get_books(
         "offset": offset,
         "data": [],
     }
-
 @router.get(
     "/search",
     response_model=PaginatedResponse[BookSearchItemResponse],
     summary="Tìm kiếm sách Full-Text Search và phân trang",
 )
-@router.get("/search")
 def search_books(
     q: Optional[str] = Query(None, description="Tìm toàn văn trên nhan đề, tác giả, NXB, mô tả, từ khóa"),
     author: Optional[str] = Query(None, description="Tìm theo tên tác giả"),

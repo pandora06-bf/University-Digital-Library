@@ -23,7 +23,7 @@ def search_books_advanced(
     page_size = max(1, min(page_size, 50))
     offset = (page - 1) * page_size
 
-    stmt = select(Book)
+    stmt = select(Book).options(joinedload(Book.category), joinedload(Book.subject))
 
     # 1. Tìm kiếm toàn văn (FTS) trên toàn bộ siêu dữ liệu (Metadata):
     # Bao gồm: Nhan đề, Tác giả, Nhà xuất bản, Mô tả, Từ khóa
@@ -87,7 +87,6 @@ def search_books_advanced(
 
     # 9. Tính tổng số bản ghi (Count an toàn và tối ưu)
     count_stmt = stmt.with_only_columns(func.count(Book.id)).order_by(None)
-    total_records = db.scalar(count_stmt) or 0
     total_records = db.scalar(count_stmt) or 0
 
     # 10. Phân trang và Eager Loading tránh N+1
