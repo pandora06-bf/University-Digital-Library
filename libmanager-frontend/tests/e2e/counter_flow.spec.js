@@ -1,10 +1,20 @@
 import { expect, test } from '@playwright/test';
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/auth/login', async (route) => {
+    await page.route(/\/api\/auth\/login/, async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
       await route.fulfill({
         status: 200,
+        headers: CORS_HEADERS,
         contentType: 'application/json',
         body: JSON.stringify({
           access_token: 'mock-jwt-admin-token',
@@ -14,9 +24,13 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
       });
     });
 
-    await page.route('**/api/admin/loans/lookup*', async (route) => {
+    await page.route(/\/api\/admin\/loans\/lookup/, async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
       await route.fulfill({
         status: 200,
+        headers: CORS_HEADERS,
         contentType: 'application/json',
         body: JSON.stringify({
           user_code: 'SV-DEMO-001',

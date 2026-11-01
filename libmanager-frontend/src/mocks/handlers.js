@@ -1,4 +1,4 @@
-﻿import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { INITIAL_BOOKS } from './books';
 
 const API_BOOKS = INITIAL_BOOKS.map((book, index) => ({
@@ -170,4 +170,44 @@ export const handlers = [
     return HttpResponse.json({ total: WALLET_TRANSACTIONS.length, skip, limit, data: WALLET_TRANSACTIONS.slice(skip, skip + limit) });
   }),
   http.get('*/api/wallet/transactions/*', () => HttpResponse.json({ total: WALLET_TRANSACTIONS.length, data: WALLET_TRANSACTIONS })),
+  http.get('*/api/admin/loans/lookup', ({ request }) => {
+    const q = new URL(request.url).searchParams.get('q') || 'SV-DEMO-001';
+    return HttpResponse.json({
+      user_code: q,
+      data: [
+        {
+          id: 101,
+          loan_code: 'PM-2026-0101',
+          user_code: q,
+          book_id: 1,
+          book_title: 'Lap trinh Web hien dai voi React 19',
+          copy_barcode: 'DEMO-BC-001-01',
+          loan_type: 'PHYSICAL',
+          loan_status: 'PENDING_PICKUP',
+          borrow_date: '2026-10-28T09:00:00Z',
+          due_date: '2026-11-11T17:00:00Z',
+        },
+      ],
+    });
+  }),
+  http.post('*/api/admin/loans/checkin', () => HttpResponse.json({ message: 'Da nhan tra sach thanh cong' })),
+  http.post('*/api/admin/loans/checkout', () => HttpResponse.json({ message: 'Da xuat phieu muon thanh cong' })),
+  http.get('*/api/admin/fines/lookup', ({ request }) => {
+    const userCode = new URL(request.url).searchParams.get('user_code') || 'SV-DEMO-001';
+    return HttpResponse.json({
+      user_code: userCode,
+      full_name: 'Nguyen Van Dat',
+      total_fines: 50000,
+      fines: [
+        {
+          fine_id: 1,
+          loan_id: 101,
+          overdue_days: 5,
+          total_amount: 50000,
+          created_at: '2026-10-25T08:00:00Z',
+        },
+      ],
+    });
+  }),
+  http.post('*/api/admin/fines/collect', () => HttpResponse.json({ message: 'Da thu du tien phat' })),
 ];
