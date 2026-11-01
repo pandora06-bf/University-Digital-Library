@@ -23,21 +23,16 @@ def get_user_profile(db: Session, current_user: User) -> Dict[str, Any]:
     )
 
     return {
-        "user_code": current_user.user_code,
-        "username": current_user.account.username if current_user.account else "",
         "full_name": current_user.full_name,
-        "email": current_user.email,
+        "user_code": current_user.user_code,
         "phone_number": current_user.phone_number,
+        "email": current_user.email,
         "department": current_user.department,
-        "academic_title": current_user.academic_title,
-        "user_type": current_user.user_type,
         "role": current_user.account.role if current_user.account else "STUDENT",
-        "max_borrow_limit": current_user.max_borrow_limit,
-        "max_borrow_days": current_user.max_borrow_days,
-        "current_borrow_count": current_borrow_count,
-        "is_borrowing_blocked": current_user.is_borrowing_blocked,
-        "is_active": current_user.account.is_active if current_user.account else True,
+        "is_locked": current_user.is_borrowing_blocked if current_user.account else False,
         "total_fines": current_user.total_fines,
+        "service_balance": getattr(current_user, "service_balance", 0),
+        "borrow_limit": f"{current_borrow_count}/{current_user.max_borrow_limit}",  # <--- Hạn mức hiển thị dạng 1/3 hoặc 0/5
     }
 
 

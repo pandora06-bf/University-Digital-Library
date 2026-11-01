@@ -66,7 +66,9 @@ def api_checkout_loan(
         background_tasks=background_tasks,
         copy_barcode=payload.copy_barcode,
         loan_id=payload.loan_id,
+        loan_code=payload.loan_code,
         user_code=payload.user_code,
+        book_id=payload.book_id,
         condition_notes=payload.condition_notes,
     )
     return {
@@ -76,9 +78,17 @@ def api_checkout_loan(
             "user_code": loan.user_code,
             "book_id": loan.book_id,
             "copy_barcode": loan.copy_barcode,
+            "loan_type": loan.loan_type,
             "loan_status": loan.loan_status,
+            "borrow_date": loan.borrow_date,
             "due_date": loan.due_date,
+            "return_date": loan.return_date,
+            "renewal_count": loan.renewal_count,
             "checkout_condition": loan.checkout_condition,
+            "checkin_condition": loan.checkin_condition,
+            "ebook_access_token": loan.ebook_access_token,
+            "loan_code": loan.loan_code,
+            "pickup_deadline": loan.pickup_deadline,
         }
     }
 

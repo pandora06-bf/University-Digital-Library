@@ -22,5 +22,5 @@ def test_read_token_expiry_matches_due_date():
 
 def test_scheduler_has_core_jobs():
     scheduler = configure_scheduler()
-    assert {"JOB-01", "JOB-03", "JOB-05"}.issubset({job.id for job in scheduler.get_jobs()})
+    assert {"JOB-01", "JOB-02", "JOB-05"}.issubset({job.id for job in scheduler.get_jobs()})
     assert str(scheduler.timezone) == "Asia/Ho_Chi_Minh"

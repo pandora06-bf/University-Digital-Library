@@ -1,101 +1,142 @@
 import math
+import re
+import unicodedata
 from typing import Any, Dict, List, Optional
-from sqlalchemy import func, select
+
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.book import Book, Category, Subject
+from app.models.book import Book, Category
+
+DEFAULT_PAGE_SIZE = 20   # NFR-PE-02
+MAX_PAGE_SIZE = 50       # NFR-PE-02
+MAX_QUERY_LENGTH = 200
+
+# Ký tự điều khiển (bao gồm NUL \x00 khiến PostgreSQL báo lỗi)
+_CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+# Ký tự có ý nghĩa đặc biệt trong cú pháp tsquery
+_TSQUERY_SPECIAL = re.compile(r"[&|!():*<>\\'\"]")
+_MULTI_SPACE = re.compile(r"\s+")
+
+
+def normalize_text(value: Optional[str], max_length: int = MAX_QUERY_LENGTH) -> Optional[str]:
+    """Chuẩn hóa chuỗi người dùng nhập: NFC, bỏ ký tự điều khiển, gộp khoảng trắng,
+    giới hạn độ dài. Trả về None nếu chuỗi rỗng sau khi chuẩn hóa."""
+    if value is None:
+        return None
+    text = unicodedata.normalize("NFC", value)
+    text = _CONTROL_CHARS.sub(" ", text)
+    text = _MULTI_SPACE.sub(" ", text).strip()[:max_length].strip()
+    return text or None
+
+
+def normalize_tsquery_text(value: Optional[str]) -> Optional[str]:
+    """Chuẩn hóa chuỗi trước khi đưa vào plainto_tsquery: loại các toán tử tsquery.
+    Trả về None nếu không còn ký tự chữ/số nào (vd: '!!!')."""
+    text = normalize_text(value)
+    if not text:
+        return None
+    text = _MULTI_SPACE.sub(" ", _TSQUERY_SPECIAL.sub(" ", text)).strip()
+    if not any(ch.isalnum() for ch in text):
+        return None
+    return text
+
+
+def _escape_like(value: str) -> str:
+    """Escape ký tự đại diện của LIKE để tìm đúng nghĩa đen."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _ilike(column, value: str):
+    return column.ilike(f"%{_escape_like(value)}%", escape="\\")
 
 
 def search_books_advanced(
     db: Session,
-    query_text: Optional[str] = None,       # Tìm kiếm toàn văn trên siêu dữ liệu
-    author: Optional[str] = None,           # Tìm theo tác giả
-    publisher: Optional[str] = None,        # Tìm theo nhà xuất bản
-    publication_year: Optional[int] = None, # Tìm theo năm xuất bản
-    category_id: Optional[int] = None,      # Lọc theo danh mục
-    book_type: Optional[str] = None,        # Lọc theo định dạng (PRINTED, EBOOK, BOTH)
-    subject_code: Optional[str] = None,     # Lọc theo mã môn học
-    keyword: Optional[str] = None,          # Lọc theo từ khóa (keywords)
+    query_text: Optional[str] = None,       # q: tìm toàn văn trên siêu dữ liệu
+    author: Optional[str] = None,
+    publisher: Optional[str] = None,
+    year: Optional[int] = None,
+    subject_code: Optional[str] = None,
+    category: Optional[str] = None,         # id hoặc tên danh mục
+    attribute: Optional[str] = None,        # thuộc tính / từ khóa (keywords)
+    format: Optional[str] = None,           # PRINTED | EBOOK | BOTH
     page: int = 1,
-    page_size: int = 10,
+    page_size: int = DEFAULT_PAGE_SIZE,
 ) -> Dict[str, Any]:
-    page = max(1, page)
-    page_size = max(1, min(page_size, 50))
+    if page < 1:
+        raise ValueError("page phải >= 1")
+    if page_size < 1 or page_size > MAX_PAGE_SIZE:
+        raise ValueError(f"page_size phải trong khoảng 1..{MAX_PAGE_SIZE}")
     offset = (page - 1) * page_size
 
     stmt = select(Book)
 
-    # 1. Tìm kiếm toàn văn (FTS) trên toàn bộ siêu dữ liệu (Metadata):
-    # Bao gồm: Nhan đề, Tác giả, Nhà xuất bản, Mô tả, Từ khóa
-    if query_text and query_text.strip():
-        search_terms = query_text.strip()
+    # 1. Full-text search trên nhan đề, tác giả, NXB, mô tả, từ khóa
+    search_terms = normalize_tsquery_text(query_text)
+    if search_terms:
         ts_query = func.plainto_tsquery("simple", search_terms)
-
-        # Gom toàn bộ siêu dữ liệu vào một tsvector
         metadata_vector = func.to_tsvector(
             "simple",
-            func.coalesce(Book.title, "")
-            + " "
-            + func.coalesce(Book.author, "")
-            + " "
-            + func.coalesce(Book.publisher, "")
-            + " "
-            + func.coalesce(Book.description, "")
-            + " "
-            + func.coalesce(Book.keywords, ""),
+            func.concat_ws(
+                " ",
+                Book.title,
+                Book.author,
+                Book.publisher,
+                Book.description,
+                Book.keywords,
+            ),
         )
-
-        fts_filter = metadata_vector.op("@@")(ts_query)
-        rank_expr = func.ts_rank_cd(metadata_vector, ts_query)
-
-        stmt = stmt.where(fts_filter).order_by(rank_expr.desc(), Book.id.desc())
+        stmt = stmt.where(metadata_vector.op("@@")(ts_query)).order_by(
+            func.ts_rank_cd(metadata_vector, ts_query).desc(), Book.id.desc()
+        )
     else:
         stmt = stmt.order_by(Book.id.desc())
 
-    # 2. Tìm theo Tác giả (không phân biệt hoa thường)
-    if author and author.strip():
-        stmt = stmt.where(Book.author.ilike(f"%{author.strip()}%"))
+    # 2. Các bộ lọc (kết hợp AND)
+    author = normalize_text(author)
+    if author:
+        stmt = stmt.where(_ilike(Book.author, author))
 
-    # 3. Tìm theo Nhà xuất bản
-    if publisher and publisher.strip():
-        stmt = stmt.where(Book.publisher.ilike(f"%{publisher.strip()}%"))
+    publisher = normalize_text(publisher)
+    if publisher:
+        stmt = stmt.where(_ilike(Book.publisher, publisher))
 
-    # 4. Tìm theo Năm xuất bản
-    if publication_year:
-        stmt = stmt.where(Book.publication_year == publication_year)
+    if year is not None:
+        stmt = stmt.where(Book.publication_year == year)
 
-    # 5. Lọc chéo theo Danh mục
-    if category_id:
-        stmt = stmt.where(Book.category_id == category_id)
+    subject_code = normalize_text(subject_code, 50)
+    if subject_code:
+        stmt = stmt.where(func.upper(Book.subject_code) == subject_code.upper())
 
-    # 6. Lọc chéo theo Định dạng sách (Vật lý: PRINTED, Điện tử: EBOOK)
-    if book_type and book_type.strip():
-        target_type = book_type.strip().upper()
-        if target_type in ["PRINTED", "EBOOK"]:
-            # Khớp định dạng đích hoặc các sách hỗ trợ cả hai (BOTH)
-            stmt = stmt.where(Book.book_type.in_([target_type, "BOTH"]))
+    category = normalize_text(category, 100)
+    if category:
+        if category.isdigit():
+            stmt = stmt.where(Book.category_id == int(category))
         else:
-            stmt = stmt.where(Book.book_type == target_type)
+            stmt = stmt.join(Category, Book.category_id == Category.id).where(
+                func.lower(Category.category_name) == category.lower()
+            )
 
-    # 7. Tìm theo Từ khóa (Keywords)
-    if keyword and keyword.strip():
-        stmt = stmt.where(Book.keywords.ilike(f"%{keyword.strip()}%"))
+    attribute = normalize_text(attribute)
+    if attribute:
+        stmt = stmt.where(_ilike(Book.keywords, attribute))
 
-    # 8. Lọc theo Mã môn học
-    if subject_code and subject_code.strip():
-        stmt = stmt.where(Book.subject_code == subject_code.strip().upper())
+    if format:
+        target = format.upper()
+        if target in ("PRINTED", "EBOOK"):
+            # Sách BOTH đáp ứng cả hai định dạng
+            stmt = stmt.where(or_(Book.book_type == target, Book.book_type == "BOTH"))
+        else:
+            stmt = stmt.where(Book.book_type == target)
 
-    # 9. Tính tổng số bản ghi (Count an toàn và tối ưu)
-    count_stmt = stmt.with_only_columns(func.count(Book.id)).order_by(None)
+    # 3. Tổng số kết quả
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
     total_records = db.scalar(count_stmt) or 0
-    total_records = db.scalar(count_stmt) or 0
 
-    # 10. Phân trang và Eager Loading tránh N+1
+    # 4. Phân trang + eager loading
     paginated_stmt = (
-        stmt.options(
-            joinedload(Book.category),
-            joinedload(Book.subject),
-        )
+        stmt.options(joinedload(Book.category), joinedload(Book.subject))
         .limit(page_size)
         .offset(offset)
     )

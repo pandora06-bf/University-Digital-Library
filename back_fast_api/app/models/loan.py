@@ -27,7 +27,7 @@ class Loan(Base):
     __tablename__ = "loans"
     __table_args__ = (
         CheckConstraint(
-            "loan_status IN ('REQUESTED', 'BORROWED', 'RETURNED', 'OVERDUE', 'CANCELLED', 'LOST', 'EXPIRED')",
+            "loan_status IN ('PENDING_PICKUP', 'REQUESTED', 'BORROWED', 'RETURNED', 'OVERDUE', 'CANCELLED', 'LOST', 'EXPIRED')",
             name="chk_loan_status_valid",
         ),
     )
@@ -44,9 +44,11 @@ class Loan(Base):
     )
     loan_type: Mapped[str] = mapped_column(String(20), nullable=False)
     loan_status: Mapped[str] = mapped_column(String(30), nullable=False, default="BORROWED")
+    loan_code: Mapped[Optional[str]] = mapped_column(String(30), unique=True, nullable=True)
 
     borrow_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=False), nullable=False)
     due_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=False), nullable=False)
+    pickup_deadline: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=False), nullable=True)
     return_date: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=False), nullable=True)
     renewal_count: Mapped[int] = mapped_column(SmallInteger, server_default="0", nullable=False)
     checkout_condition: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

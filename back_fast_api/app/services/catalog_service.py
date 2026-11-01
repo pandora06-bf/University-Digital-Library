@@ -5,6 +5,19 @@ from sqlalchemy.orm import Session
 
 from app.models.book import Book, BookCopy, Category, Subject
 
+# Bản sao ở các trạng thái này coi như ngừng lưu hành
+INACTIVE_COPY_STATUSES = {"LOST", "DAMAGED", "RETIRED"}
+
+
+def is_book_disabled(book: Book, copies) -> bool:
+    """Sách bị coi là vô hiệu hóa khi có bản sao vật lý nhưng TẤT CẢ đều ngừng lưu hành,
+    trừ khi sách vẫn còn đọc được dưới dạng ebook. Sách chưa có bản sao nào thì vẫn hiển thị."""
+    if book.book_type in ("EBOOK", "BOTH") and book.ebook is not None:
+        return False
+    if not copies:
+        return False
+    return all((cp.status or "").upper() in INACTIVE_COPY_STATUSES for cp in copies)
+
 
 def get_catalog_tree_service(db: Session) -> Dict[str, Any]:
     subjects = db.scalars(select(Subject).order_by(Subject.subject_code)).all()
@@ -46,7 +59,13 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
             detail=f"Không tìm thấy sách với mã {book_id}",
         )
 
-    if hasattr(book, "is_active") and not book.is_active:
+    copies = db.scalars(
+        select(BookCopy)
+        .where(BookCopy.book_id == book_id)
+        .order_by(BookCopy.zone, BookCopy.floor, BookCopy.shelf)
+    ).all()
+
+    if is_book_disabled(book, copies):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sách hiện đã bị vô hiệu hóa hoặc ngừng lưu hành",
@@ -59,13 +78,7 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
         if category:
             cat_name = category.category_name
 
-    # Danh sách vị trí bản sao trên kệ
-    copies = db.scalars(
-        select(BookCopy)
-        .where(BookCopy.book_id == book_id)
-        .order_by(BookCopy.zone, BookCopy.floor, BookCopy.shelf)
-    ).all()
-
+    # Danh sách vị trí bản sao trên kệ (bỏ các bản đã ngừng lưu hành)
     locations = [
         {
             "copy_barcode": cp.copy_barcode,
@@ -75,6 +88,7 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
             "status": cp.status,
         }
         for cp in copies
+        if (cp.status or "").upper() not in INACTIVE_COPY_STATUSES
     ]
 
     return {
@@ -86,7 +100,7 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
         "description": book.description,
         "book_type": book.book_type,
         "price": float(book.price) if book.price is not None else None,
-        "cover_image_url": getattr(book, "cover_image_url", None),
+        "cover_image_url": book.cover_image_path,
         "available_stock": book.available_stock,
         "subject_code": book.subject_code,
         "category_id": book.category_id,

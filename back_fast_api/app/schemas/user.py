@@ -3,7 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
-
+from pydantic import Field
 
 class UserBase(BaseModel):
     username: str
@@ -21,21 +21,24 @@ class UserResponse(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
 class UserProfileResponse(BaseModel):
-    user_code: str
-    username: str
     full_name: str
-    email: str
+    user_code: str
     phone_number: Optional[str] = None
+    email: str
     department: str
-    academic_title: Optional[str] = None
-    user_type: str
     role: str
-    max_borrow_limit: int
-    max_borrow_days: int
-    current_borrow_count: int
-    is_borrowing_blocked: bool
-    is_active: bool
+    is_locked: bool
     total_fines: Decimal
+    service_balance: int = Field(
+        default=0, description="Số dư ví dịch vụ (VNĐ)"
+    )
+
+    # Dạng chuỗi hiển thị theo yêu cầu "đã dùng / tối đa"
+    borrow_limit: str = Field(
+        ...,
+        example="1/3",
+        description="Hạn mức mượn (Số sách đã mượn / Hạn mức tối đa)",
+    )
 
     model_config = ConfigDict(from_attributes=True)
 
