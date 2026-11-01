@@ -1,3 +1,8 @@
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 """Seed repeatable development/demo data after applying Alembic migrations.
 
 Sprint 2C - Lợi (3-21, 4-21):
@@ -10,9 +15,12 @@ Sprint 2C - Lợi (3-21, 4-21):
   - Dùng chung cho môi trường dev và demo
 """
 
+import csv
+import json
 import os
 import random
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from faker import Faker
 
@@ -89,6 +97,75 @@ def _get_or_create(db, model, lookup, **values):
         db.add(instance)
         db.flush()
     return instance
+
+
+def _isbn13_valid(value):
+    value = str(value or "").replace("-", "").replace(" ", "")
+    if len(value) != 13 or not value.isdigit():
+        return False
+    checksum = sum(int(char) * (1 if index % 2 == 0 else 3)
+                   for index, char in enumerate(value[:12]))
+    return (10 - checksum % 10) % 10 == int(value[-1])
+
+
+def _validate_books_catalog(rows):
+    """Reject incomplete or inconsistent API catalog before seeding any books."""
+    if len(rows) != 100:
+        raise ValueError(f"Books catalog must contain exactly 100 records; found {len(rows)}")
+
+    seen_isbns = set()
+    subject_counts = {}
+    required_subjects = {code for code, _, _ in SUBJECTS}
+    for line, row in enumerate(rows, start=2):
+        required = ("title", "author", "publisher", "publication_year", "isbn",
+                    "subject_code", "category_name", "cover_image_path", "reference_source")
+        missing = [field for field in required if not str(row.get(field, "")).strip()]
+        if missing:
+            raise ValueError(f"Catalog CSV row {line} is missing: {', '.join(missing)}")
+        if str(row["publisher"]).strip().casefold() in {
+            "chưa có thông tin nhà xuất bản", "unknown", "n/a", "not available"
+        }:
+            raise ValueError(f"Catalog row {line} has no verified publisher")
+        if not _isbn13_valid(row["isbn"]):
+            raise ValueError(f"Catalog CSV row {line} has an invalid ISBN-13")
+        isbn = str(row["isbn"]).replace("-", "").replace(" ", "")
+        if isbn in seen_isbns:
+            raise ValueError(f"Catalog contains duplicate ISBN-13: {isbn}")
+        seen_isbns.add(isbn)
+        subject_code = row["subject_code"]
+        if subject_code not in required_subjects:
+            raise ValueError(f"Catalog row {line} has unknown subject_code: {subject_code!r}")
+        expected_category = {
+            "IT": "Công nghệ thông tin", "MATH": "Khoa học", "PHYS": "Khoa học",
+            "LIT": "Văn học", "ECO": "Kinh tế", "ENG": "Ngoại ngữ",
+        }[subject_code]
+        if row["category_name"] != expected_category:
+            raise ValueError(
+                f"Catalog row {line} category {row['category_name']!r} does not match "
+                f"subject {subject_code}"
+            )
+        subject_counts[subject_code] = subject_counts.get(subject_code, 0) + 1
+        cover_path_str = str(row.get("cover_image_path", ""))
+        if not (cover_path_str.startswith("https://") or cover_path_str.startswith("/static/covers/") or cover_path_str.startswith("static/covers/")):
+            raise ValueError(f"Catalog row {line} cover must be an HTTPS URL or local /static/covers/ path")
+        if not str(row.get("reference_source", "")).strip():
+            raise ValueError(f"Catalog row {line} is missing its reference source")
+        if row.get("book_type") not in {"PRINTED", "EBOOK", "BOTH"}:
+            raise ValueError(f"Catalog row {line} has invalid book_type")
+        try:
+            year = int(row["publication_year"])
+            copies = int(row.get("copies_count", 0))
+            int(row.get("price", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Catalog row {line} has invalid numeric metadata") from exc
+        if not 1400 <= year <= datetime.utcnow().year + 1:
+            raise ValueError(f"Catalog row {line} has an implausible publication year: {year}")
+        if not 1 <= copies <= 3:
+            raise ValueError(f"Catalog row {line} copies_count must be from 1 to 3")
+
+    missing_subjects = sorted(required_subjects - subject_counts.keys())
+    if missing_subjects:
+        raise ValueError("Catalog is missing subject groups: " + ", ".join(missing_subjects))
 
 
 def _seed_user(db, *, username, role, user_code, name, email, password, balance=0):
@@ -191,32 +268,84 @@ def seed_database():
             )
         db.flush()
 
-        # ── 3. Books + Copies + Ebooks ──────────────────────────────────────
-        for index in range(1, 101):
-            title = f"[DEMO-{index:03d}] {fake.catch_phrase()}"
+        # ── 3. Books + Copies + Ebooks: nạp catalog đã lấy từ Google Books API ──
+        # Lấy catalog trước bằng scripts/fetch_books_from_google_books.py.
+        # Không lấp thiếu sách bằng Faker để tránh trộn nguồn dữ liệu trong demo.
+        base_dir = Path(__file__).resolve().parent
+        csv_file = base_dir / "data" / "books_seed.csv"
+        if not csv_file.exists():
+            csv_file = base_dir.parent / "data" / "books_seed.csv"
+
+        raw_books = []
+        if csv_file.exists():
+            with open(csv_file, mode="r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                for r in reader:
+                    raw_books.append(r)
+        else:
+            json_file = base_dir / "data" / "books_seed.json"
+            if not json_file.exists():
+                json_file = base_dir.parent / "data" / "books_seed.json"
+            if json_file.exists():
+                with open(json_file, mode="r", encoding="utf-8") as f:
+                    raw_books = json.load(f)
+
+        if len(raw_books) != 100:
+            raise ValueError(
+                f"Books catalog must contain exactly 100 records; found {len(raw_books)}. "
+                "Fetch it from Google Books first: "
+                "python back_fast_api/scripts/fetch_books_from_google_books.py"
+            )
+        _validate_books_catalog(raw_books)
+
+        for index, book_data in enumerate(raw_books, start=1):
+            title = f"[DEMO-{index:03d}] {book_data['title']}"
+            author = book_data["author"]
+            publisher = book_data["publisher"]
+            pub_year = int(book_data["publication_year"])
+            price = int(book_data.get("price") or 0)  # API has no universal retail price.
+            desc = book_data.get("description") or ""
+            pages = int(book_data.get("num_pages") or 0)
+            btype = book_data["book_type"]
+            cover_path = book_data["cover_image_path"]
+
+            cat_name = book_data["category_name"]
+            if cat_name not in categories:
+                raise ValueError(f"Unknown category in book catalog: {cat_name!r}")
+            subj_code = book_data["subject_code"]
+            if subj_code not in subjects:
+                raise ValueError(f"Unknown subject_code in book catalog: {subj_code!r}")
+
             book = _get_or_create(
                 db,
                 Book,
                 {"title": title},
-                author=fake.name(),
-                publisher=fake.company(),
-                publication_year=int(fake.year()),
-                price=rng.randrange(5, 61) * 5_000,
-                description=fake.text(max_nb_chars=240),
-                keywords=" ".join(fake.words(nb=4, unique=True)),
-                num_pages=rng.randint(80, 800),
-                book_type="BOTH" if index % 3 == 0 else (
-                    "EBOOK" if index % 3 == 1 else "PRINTED"
-                ),
+                author=author,
+                publisher=publisher,
+                publication_year=pub_year,
+                price=price,
+                description=desc,
+                keywords=f"{subj_code} {cat_name} demo",
+                num_pages=pages,
+                book_type=btype,
+                cover_image_path=cover_path,
                 available_stock=0,
-                category_id=categories[CATEGORIES[(index - 1) % len(CATEGORIES)]].id,
-                subject_code=CATEGORY_SUBJECT[CATEGORIES[(index - 1) % len(CATEGORIES)]],
+                category_id=categories[cat_name].id,
+                subject_code=subj_code,
             )
-            book.price = book.price or rng.randrange(5, 61) * 5_000
-            # Fixture books always follow the matching category/subject pair.
-            book.subject_code = CATEGORY_SUBJECT[CATEGORIES[(index - 1) % len(CATEGORIES)]]
+            book.author = author
+            book.publisher = publisher
+            book.publication_year = pub_year
+            book.price = price
+            book.description = desc
+            book.cover_image_path = cover_path
+            book.num_pages = pages
+            book.book_type = btype
+            book.category_id = categories[cat_name].id
+            book.subject_code = subj_code
 
-            copy_count = rng.randint(1, 3)
+            # Giữ 1-3 bản sao mỗi sách theo yêu cầu 2B-30.a
+            copy_count = int(book_data.get("copies_count", 1 + (index % 3)))
             existing_copy_count = db.query(BookCopy).filter_by(book_id=book.id).count()
             for copy_index in range(existing_copy_count + 1, copy_count + 1):
                 copy = BookCopy(
