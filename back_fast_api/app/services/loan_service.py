@@ -19,6 +19,7 @@ from app.models.user import User
 # bạn đọc: phiếu vật lý đang chờ nhận tại quầy, đang mượn, đang quá hạn, và
 # eBook đang mượn (loan_type không phân biệt ở đây).
 ACTIVE_LOAN_STATUSES = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
+PICKUP_HOLD_PERIOD = timedelta(hours=24)
 
 def get_user_max_borrow_limit(user: User) -> int:
     """
