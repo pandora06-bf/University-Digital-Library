@@ -59,7 +59,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 1,
     title: 'Clean Code: A Handbook of Agile Software Craftsmanship',
-    otherTitle: 'Mã Sạch - Cẩm Nang Kỹ Thuật Lập Trình Agile',
     isbn: '978-0132350884',
     barcode: 'BC-10001',
     author: 'Robert C. Martin',
@@ -91,7 +90,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 2,
     title: 'Nhập môn Trí tuệ Nhân tạo và Machine Learning',
-    otherTitle: 'Introduction to AI & Machine Learning with Python',
     isbn: '978-6045689123',
     barcode: 'BC-10002',
     author: 'TS. Nguyễn Văn Hùng',
@@ -127,7 +125,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 3,
     title: 'Cấu trúc Dữ liệu & Giải thuật Ứng dụng',
-    otherTitle: 'Data Structures and Algorithms in C++',
     isbn: '978-0321573513',
     barcode: 'BC-10003',
     author: 'Michael T. Goodrich, Roberto Tamassia',
@@ -159,7 +156,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 4,
     title: 'Nguyên lý Hệ điều hành Hiện đại',
-    otherTitle: 'Operating System Concepts (Silberschatz)',
     isbn: '978-1119800361',
     barcode: 'BC-10004',
     author: 'Abraham Silberschatz, Peter B. Galvin',
@@ -191,7 +187,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 5,
     title: 'Lập trình Web với React và Node.js',
-    otherTitle: 'Modern Full-Stack Web Development',
     isbn: '978-6047781029',
     barcode: 'BC-10005',
     author: 'Trần Minh Quân, Lê Hoàng Nam',
@@ -227,7 +222,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 6,
     title: 'Kinh tế Vi mô Ứng dụng trong Doanh nghiệp',
-    otherTitle: 'Applied Microeconomics for Managers',
     isbn: '978-6048991201',
     barcode: 'BC-10006',
     author: 'PGS. TS. Trần Đình Khoa',
@@ -259,7 +253,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 7,
     title: 'Xác suất Thống kê và Xử lý Số liệu Thực nghiệm',
-    otherTitle: 'Probability and Statistics for Engineers',
     isbn: '978-0134468914',
     barcode: 'BC-10007',
     author: 'Ronald E. Walpole, Raymond H. Myers',
@@ -291,7 +284,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 8,
     title: 'Designing Data-Intensive Applications',
-    otherTitle: 'Thiết kế Hệ thống Xử lý Dữ liệu Lớn Phân tán',
     isbn: '978-1449373320',
     barcode: 'BC-10008',
     author: 'Martin Kleppmann',
@@ -327,7 +319,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 9,
     title: 'Quản trị Dự án Phần mềm Theo Mô hình Scrum',
-    otherTitle: 'Agile Project Management with Scrum',
     isbn: '978-6047712398',
     barcode: 'BC-10009',
     author: 'Ken Schwaber, Jeff Sutherland',
@@ -359,7 +350,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 10,
     title: 'English for Information Technology & Engineering',
-    otherTitle: 'Tiếng Anh Chuyên Ngành Công Nghệ Thông Tin',
     isbn: '978-0194574921',
     barcode: 'BC-10010',
     author: 'Mairi Maclean, John Eastwood',
@@ -395,7 +385,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 11,
     title: 'An toàn Thông tin và Phòng thủ Mạng Doanh nghiệp',
-    otherTitle: 'Network Security Essentials: Applications and Standards',
     isbn: '978-0134444284',
     barcode: 'BC-10011',
     author: 'William Stallings',
@@ -427,7 +416,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 12,
     title: 'Báo cáo Khóa luận Tốt nghiệp: Hệ thống Thư viện Số ĐHQG',
-    otherTitle: 'Graduation Thesis: University Digital Library Management System',
     isbn: 'KL-2025-IT-001',
     barcode: 'BC-10012',
     author: 'Phan Phạm Thùy Vân, Nhóm Đồ án CNPM',
@@ -458,7 +446,6 @@ export const ADMIN_MOCK_BOOKS = [
   {
     id: 13,
     title: 'Tài liệu Chuyên khảo Vi kiến trúc Bộ xử lý CPU',
-    otherTitle: 'Special Monograph: Advanced CPU Microarchitecture Design',
     isbn: '978-0123849885',
     barcode: 'BC-10013',
     author: 'John L. Hennessy, David A. Patterson',
