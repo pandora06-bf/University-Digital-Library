@@ -41,3 +41,5 @@ node_modules/
 *.bak
 .coverage
 htmlcov/
+.venv_seed/
+back_fast_api/.venv_seed/

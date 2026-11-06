@@ -97,6 +97,9 @@ export default function InventoryManagement() {
   const isCopyRetired = (status) =>
     status === 'DAMAGED' || status === 'RETIRED' || status === 'LOST';
 
+  // Thanh lý = ngừng lưu thông. UC09 không có bước đưa lại Sẵn sàng.
+  const isLiquidatedStatus = (status) => status === 'DAMAGED' || status === 'RETIRED';
+
   const mapCopyRow = (c, targetBook) => ({
     id: c.copy_barcode || c.barcode,
     barcode: c.copy_barcode || c.barcode,
@@ -227,13 +230,17 @@ export default function InventoryManagement() {
     setEditFormErrors({});
 
     try {
-      await axiosInstance.patch(`/api/admin/copies/${editingRow.barcode}/condition`, {
+      const payload = {
         zone: editForm.zone.trim(),
         floor: editForm.floor.trim(),
         shelf: editForm.shelf.trim(),
-        status: editForm.status,
-        damage_notes: editForm.condition ? editForm.condition.trim() : null
-      });
+        damage_notes: editForm.condition ? editForm.condition.trim() : null,
+      };
+      // Bản đã thanh lý: chỉ sửa vị trí và ghi chú, không gửi status (tránh đưa lại Sẵn sàng).
+      if (!isLiquidatedStatus(editingRow.rawStatus)) {
+        payload.status = editForm.status;
+      }
+      await axiosInstance.patch(`/api/admin/copies/${editingRow.barcode}/condition`, payload);
       showToast('Cập nhật bản sao thành công!', 'success');
       setEditingRow(null);
       fetchInventory(bookId, bookInfo);
@@ -886,16 +893,25 @@ export default function InventoryManagement() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-                <select 
-                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
-                  value={editForm.status}
-                  onChange={e => setEditForm({...editForm, status: e.target.value})}
-                >
-                  <option value="AVAILABLE">Sẵn sàng</option>
-                  <option value="BORROWED">Đang mượn</option>
-                  <option value="DAMAGED">Đã thanh lý / Hỏng</option>
-                  <option value="LOST">Báo mất</option>
-                </select>
+                {isLiquidatedStatus(editingRow.rawStatus) ? (
+                  <>
+                    <Input defaultValue="Đã thanh lý" disabled className="w-full bg-slate-50 text-slate-500" />
+                    <p className="mt-1.5 text-[11px] text-slate-500">
+                      Bản sao đã ngừng lưu thông. Không đưa lại trạng thái Sẵn sàng hoặc Đang mượn.
+                    </p>
+                  </>
+                ) : (
+                  <select
+                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={editForm.status}
+                    onChange={e => setEditForm({...editForm, status: e.target.value})}
+                  >
+                    <option value="AVAILABLE">Sẵn sàng</option>
+                    <option value="BORROWED">Đang mượn</option>
+                    <option value="DAMAGED">Đã thanh lý / Hỏng</option>
+                    <option value="LOST">Báo mất</option>
+                  </select>
+                )}
               </div>
             </div>
           </div>

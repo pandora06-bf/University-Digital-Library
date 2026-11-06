@@ -2,18 +2,23 @@
 
 | | |
 |---|---|
-| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **28/10/2026** |
+| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **06/11/2026** |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **URL (Docker)** | http://localhost:5174 |
-| **Đăng nhập demo** | `admin` / `Admin@123` |
+| **API** | http://localhost:8010 |
+| **Đăng nhập demo** | `admin` / `Admin@123` — vào thẳng **Danh mục sách** |
 | **File nguồn** | `docs/HUONG_DAN_THU_THU.md` |
 
-Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đã đủ các mục quản trị (không còn trang Tổng quan riêng).
+Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đủ các mục quản trị (không có trang Tổng quan riêng).
 
-**Máy quét barcode:** ô quét **tự focus**; tít mã hoặc gõ rồi **Enter**. Toast Admin hiện **giữa phía trên**.
+**Máy quét barcode:** ô quét tự focus. Tít mã hoặc gõ rồi **Enter**. Toast hiện giữa phía trên.
 
-**Banner vàng «Đang dùng dữ liệu mẫu»:** hiện khi trang chưa nối máy chủ (Users / Rooms / Unmatched / …) hoặc khi API tạm lỗi (Catalog / Inventory / eBook).
+**Barcode** là mã từng bản in (`DEMO-BC-099-01`), xem ở **Tồn kho** sau khi chọn đầu sách. File ebook không có barcode.
+
+**Bạn đọc thật trong database** dùng mã `SV-DEMO-001`, `GV-DEMO-002`, … Đăng nhập cổng bạn đọc: `demo_student_001` / `User@123`. Trang **Người dùng** của Admin vẫn là dữ liệu mẫu (`50214569`, `TEST409DEBT`), không dùng các mã đó để mượn hoặc thu phạt.
+
+**Banner vàng «Đang dùng dữ liệu mẫu»:** trang chưa ghi máy chủ (Người dùng, Phòng, Giao dịch chưa khớp) hoặc API tạm lỗi (Danh mục, Tồn kho, eBook).
 
 ---
 
@@ -21,95 +26,120 @@ Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đã đủ các m�
 
 | Màn hình | Đường dẫn | Máy chủ |
 |----------|-----------|---------|
-| Danh mục sách | `/admin/catalog` | **Đã nối** (CRUD + thể loại + upload) |
-| eBook / PDF | `/admin/ebooks` | **List + upload** đã nối; xem trước cần BE bật preview |
+| Danh mục sách | `/admin/catalog` | **Đã nối** (CRUD + thể loại + bìa/PDF) |
+| eBook / PDF | `/admin/ebooks` | **Danh sách + tải PDF** đã nối. **Xem trước** đang lỗi với dữ liệu mẫu |
 | Tồn kho | `/admin/inventory` | **Đã nối** (bản sao / thanh lý) |
-| Mượn / Trả | `/admin/loans` | **Đã nối** quầy lookup / checkout / check-in |
-| Thu phạt | `/admin/fines` | **Đã nối** lookup MSSV + thu đủ nợ |
-| Báo mất / Hỏng | `/admin/incidents` | **Tạo** qua nhận trả; **danh sách** lưu trình duyệt |
-| Người dùng | `/admin/users` | **Mẫu FE** (chờ API admin users) |
+| Mượn / Trả | `/admin/loans` | **Đã nối** tra cứu / xuất mượn / nhận trả |
+| Thu phạt | `/admin/fines` | **Đã nối** tra một mã bạn đọc + thu đủ nợ. Không có danh sách mọi phiếu |
+| Báo mất / Hỏng | `/admin/incidents` | **Tạo** qua nhận trả khi phiếu còn đang mượn. **Danh sách** lưu trên trình duyệt |
+| Người dùng | `/admin/users` | **Mẫu FE** |
 | Phòng học nhóm | `/admin/rooms` | **Mẫu FE** |
 | Check-in phòng | `/admin/rooms/checkin` | **Mẫu FE** |
-| GD chưa khớp | `/admin/unmatched` | **Mẫu FE** |
+| GD chưa khớp | `/admin/unmatched` | **Mẫu FE** (không cộng ví thật) |
 
 ---
 
 ## 1. Check-out (xuất mượn) — `/admin/loans`
 
-1. Cột **Quầy Xuất Phiếu Mượn**: nhập **MSSV / mã độc giả** → **Enter**.
-2. Kiểm tra thẻ người mượn + danh sách phiếu (trạng thái, hạn).
-3. (Tuỳ chọn) ghi chú tình trạng sách khi giao.
-4. Quét barcode sách (**tít liên tục** — ô tự xóa sau mỗi lần) → thêm vào phiếu.
-5. **Xác nhận xuất phiếu mượn** → Toast thành công / lỗi.
+1. Cột **Quầy Xuất Phiếu Mượn**: nhập **mã bạn đọc** (`SV-DEMO-001`) → **Enter**.
+2. Xem phiếu chờ nhận nếu có. Không có phiếu chờ vẫn xuất mượn trực tiếp tại quầy.
+3. Ghi chú tình trạng sách khi giao nếu cần.
+4. Quét barcode bản in đang **Sẵn sàng** (ô tự xóa sau mỗi lần) → thêm vào phiếu.
+5. **Xác nhận xuất phiếu mượn**.
 
-> Thành công khi có phiếu chờ xuất / chờ nhận và barcode khớp đúng đầu sách.
+Barcode không có trong kho thì toast: không tìm thấy bản sao (E1). Sách đang giữ chỗ cho bạn đọc khác thì máy chủ từ chối xuất cho người không giữ chỗ.
 
-Thống kê góc trên = **phiên làm việc hiện tại** (không phải số liệu cả ngày từ máy chủ).
+Thống kê góc trên là **phiên làm việc hiện tại**, không phải số liệu cả ngày.
 
 ---
 
 ## 2. Check-in (nhận trả) — `/admin/loans`
 
-1. Cột **Quầy Nhận Trả Sách Nhanh**: quét barcode sách trả → **Enter** (ô giữ mã để xác nhận).
-2. Chọn tình trạng: **Nguyên vẹn** hoặc **Hư hỏng / Mất sách**.
-3. **Xác nhận trả sách** → Toast thành công / lỗi nghiệp vụ.
+1. Cột **Quầy Nhận Trả Sách Nhanh**: quét barcode bản đang **BORROWED** hoặc **OVERDUE** → **Enter** (ô giữ mã để xác nhận).
+2. Chọn **Nguyên vẹn** hoặc **Hư hỏng / Mất sách**.
+3. **Xác nhận trả sách** một lần.
 
-Nếu hư hỏng / mất: sang **Thu phạt** (`/admin/fines`) hoặc **Biên bản** (`/admin/incidents`).
+Chỉ trả được phiếu còn đang mượn hoặc quá hạn. Bấm lại cùng mã sau khi đã trả sẽ báo không còn phiếu BORROWED (E3).
+
+Lần trả đầu đôi khi hiện **Hệ thống gặp sự cố** dù sách đã được ghi nhận trả. Tra lại mã: nếu bản sao đã **Sẵn sàng** thì không trả thêm lần nữa.
+
+Phiếu quá hạn **đã có khoản phạt** (mẫu `DEMO-BC-002-01` / `SV-DEMO-003`) hiện chưa nhận trả được: máy chủ báo dữ liệu trùng.
+
+Mất hoặc hỏng nặng: lập tiếp ở **Báo mất / Hỏng**. Tiền phạt quá hạn thu ở **Thu phạt**.
 
 ---
 
 ## 3. Thu phạt — `/admin/fines`
 
-1. Nhập **MSSV** → **Enter** để tra cứu công nợ.
-2. Xem các khoản chưa thu / tổng nợ.
-3. **Thu tiền** → **Xác nhận Đã Thu** (tiền mặt; **thu đủ toàn bộ** nợ).
+1. Nhập đúng **mã bạn đọc** (`SV-DEMO-003`) → **Enter**. Bảng trống cho đến khi tra cứu.
+2. Xem khoản chưa thu và tổng nợ.
+3. **Thu tiền** → **Xác nhận Đã Thu**. Chỉ thu **đủ toàn bộ** nợ một lần, bằng tiền mặt.
+
+`demo_student_003` và mã trên trang Người dùng mẫu không tra được.
 
 ---
 
 ## 4. Báo mất / hỏng — `/admin/incidents`
 
-1. **Lập biên bản** → nhập mã vạch / mã phiếu → **Tra cứu**.
-2. Chọn loại (mất / hỏng), mô tả, tiền bồi thường → Lưu.
-3. Nếu máy chủ nhận được: sự cố được ghi qua luồng nhận trả; bảng danh sách vẫn chủ yếu trên trình duyệt.
+1. **Lập biên bản** → nhập **mã bạn đọc** hoặc **số id phiếu** → **Tra cứu**.
+2. Chỉ phiếu **BORROWED** hoặc **OVERDUE** được điền vào form. Quét barcode ở ô này hiện chưa ra phiếu.
+3. Chọn mất hoặc hỏng, mô tả, tiền bồi thường (tra cứu chưa trả giá bìa, nhập tay nếu ô tiền bằng 0) → Lưu.
+
+Máy chủ ghi sự cố qua luồng nhận trả. Bảng trên màn hình vẫn là dữ liệu trình duyệt, không hiện biên bản đã có sẵn trong database (mẫu mất sách `SV-DEMO-005`).
+
+Phiếu quá hạn đã có phạt thì lưu biên bản bị từ chối.
 
 ---
 
-## 5. Danh mục & tồn kho & eBook (UC09)
+## 5. Danh mục, tồn kho, eBook
 
 ### `/admin/catalog`
-- Tìm (debounce) + phân trang; thêm/sửa/xóa đầu sách; upload bìa/PDF.
-- **Quản lý thể loại**: thêm / sửa / xóa.
+
+Tìm (tự tìm sau khoảng 0,35 giây) và phân trang. Thêm, sửa, xóa đầu sách. Upload bìa và PDF. Quản lý thể loại: thêm, sửa, xóa.
+
+Form thêm đầu sách chỉ có **tên sách**. Không có ô tên khác.
 
 ### `/admin/inventory`
-- Chọn đầu sách → xem barcode, vị trí kệ, tình trạng.
-- Thêm / sửa / xóa bản sao; **không thanh lý** khi đang mượn.
+
+Chọn đầu sách → xem mã vạch, vị trí kệ, tình trạng.
+
+Thêm, sửa, xóa bản sao. **Không thanh lý** bản đang cho mượn. Lý do thanh lý **không bắt buộc**. Để trống thì ghi chú mặc định `[Thanh lý] Ngừng lưu thông`.
+
+Sau thanh lý, bản sao ở lại danh sách của đầu sách với trạng thái **Đã thanh lý**, không còn tính vào tồn cho mượn. Sửa vẫn đổi được vị trí kệ và ghi chú. Không đưa lại **Sẵn sàng** hoặc **Đang mượn**.
 
 ### `/admin/ebooks`
-- Danh sách đầu sách điện tử; tải lên / thay PDF; xem trước khi máy chủ hỗ trợ.
+
+Danh sách gồm sách `EBOOK` và `BOTH`. Tải PDF lên đầu sách loại `EBOOK`.
+
+Form tải có **trang xem trước (5–10)** và **miễn phí đọc toàn bộ**. Số ngày mượn ebook gửi sẵn 14 ngày, không có ô nhập.
+
+**Xem trước** với dữ liệu mẫu hiện báo **Không tìm thấy eBook**: sách demo loại `BOTH` bị máy chủ từ chối, sách loại `EBOOK` chưa có file đính kèm.
 
 ---
 
-## 6. Phòng học nhóm & check-in
+## 6. Phòng học nhóm
 
 ### `/admin/rooms`
-1. Xem / thêm / sửa phòng; ngừng phòng còn lịch đặt tương lai → Toast nghiệp vụ.
-2. **Check-in mã đặt** → `/admin/rooms/checkin`.
+
+Xem, thêm, sửa phòng. Ngừng phòng còn lịch đặt tương lai thì có toast nghiệp vụ. **Check-in mã đặt** mở `/admin/rooms/checkin`.
 
 ### `/admin/rooms/checkin`
-1. Nhập mã đặt → Enter / xác nhận (vd mẫu `RB-2026-1001`).
-2. Xem lượt đặt trong ngày.
 
-> Đang dùng **dữ liệu mẫu** trên trình duyệt.
+Nhập mã đặt → Enter (mẫu `RB-2026-1001`). Xem lượt trong ngày.
+
+Đang dùng dữ liệu mẫu trên trình duyệt.
 
 ---
 
-## 7. Người dùng & giao dịch chưa khớp
+## 7. Người dùng và giao dịch chưa khớp
 
 ### `/admin/users`
-CRUD, khóa/mở khóa, đặt lại mật khẩu tạm (hiện một lần) — **mẫu FE**.
+
+Thêm, sửa, khóa, mở khóa, đặt lại mật khẩu tạm (hiện một lần). Chỉ lưu trên trình duyệt. Banner vàng nghĩa là chưa ghi máy chủ. Danh sách này không phải 100 hồ sơ `SV-DEMO-xxx`.
 
 ### `/admin/unmatched`
-Gán giao dịch nạp tiền chưa khớp cho bạn đọc — **mẫu FE** (không cộng ví thật).
+
+Gán giao dịch nạp tiền chưa khớp. Chỉ mô phỏng trên trình duyệt, không cộng ví thật.
 
 ---
 
@@ -119,23 +149,24 @@ Gán giao dịch nạp tiền chưa khớp cho bạn đọc — **mẫu FE** (kh
 |------|-----------|
 | Danh mục / thể loại | `/admin/catalog` |
 | eBook / PDF | `/admin/ebooks` |
-| Tồn kho / thanh lý | `/admin/inventory` |
-| Mượn–trả (quầy) | `/admin/loans` |
+| Tồn kho / thanh lý / barcode | `/admin/inventory` |
+| Mượn–trả | `/admin/loans` |
 | Thu phạt | `/admin/fines` |
 | Mất–hỏng | `/admin/incidents` |
-| Người dùng | `/admin/users` |
-| Phòng / check-in mã đặt | `/admin/rooms`, `/admin/rooms/checkin` |
-| Giao dịch chưa khớp | `/admin/unmatched` |
+| Người dùng (mẫu) | `/admin/users` |
+| Phòng / check-in mã đặt (mẫu) | `/admin/rooms`, `/admin/rooms/checkin` |
+| Giao dịch chưa khớp (mẫu) | `/admin/unmatched` |
 
 ---
 
-## 9. API quầy đã mount (tham chiếu kỹ thuật)
+## 9. API quầy đã gắn
 
-- `GET /api/admin/loans/lookup`
+- `GET /api/admin/loans/lookup` — theo id phiếu hoặc mã bạn đọc
 - `POST /api/admin/loans/checkout`
 - `POST /api/admin/loans/checkin`
 - `GET /api/admin/fines/lookup`
 - `POST /api/admin/fines/collect`
-- Admin books / categories / inventory (UC09)
+- Sách, thể loại, tồn kho
+- `GET /api/ebooks/{id}/preview` đã được gắn. Dữ liệu mẫu vẫn chưa xem trước được
 
-Swagger: http://localhost:8010/docs (JWT admin trước khi thử).
+Swagger: http://localhost:8010/docs (đăng nhập admin lấy JWT trước khi thử).
