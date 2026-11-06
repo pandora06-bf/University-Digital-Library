@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, Clock3, DoorOpen, MapPin, Users, Wallet, RotateCcw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import Toast from '../../components/Toast';
+import ToastAlertComponent from '../../components/ToastAlertComponent';
 import { roomBookingService } from '../../services/roomBookingService';
 import { libraryToday, formatLibraryDate, formatMoney, slotTimestamp } from '../../utils/libraryDate';
 import { describeBooking, formatPrice } from '../../utils/roomBooking';
@@ -30,8 +30,9 @@ export default function RoomBookingPage() {
   const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  const [failure, setFailure] = useState(null); // thiếu số dư, hết chỗ... → Toast đỏ (4-14.a)
   const [now, setNow] = useState(Date.now);
-  const closeToast = useCallback(() => setToast(null), []);
+  const closeToast = useCallback(() => { setToast(null); setFailure(null); }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -55,7 +56,7 @@ export default function RoomBookingPage() {
   };
   const performAction = async () => {
     if (busy) return;
-    setBusy(true);
+    setBusy(true); closeToast();
     try {
       if (confirm.type === 'book') {
         await roomBookingService.book({ roomId: selection.room.id, date, slotId: selection.slot.id });
@@ -66,15 +67,15 @@ export default function RoomBookingPage() {
       }
       setSelection(null);
     } catch (error) {
-      setToast({ type: 'error', message: error.message || 'Thao tác thất bại. Vui lòng thử lại.',
-        action: error.code === 'INSUFFICIENT_BALANCE' ? { label: 'Sang Nạp tiền', to: '/wallet/top-up' } : undefined });
+      // mapRoomApiError đã đổi câu; thiếu số dư thì ToastAlertComponent thêm nút Sang Nạp tiền
+      setFailure(error);
     } finally {
       setBusy(false); setConfirm(null); setRevision((value) => value + 1);
     }
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 space-y-8">
-      <Toast toast={toast} onClose={closeToast} placement="bottom" />
+      <ToastAlertComponent error={failure} notice={toast} onClose={closeToast} />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <p className="text-sm font-semibold text-indigo-600 mb-2">KHÔNG GIAN HỌC TẬP</p>

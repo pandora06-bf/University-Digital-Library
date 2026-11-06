@@ -16,7 +16,10 @@ export const BookCard = ({
   isBorrowing = false,
   className = '',
 }) => {
+  // availableCopies = null khi API tìm kiếm chưa trả tồn kho: không kết luận còn hay hết.
+  const stockKnown = book.availableCopies != null;
   const isAvailable = book.availableCopies > 0;
+  const meta = [book.author, book.publishYear].filter(Boolean).join(' • ');
 
   return (
     <div
@@ -29,23 +32,29 @@ export const BookCard = ({
           className="block w-full h-48 rounded-xl bg-gradient-to-br from-indigo-500/10 to-indigo-600/20 mb-3.5 relative overflow-hidden group/cover focus:outline-none focus:ring-2 focus:ring-indigo-500"
           title={`Xem chi tiết ${book.title}`}
         >
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-            <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-600 mb-2 group-hover/cover:scale-110 transition-transform">
-              <BookOpen className="w-6 h-6" />
+          {book.coverUrl ? (
+            <img src={book.coverUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+              <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center text-indigo-600 mb-2 group-hover/cover:scale-110 transition-transform">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
+                {book.barcode ?? book.isbn}
+              </span>
             </div>
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
-              {book.barcode}
-            </span>
-          </div>
+          )}
         </Link>
 
         {/* Thể loại & Tình trạng */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="text-xs font-semibold px-2.5 py-0.5 bg-[#EEF2FF] text-[#3730A3] rounded-md">
-            {book.category}
-          </span>
-          <span className="text-xs flex items-center gap-1 font-medium">
-            {isAvailable ? (
+        <div className="flex items-center justify-between gap-2 mb-2 min-h-[22px]">
+          {book.category ? (
+            <span className="text-xs font-semibold px-2.5 py-0.5 bg-[#EEF2FF] text-[#3730A3] rounded-md truncate">
+              {book.category}
+            </span>
+          ) : <span />}
+          <span className="text-xs flex items-center gap-1 font-medium shrink-0">
+            {!stockKnown ? null : isAvailable ? (
               <span className="text-emerald-600 flex items-center gap-1">
                 <CheckCircle className="w-3.5 h-3.5" />
                 <span>{book.availableCopies} cuốn</span>
@@ -71,7 +80,7 @@ export const BookCard = ({
 
         {/* Tác giả & Năm XB */}
         <p className="text-body-md text-[#5B6B82] mt-1 line-clamp-1">
-          {book.author} • {book.publishYear}
+          {meta}
         </p>
       </div>
 
@@ -90,18 +99,27 @@ export const BookCard = ({
           </Button>
         </Link>
 
-        <div className="flex-1">
-          <Button
-            variant="primary"
-            size="sm"
-            fullWidth
-            disabled={!isAvailable}
-            loading={isBorrowing}
-            onClick={() => onBorrow && onBorrow(book)}
-          >
-            {isAvailable ? 'Mượn sách' : 'Hết bản sao'}
-          </Button>
-        </div>
+        {onBorrow ? (
+          <div className="flex-1">
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              disabled={!isAvailable}
+              loading={isBorrowing}
+              onClick={() => onBorrow(book)}
+            >
+              {isAvailable ? 'Mượn sách' : 'Hết bản sao'}
+            </Button>
+          </div>
+        ) : (
+          // Mượn qua trang chi tiết để có hộp xác nhận vị trí kệ, hạn trả (3-12.a)
+          <Link to={`/books/${book.id}`} className="flex-1">
+            <Button variant="primary" size="sm" fullWidth>
+              Đặt mượn
+            </Button>
+          </Link>
+        )}
       </div>
     </div>
   );

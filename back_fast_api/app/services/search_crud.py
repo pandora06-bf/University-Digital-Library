@@ -74,8 +74,11 @@ def search_books_advanced(
 
     # 1. Full-text search trên nhan đề, tác giả, NXB, mô tả, từ khóa
     search_terms = normalize_tsquery_text(query_text)
-    if search_terms:
-        ts_query = func.plainto_tsquery("simple", search_terms)
+    # Khớp theo tiền tố để tìm ngay khi đang gõ: "app" → app:* khớp "app", "apps", "application".
+    # Chỉ giữ từ gồm chữ/số nên chuỗi đưa vào to_tsquery luôn đúng cú pháp (vd: "c++" → c:*).
+    prefix_terms = re.findall(r"\w+", search_terms or "")
+    if prefix_terms:
+        ts_query = func.to_tsquery("simple", " & ".join(f"{term}:*" for term in prefix_terms))
         metadata_vector = func.to_tsvector(
             "simple",
             func.concat_ws(

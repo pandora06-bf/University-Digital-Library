@@ -168,7 +168,7 @@ try {
     assert.equal(redirect.landingPathFor({ role: 'user' }, '/books/b1'), '/books/b1');
     assert.equal(redirect.landingPathFor({ role: 'user' }, null), '/');
     assert.equal(redirect.landingPathFor({ role: 'user' }, '/admin/users'), '/');
-    assert.equal(redirect.landingPathFor({ role: 'admin' }, '/books/b1'), '/admin');
+    assert.equal(redirect.landingPathFor({ role: 'admin' }, '/books/b1'), '/admin/catalog'); // Vân bỏ Dashboard (d5e5b49)
     assert.equal(redirect.landingPathFor({ role: 'admin' }, '/admin/loans'), '/admin/loans');
     for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', '/login?redirect=/']) assert.equal(redirect.safeRedirect(bad), null);
   });
@@ -182,6 +182,25 @@ try {
     const out = borrowErr.mapBorrowError(err(409, 'Sách đã hết bản có thể mượn'));
     assert.equal(out.code, 'OUT_OF_STOCK'); assert.equal(out.offerWaitlist, true);
     assert.equal(borrowErr.mapBorrowError(new Error('offline')).code, 'NETWORK');
+  });
+  await check('3-12.b: đúng nguyên văn câu lỗi của POST /api/loans/physical/request (loan_service.py)', () => {
+    const map = (status, detail) => borrowErr.mapBorrowError(borrowErr.apiError(status, detail));
+    assert.equal(map(403, 'Tài khoản đang bị khóa mượn hoặc còn nợ phạt chưa thanh toán').code, 'BLOCKED');
+    assert.equal(map(409, 'Bạn đang có phiếu mượn hoặc đang chờ nhận sách này').code, 'DUPLICATE');
+    assert.equal(map(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)').code, 'LIMIT');
+    assert.equal(map(409, 'Sách này không có bản vật lý để đặt mượn tại quầy').code, 'NO_PRINT');
+    const out = map(409, 'Sách đã hết bản khả dụng, vui lòng Hẹn đặt trước');
+    assert.equal(out.code, 'OUT_OF_STOCK'); assert.equal(out.offerWaitlist, true);
+  });
+  await check('4-14.a: lỗi Axios → Toast đỏ; nợ phạt và thiếu số dư kèm nút sang trang nạp tiền', () => {
+    const fine = borrowErr.errorToast(borrowErr.apiError(403, 'Tài khoản đang bị khóa mượn hoặc còn nợ phạt chưa thanh toán'));
+    assert.equal(fine.type, 'error'); assert.equal(fine.action.to, '/wallet/top-up');
+    const limit = borrowErr.errorToast(borrowErr.apiError(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)'));
+    assert.match(limit.message, /tối đa/); assert.equal(limit.action, undefined);
+    const room = borrowErr.errorToast(Object.assign(new Error('Số dư không đủ. Bạn còn thiếu 20.000 ₫ để đặt phòng.'), { code: 'INSUFFICIENT_BALANCE' }));
+    assert.match(room.message, /thiếu 20\.000/); assert.equal(room.action.label, 'Sang Nạp tiền');
+    const offline = borrowErr.errorToast(Object.assign(new Error('Network Error'), { isAxiosError: true }));
+    assert.match(offline.message, /Không kết nối/);
   });
   await check('3-12.a mock: chốt chặn nợ phạt -> hạn mức -> tồn; thành công tạo phiếu Chờ nhận hạn 24 giờ', () => {
     clock = RealDate.parse('2026-10-26T09:00:00+07:00');

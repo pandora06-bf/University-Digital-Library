@@ -1,19 +1,21 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, BookMarked, FileText, CheckCircle2, RotateCcw, AlertCircle } from 'lucide-react';
+import { BookOpen, BookMarked, FileText, CheckCircle2, AlertTriangle, Clock, MapPin } from 'lucide-react';
 import { Table, StatusBadge } from '../../components/Table';
 import { Button } from '../../components/Button';
-import { getStoredLoans, returnBookAction } from '../../mocks/loans';
+import { loanService, ACTIVE_LOAN_STATES, WAITING_PICKUP_STATES } from '../../services/loanService';
 
 /**
- * Trang Sách của tôi (My Books Page)
+ * Trang Sách của tôi (My Books Page) — nối API ở 3-12.b
  * Tham chiếu Figma Node 46:6 (Desktop) & Node 66:5 (Mobile)
- * 
- * Bố cục:
- * - Desktop 1440: Sử dụng Table với custom columns, không hiện cột tồn kho hay nút Sửa/Xóa của Admin.
- * - Mobile 390: Chuyển đổi linh hoạt sang dạng thẻ (Card list) tối ưu cho màn hình nhỏ.
- * - Tính năng: Đọc sách trực tuyến (/reader/:loanId), Trả sách, cập nhật realtime.
+ *
+ * Dữ liệu: GET /api/loans/me qua loanService (phiếu vật lý và eBook, mới nhất trước).
+ * - Desktop: Table với cột riêng của độc giả, không có nút Sửa/Xóa của Admin.
+ * - Mobile: danh sách thẻ.
+ * - Sách in nhận và trả tại quầy (thủ thư quét mã, UC10/UC11) nên trang chỉ hướng dẫn;
+ *   phiếu eBook còn hiệu lực có nút Đọc online (/reader/:loanId), trả eBook trong trình đọc.
  */
+
 // "HH:mm dd/MM" theo giờ Việt Nam (ICU vi-VN tự in "dd-MM" khi bỏ năm, nên ghép tay).
 const shortDateTime = (value) => {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
@@ -21,250 +23,268 @@ const shortDateTime = (value) => {
   }).formatToParts(new Date(value)).map((part) => [part.type, part.value]));
   return `${parts.hour}:${parts.minute} ${parts.day}/${parts.month}`;
 };
+const shortDate = (value) => (value
+  ? new Date(value).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' })
+  : '—');
 
-// Phiếu Chờ nhận (3-12.a): hạn trả tính khi nhận sách, nên hiện hạn nhận tại quầy.
-const dueText = (loan, dueDate) => (loan.status === 'Chờ nhận' && loan.pickupDeadline
-  ? `Nhận trước ${shortDateTime(loan.pickupDeadline)}`
-  : dueDate);
+const isActive = (loan) => ACTIVE_LOAN_STATES.includes(loan.state);
+const isWaitingPickup = (loan) => WAITING_PICKUP_STATES.includes(loan.state);
+const canRead = (loan) => loan.isEbook && isActive(loan);
+
+// Cột "Hạn": phiếu chờ nhận chưa có hạn trả (tính khi nhận sách) nên hiện hạn nhận tại quầy.
+function DueText({ loan }) {
+  if (isWaitingPickup(loan) && loan.pickupDeadline) {
+    return <span className="font-semibold text-indigo-700">Nhận trước {shortDateTime(loan.pickupDeadline)}</span>;
+  }
+  if (loan.state === 'RETURNED') {
+    return <span className="font-semibold text-slate-400">Trả ngày {shortDate(loan.returnDate ?? loan.dueDate)}</span>;
+  }
+  if (!isActive(loan)) return <span className="text-slate-400">—</span>;
+  return (
+    <span className={`font-semibold ${loan.state === 'OVERDUE' ? 'text-rose-600' : 'text-amber-700'}`}>
+      {shortDate(loan.dueDate)}
+    </span>
+  );
+}
+
+// Thao tác của một phiếu: eBook đọc online; sách in thì nhắc việc cần làm tại quầy.
+function LoanAction({ loan, fullWidth = false }) {
+  if (canRead(loan)) {
+    return (
+      <Link to={`/reader/${loan.id}`} className={fullWidth ? 'flex-1' : undefined}>
+        <Button size="sm" variant="outline" fullWidth={fullWidth} icon={<FileText className="w-3.5 h-3.5" />}>
+          Đọc online
+        </Button>
+      </Link>
+    );
+  }
+  const hint = isWaitingPickup(loan)
+    ? `Đưa mã ${loan.loanCode} cho thủ thư để nhận sách`
+    : loan.state === 'OVERDUE'
+      ? 'Quá hạn — trả tại quầy sớm để tránh phạt thêm'
+      : isActive(loan)
+        ? 'Trả sách tại quầy thư viện'
+        : 'Đã hoàn tất';
+  return (
+    <span className={`text-xs font-medium whitespace-normal ${loan.state === 'OVERDUE' ? 'text-rose-600' : 'text-slate-500'}`}>
+      {hint}
+    </span>
+  );
+}
+
+const loanColumns = [
+  {
+    key: 'loanCode',
+    header: 'Mã phiếu',
+    align: 'left',
+    render: (val) => <span className="font-mono text-indigo-600 font-semibold">{val}</span>,
+  },
+  {
+    key: 'bookTitle',
+    header: 'Tài liệu & Tác giả',
+    align: 'left',
+    render: (val, row) => (
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+          {row.isEbook ? <FileText className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
+        </div>
+        {/* Table dùng whitespace-nowrap; cột này cho xuống dòng để bảng không tràn ở 1440px */}
+        <div className="flex flex-col w-64 whitespace-normal">
+          <Link to={`/books/${row.bookId}`} className="font-semibold text-slate-900 line-clamp-2 hover:text-indigo-600">{val}</Link>
+          <span className="text-xs text-slate-500 line-clamp-1">
+            {[row.author, row.isEbook ? 'eBook' : 'Sách in'].filter(Boolean).join(' • ')}
+          </span>
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: 'borrowDate',
+    header: 'Ngày đặt',
+    align: 'left',
+    render: (val) => <span className="text-slate-600 font-medium">{shortDate(val)}</span>,
+  },
+  {
+    key: 'dueDate',
+    header: 'Hạn',
+    align: 'left',
+    render: (_, row) => <DueText loan={row} />,
+  },
+  {
+    key: 'status',
+    header: 'Trạng thái',
+    align: 'center',
+    render: (val, row) => <StatusBadge status={val} type={row.statusType} />,
+  },
+  {
+    key: 'actions',
+    header: 'Thao tác',
+    align: 'right',
+    render: (_, row) => <div className="inline-flex justify-end max-w-[220px] text-right"><LoanAction loan={row} /></div>,
+  },
+];
+
+function StatCard({ icon, label, value, tone }) {
+  const tones = {
+    indigo: 'bg-indigo-50 border-indigo-100 text-indigo-600 [&_strong]:text-indigo-900',
+    rose: 'bg-rose-50 border-rose-100 text-rose-600 [&_strong]:text-rose-900',
+    emerald: 'bg-emerald-50 border-emerald-100 text-emerald-600 [&_strong]:text-emerald-900',
+  };
+  return (
+    <div className={`px-3 sm:px-4 py-2.5 border rounded-xl flex items-center gap-2.5 ${tones[tone]}`}>
+      {icon}
+      <div>
+        <div className="text-xs font-medium">{label}</div>
+        <strong className="block text-base font-bold">{value}</strong>
+      </div>
+    </div>
+  );
+}
 
 export default function MyBooksPage() {
-  const [loans, setLoans] = useState(getStoredLoans);
-  const [toast, setToast] = useState(null);
+  const [revision, setRevision] = useState(0);
+  const reload = useCallback(() => setRevision((value) => value + 1), []);
+  const [result, setResult] = useState({ key: -1, loans: null, error: null });
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  useEffect(() => {
+    let cancelled = false;
+    loanService.getMyLoans()
+      .then((loans) => !cancelled && setResult({ key: revision, loans, error: null }))
+      .catch((error) => !cancelled && setResult({ key: revision, loans: null, error }));
+    return () => { cancelled = true; };
+  }, [revision]);
 
-  const handleReturn = (loanId) => {
-    const res = returnBookAction(loanId);
-    if (res.success) {
-      showToast('Đã hoàn trả tài liệu thành công!', 'success');
-      setLoans(getStoredLoans());
-    } else {
-      showToast(res.message, 'error');
-    }
-  };
+  const loading = result.key !== revision;
+  const loans = result.loans ?? [];
 
   // Thống kê nhanh (phiếu Chờ nhận cũng tính vào hạn mức, 3-01.a)
-  const activeLoansCount = loans.filter((l) => l.status === 'Đang mượn' || l.status === 'Chờ nhận').length;
-  const returnedCount = loans.filter((l) => l.status === 'Đã trả').length;
-
-  // Cấu hình Custom Columns cho Table của User Portal
-  const loanColumns = [
-    {
-      key: 'loanCode',
-      header: 'Mã phiếu',
-      align: 'left',
-      render: (val) => <span className="font-mono text-indigo-600 font-semibold">{val}</span>,
-    },
-    {
-      key: 'bookTitle',
-      header: 'Tài liệu & Tác giả',
-      align: 'left',
-      render: (val, row) => (
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-            <BookOpen className="w-4 h-4" />
-          </div>
-          {/* Table dùng whitespace-nowrap; cột này cho xuống dòng để bảng không tràn ở 1440px */}
-          <div className="flex flex-col w-72 whitespace-normal">
-            <span className="font-semibold text-slate-900 line-clamp-2">{val}</span>
-            <span className="text-xs text-slate-500 line-clamp-1">{row.author} • ISBN: {row.isbn}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'borrowDate',
-      header: 'Ngày mượn',
-      align: 'left',
-      render: (val) => <span className="text-slate-600 font-medium">{val}</span>,
-    },
-    {
-      key: 'dueDate',
-      header: 'Hạn trả',
-      align: 'left',
-      render: (val, row) => (
-        <span className={`font-semibold ${row.status === 'Đã trả' ? 'text-slate-400' : 'text-amber-700'}`}>
-          {dueText(row, val)}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Trạng thái',
-      align: 'center',
-      render: (val, row) => <StatusBadge status={val} type={row.statusType} />,
-    },
-    {
-      key: 'actions',
-      header: 'Thao tác',
-      align: 'right',
-      render: (_, row) => (
-        <div className="inline-flex items-center gap-2">
-          {row.pdfAvailable && row.status !== 'Đã trả' && (
-            <Link to={`/reader/${row.id}`}>
-              <Button size="sm" variant="outline" icon={<FileText className="w-3.5 h-3.5" />}>
-                Đọc online
-              </Button>
-            </Link>
-          )}
-          {row.status === 'Đang mượn' ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-rose-600 hover:bg-rose-50"
-              icon={<RotateCcw className="w-3.5 h-3.5" />}
-              onClick={() => handleReturn(row.id)}
-            >
-              Trả sách
-            </Button>
-          ) : (
-            <span className="text-xs text-slate-400 font-medium px-2 py-1">{row.status === 'Chờ nhận' ? 'Chờ nhận tại quầy' : 'Đã hoàn tất'}</span>
-          )}
-        </div>
-      ),
-    },
-  ];
+  const activeCount = loans.filter(isActive).length;
+  const overdueCount = loans.filter((loan) => loan.state === 'OVERDUE').length;
+  const returnedCount = loans.filter((loan) => loan.state === 'RETURNED').length;
+  const pickups = loans.filter(isWaitingPickup);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-10 space-y-8">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
-          <div
-            className={`px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2 border ${
-              toast.type === 'success'
-                ? 'bg-emerald-600 text-white border-emerald-500'
-                : 'bg-rose-600 text-white border-rose-500'
-            }`}
-          >
-            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-            <span>{toast.message}</span>
-          </div>
-        </div>
-      )}
 
       {/* Page Title & Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
         <div>
           <h1 className="text-2xl sm:text-headline-lg text-[#172033] font-semibold tracking-tight">
             Sách của tôi
           </h1>
           <p className="text-body-md text-[#5B6B82] mt-1">
-            Theo dõi danh sách tài liệu đang mượn, gia hạn và đọc sách điện tử
+            Theo dõi phiếu mượn, hạn nhận sách tại quầy và đọc sách điện tử
           </p>
         </div>
 
-        {/* Quick Stats Cards */}
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2.5 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-2.5">
-            <BookMarked className="w-4 h-4 text-indigo-600" />
-            <div>
-              <div className="text-xs text-indigo-600 font-medium">Đang mượn</div>
-              <div className="text-base font-bold text-indigo-900">{activeLoansCount} cuốn</div>
-            </div>
-          </div>
-
-          <div className="px-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <div>
-              <div className="text-xs text-emerald-600 font-medium">Đã trả</div>
-              <div className="text-base font-bold text-emerald-900">{returnedCount} cuốn</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* DESKTOP VIEW: Tái sử dụng Table với Custom Columns */}
-      <div className="hidden md:block">
-        <Table
-          title="Phiếu mượn tài liệu cá nhân"
-          subtitle="Tất cả các bản ghi mượn và đọc trực tuyến của bạn"
-          columns={loanColumns}
-          data={loans}
-          emptyMessage="Bạn chưa có phiếu mượn tài liệu nào trong thư viện"
-          footerNote="Hạn mượn tối đa 14 ngày kể từ ngày tạo phiếu"
-          pagination={true}
-          itemsPerPage={5}
-        />
-      </div>
-
-      {/* MOBILE VIEW: Card List chuẩn Figma Node 66:5 */}
-      <div className="md:hidden space-y-4">
-        {loans.length > 0 ? (
-          loans.map((loan) => (
-            <div
-              key={loan.id}
-              className="bg-white rounded-2xl border border-[#D9E2EE] p-4 shadow-sm space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">
-                  {loan.loanCode}
-                </span>
-                <StatusBadge status={loan.status} type={loan.statusType} />
-              </div>
-
-              <div>
-                <h3 className="text-base font-bold text-slate-900 line-clamp-2">
-                  {loan.bookTitle}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{loan.author}</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100">
-                <div>
-                  <span className="text-slate-400 block">Ngày mượn:</span>
-                  <span className="font-medium text-slate-700">{loan.borrowDate}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">Hạn trả:</span>
-                  <span className={`font-semibold ${loan.status === 'Đã trả' ? 'text-slate-400' : 'text-amber-700'}`}>
-                    {dueText(loan, loan.dueDate)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                {loan.pdfAvailable && loan.status !== 'Đã trả' && (
-                  <Link to={`/reader/${loan.id}`} className="flex-1">
-                    <Button size="sm" variant="outline" fullWidth icon={<FileText className="w-3.5 h-3.5" />}>
-                      Đọc online
-                    </Button>
-                  </Link>
-                )}
-
-                {loan.status === 'Đang mượn' && (
-                  <div className="flex-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      fullWidth
-                      className="text-rose-600 hover:bg-rose-50"
-                      icon={<RotateCcw className="w-3.5 h-3.5" />}
-                      onClick={() => handleReturn(loan.id)}
-                    >
-                      Trả sách
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="py-12 bg-white rounded-2xl border border-slate-200 text-center p-6 space-y-3">
-            <BookOpen className="w-8 h-8 text-slate-400 mx-auto" />
-            <div className="text-sm font-bold text-slate-800">Chưa có phiếu mượn</div>
-            <p className="text-xs text-slate-500">Khám phá danh mục để mượn sách bạn cần.</p>
-            <Link to="/catalog">
-              <Button size="sm" variant="primary">Khám phá Danh mục</Button>
-            </Link>
+        {result.loans && (
+          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-3">
+            <StatCard tone="indigo" label="Đang mượn" value={`${activeCount} cuốn`} icon={<BookMarked className="w-4 h-4 shrink-0" />} />
+            <StatCard tone="rose" label="Quá hạn" value={`${overdueCount} cuốn`} icon={<AlertTriangle className="w-4 h-4 shrink-0" />} />
+            <StatCard tone="emerald" label="Đã trả" value={`${returnedCount} cuốn`} icon={<CheckCircle2 className="w-4 h-4 shrink-0" />} />
           </div>
         )}
       </div>
 
+      {/* Nhắc phiếu đang chờ nhận: quá 24 giờ chưa tới quầy thì phiếu tự hủy */}
+      {pickups.length > 0 && (
+        <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 flex items-start gap-3 text-sm text-indigo-900">
+          <Clock className="w-5 h-5 shrink-0 mt-0.5 text-indigo-600" />
+          <div className="space-y-1">
+            <p className="font-semibold">Bạn có {pickups.length} phiếu đang chờ nhận sách tại quầy</p>
+            <p>Đưa mã phiếu cho thủ thư trước hạn nhận; quá hạn, phiếu tự hủy và sách được trả về kệ.</p>
+          </div>
+        </div>
+      )}
+
+      {loading && !result.loans && (
+        <div className="space-y-3" aria-busy="true">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div key={i} className="h-24 rounded-2xl border border-[#D9E2EE] bg-white animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {!loading && result.error && (
+        <div role="alert" className="py-10 bg-white rounded-2xl border border-rose-200 text-center space-y-3 px-6">
+          <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+          <p className="font-semibold text-slate-800">Không tải được danh sách phiếu mượn</p>
+          <p className="text-sm text-slate-500">
+            {result.error.response?.status === 401
+              ? 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+              : 'Không kết nối được máy chủ thư viện. Vui lòng thử lại.'}
+          </p>
+          <Button variant="outline" onClick={reload}>Thử lại</Button>
+        </div>
+      )}
+
+      {result.loans && (
+        <>
+          {/* DESKTOP VIEW: Tái sử dụng Table với Custom Columns */}
+          <div className="hidden md:block">
+            <Table
+              title="Phiếu mượn tài liệu cá nhân"
+              subtitle="Tất cả phiếu mượn sách in và eBook của bạn"
+              columns={loanColumns}
+              data={loans}
+              emptyMessage="Bạn chưa có phiếu mượn tài liệu nào trong thư viện"
+              footerNote="Hạn trả tính từ lúc nhận sách tại quầy: sinh viên 14 ngày, giảng viên 30 ngày"
+              pagination={true}
+              itemsPerPage={5}
+            />
+          </div>
+
+          {/* MOBILE VIEW: Card List chuẩn Figma Node 66:5 */}
+          <div className="md:hidden space-y-4">
+            {loans.length > 0 ? (
+              loans.map((loan) => (
+                <div key={loan.id} className="bg-white rounded-2xl border border-[#D9E2EE] p-4 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded truncate">
+                      {loan.loanCode}
+                    </span>
+                    <StatusBadge status={loan.status} type={loan.statusType} />
+                  </div>
+
+                  <div>
+                    <Link to={`/books/${loan.bookId}`} className="text-base font-bold text-slate-900 line-clamp-2 break-words">
+                      {loan.bookTitle}
+                    </Link>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {[loan.author, loan.isEbook ? 'eBook' : 'Sách in'].filter(Boolean).join(' • ')}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs py-2 border-y border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block">Ngày đặt:</span>
+                      <span className="font-medium text-slate-700">{shortDate(loan.borrowDate)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block">Hạn:</span>
+                      <DueText loan={loan} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    {!canRead(loan) && isActive(loan) && <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />}
+                    <LoanAction loan={loan} fullWidth />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-12 bg-white rounded-2xl border border-slate-200 text-center p-6 space-y-3">
+                <BookOpen className="w-8 h-8 text-slate-400 mx-auto" />
+                <div className="text-sm font-bold text-slate-800">Chưa có phiếu mượn</div>
+                <p className="text-xs text-slate-500">Khám phá danh mục để mượn sách bạn cần.</p>
+                <Link to="/catalog">
+                  <Button size="sm" variant="primary">Khám phá Danh mục</Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
