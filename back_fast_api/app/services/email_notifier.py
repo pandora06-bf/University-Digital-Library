@@ -35,7 +35,7 @@ def context_base(user_name):
             "pickup_url": site_url("my-books?tab=waitlist"), "wallet_url": site_url("wallet")}
 
 def render_template(template, **context):
-    allowed = {"receipt.html", "due_reminder.html", "hold_24h.html", "top_up.html"}
+    allowed = {"receipt.html", "due_reminder.html", "hold_24h.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html"}
     if template not in allowed:
         raise ValueError("Mẫu email không được hỗ trợ")
     return environment.get_template(template).render(**context)
@@ -98,3 +98,29 @@ def send_hold(recipient, user_name, book_title, hold_id, expires_at):
     context.update(book_title=book_title, hold_code=f"GC-{hold_id}", pickup_deadline=local_date(expires_at),
                    pickup_location=os.getenv("PICKUP_LOCATION", "Quầy mượn trả thư viện"))
     return send_sync(recipient, "Thư viện - Sách đã được giữ trong 24 giờ", "hold_24h.html", context)
+
+
+def send_room_booking(recipient, user_name, booking_id, room_name, date, slot):
+    context = context_base(user_name)
+    context.update(booking_id=booking_id, room_name=room_name, booking_date=str(date), slot=str(slot))
+    return send_sync(recipient, 'Thư viện - Xác nhận đặt phòng', 'room_booking.html', context)
+
+def send_incident_notice(recipient, user_name, incident_id, incident_type, amount):
+    context = context_base(user_name)
+    context.update(incident_id=incident_id, incident_type=incident_type, amount=amount)
+    return send_sync(recipient, 'Thư viện - Biên bản mất/hỏng sách', 'incident.html', context)
+
+def send_topup_confirmed(recipient, user_name, amount, balance):
+    context = context_base(user_name)
+    context.update(amount=amount, balance=balance)
+    return send_sync(recipient, 'Thư viện - Xác nhận nạp tiền', 'topup_confirmed.html', context)
+
+def send_fine_paid(recipient, user_name, amount, balance):
+    context = context_base(user_name)
+    context.update(amount=amount, balance=balance)
+    return send_sync(recipient, 'Thư viện - Xác nhận trả phạt', 'fine_paid.html', context)
+
+def send_temporary_password(recipient, user_name, username, temp_password):
+    context = context_base(user_name)
+    context.update(username=username, temp_password=temp_password)
+    return send_sync(recipient, 'Thư viện - Thông tin tài khoản tạm thời', 'temporary_password.html', context)

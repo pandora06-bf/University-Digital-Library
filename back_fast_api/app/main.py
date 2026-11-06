@@ -78,3 +78,12 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+from app.routers.admin_user_import_router import router as admin_user_import_router
+from app.routers.room_booking_router import router as room_booking_router
+from app.routers.fine_wallet_router import router as fine_wallet_router
+from app.routers.admin_incident_router import router as admin_incident_router
+
+app.include_router(admin_user_import_router)
+app.include_router(room_booking_router)
+app.include_router(fine_wallet_router)
+app.include_router(admin_incident_router)
