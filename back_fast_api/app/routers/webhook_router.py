@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status, BackgroundTasks
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.services import wallet_service as ws
+from app.services.email_notifier import send_topup_confirmed
 
 router = APIRouter(tags=["Webhooks"])
 
@@ -35,7 +36,7 @@ def _extract_key(authorization: Optional[str], x_api_key: Optional[str]) -> Opti
 
 
 @router.post("/api/webhooks/bank")
-def bank_webhook(event: BankEvent, db: Session = Depends(get_db),
+def bank_webhook(event: BankEvent, tasks: BackgroundTasks, db: Session = Depends(get_db),
                  authorization: Optional[str] = Header(None),
                  x_api_key: Optional[str] = Header(None)):
     ws.verify_webhook_key(_extract_key(authorization, x_api_key))
@@ -45,11 +46,16 @@ def bank_webhook(event: BankEvent, db: Session = Depends(get_db),
         db, bank_tx_id=event.id, amount=event.amount, content=event.content,
         account_number=event.account_number,
         received_at=event.received_at.replace(tzinfo=None) if event.received_at else None)
+    if result.get('result') == 'MATCHED':
+        credited = db.get(User, result['user_code'])
+        if credited:
+            tasks.add_task(send_topup_confirmed, credited.email, credited.full_name,
+                           result['amount'], result['balance_after'])
     return {"success": True, **result}
 
 
 @router.post("/api/dev/topups/{pay_code}/simulate")
-def simulate_topup(pay_code: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def simulate_topup(pay_code: str, tasks: BackgroundTasks, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Giả lập ngân hàng báo có (chỉ khi APP_ENV=dev). Dùng đúng luồng webhook."""
     if settings.APP_ENV.lower() != "dev":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
@@ -57,4 +63,7 @@ def simulate_topup(pay_code: str, user: User = Depends(get_current_user), db: Se
     result = ws.handle_bank_event_committed(
         db, bank_tx_id=f"SIM-{topup.pay_code}", amount=topup.amount,
         content=f"CHUYEN TIEN {topup.pay_code}")
+    if result.get('result') == 'MATCHED':
+        tasks.add_task(send_topup_confirmed, user.email, user.full_name,
+                       result['amount'], result['balance_after'])
     return {"success": True, **result}
