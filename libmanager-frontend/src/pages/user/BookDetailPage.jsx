@@ -142,7 +142,7 @@ export default function BookDetailPage() {
   }, [bookId, requestKey]);
 
   // Sau khi đặt mượn, tải lại tồn kho nhưng vẫn giữ trang cũ trên màn hình (không nháy khung tải).
-  const book = result.book?.id != null && String(result.book.id) === bookId ? result.book : null;
+  const book = result.book?.id != null && (String(result.book.id) === bookId || `b${result.book.id}` === bookId) ? result.book : null;
   const loading = result.key !== requestKey && !book;
 
   if (loading) {

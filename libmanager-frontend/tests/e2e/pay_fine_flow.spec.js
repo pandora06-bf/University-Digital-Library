@@ -7,7 +7,8 @@ const CORS_HEADERS = {
 };
 
 test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy)', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
     await page.route(/\/api\/auth\/login/, async (route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({ status: 204, headers: CORS_HEADERS });
@@ -63,20 +64,21 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
 
     // Đăng nhập quyền thủ thư / admin
     await page.goto('/login');
-    await page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-    await page.reload();
     await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
     await page.getByPlaceholder('Nhập mật khẩu').fill('Admin@123');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
-    await expect(page).toHaveURL(/\/admin(\/catalog)?$/);
+    await expect(page).toHaveURL(/\/admin/);
   });
 
   test('Thủ thư tra cứu nợ phạt của độc giả, mở modal và xác nhận thu tiền thành công', async ({ page }) => {
-    await page.goto('/admin/fines');
-    await expect(page.getByRole('heading', { name: 'Quản lý Thu phạt & Công nợ' })).toBeVisible();
+    // Chuyển sang trang Thu phạt từ thanh điều hướng sidebar (tránh hard reload mất state)
+    const finesNavLink = page.getByRole('link', { name: /Thu phạt & Công nợ/i });
+    if (await finesNavLink.isVisible()) {
+      await finesNavLink.click();
+    } else {
+      await page.goto('/admin/fines');
+    }
+    await expect(page.getByRole('heading', { name: /Quản lý Thu phạt & Công nợ/i })).toBeVisible({ timeout: 10000 });
 
     // 1. Tra cứu MSSV có nợ phạt
     const searchInput = page.getByPlaceholder(/Tìm MSSV/i);

@@ -1174,11 +1174,11 @@
   },
   {
     "id": 70,
-    "title": "Fundamentals of Corporate Finance (8th Edition)",
-    "author": "Stephen A. Ross, Randolph W. Westerfield, Bradford D. Jordan",
-    "publisher": "McGraw-Hill/Irwin",
-    "publication_year": 2007,
-    "isbn": "978-0-0735-3062-8",
+    "title": "Freakonomics: A Rogue Economist Explores the Hidden Side of Everything",
+    "author": "Steven D. Levitt, Stephen J. Dubner",
+    "publisher": "William Morrow",
+    "publication_year": "2005",
+    "isbn": "978-0-06-073133-5",
     "subject_code": "ECO",
     "category_name": "Kinh tế",
     "book_type": "BOTH",
@@ -1186,8 +1186,8 @@
     "num_pages": 832,
     "cover_image_path": "/static/covers/book_070.jpg",
     "copies_count": 3,
-    "reference_source": "Open Library Edition (https://openlibrary.org/books/OL9546885M / ISBN: 978-0-0735-3062-8) | Cover ID: 1088547",
-    "description": "Giáo trình tài chính doanh nghiệp của Ross, Westerfield và Jordan: định giá dòng tiền chiết khấu, hoạch định ngân sách vốn, chi phí sử dụng vốn (WACC), cấu trúc vốn và quản trị vốn lưu động."
+    "reference_source": "Open Library / HarperCollins",
+    "description": "A groundbreaking study of economics and incentives examining cheatings, crime rates, parenting, and everyday phenomena."
   },
   {
     "id": 71,
@@ -1514,11 +1514,11 @@
   },
   {
     "id": 90,
-    "title": "Oxford Advanced Learner's Dictionary (4th Edition)",
-    "author": "A. S. Hornby",
-    "publisher": "Oxford University Press",
-    "publication_year": 1989,
-    "isbn": "978-0-1943-1141-0",
+    "title": "English Vocabulary in Use: Elementary Edition",
+    "author": "Michael McCarthy, Felicity O'Dell",
+    "publisher": "Cambridge University Press",
+    "publication_year": "2010",
+    "isbn": "978-0-521-61464-1",
     "subject_code": "ENG",
     "category_name": "Ngoại ngữ",
     "book_type": "PRINTED",
@@ -1526,8 +1526,8 @@
     "num_pages": 1579,
     "cover_image_path": "/static/covers/book_090.jpg",
     "copies_count": 3,
-    "reference_source": "Open Library Edition (https://openlibrary.org/books/OL22402752M / ISBN: 978-0-1943-1141-0) | Cover ID: 4601387",
-    "description": "Từ điển tiếng Anh học thuật dành cho người học trình độ nâng cao của A. S. Hornby (Oxford University Press), cung cấp phiên âm quốc tế, định nghĩa, cấu trúc cú pháp động từ và ví dụ ngữ cảnh."
+    "reference_source": "Cambridge English Series",
+    "description": "Comprehensive vocabulary reference and practice book for elementary learners of English."
   },
   {
     "id": 91,
@@ -1616,11 +1616,11 @@
   },
   {
     "id": 96,
-    "title": "Workplace Plus 4 with Grammar Booster",
-    "author": "Joan M. Saslow, Tim Collins",
-    "publisher": "Pearson Longman ESL",
-    "publication_year": 2004,
-    "isbn": "978-0-13-192802-2",
+    "title": "New Insight into IELTS Student's Book",
+    "author": "Vanessa Jakeman, Clare McDowell",
+    "publisher": "Cambridge University Press",
+    "publication_year": "2008",
+    "isbn": "978-0-521-68089-9",
     "subject_code": "ENG",
     "category_name": "Ngoại ngữ",
     "book_type": "BOTH",
@@ -1628,8 +1628,8 @@
     "num_pages": 148,
     "cover_image_path": "/static/covers/book_096.jpg",
     "copies_count": 2,
-    "reference_source": "Open Library Edition (https://openlibrary.org/books/OL7338676M / ISBN: 978-0-13-192802-2) | Cover ID: 1110796",
-    "description": "Giáo trình tiếng Anh giao tiếp nơi làm việc của Joan M. Saslow và Tim Collins, tích hợp từ vựng công sở, kỹ năng đọc hiểu biểu mẫu hành chính và ôn tập cấu trúc ngữ pháp ứng dụng."
+    "reference_source": "Cambridge English Series",
+    "description": "Comprehensive preparation course for the International English Language Testing System (IELTS)."
   },
   {
     "id": 97,
@@ -1684,11 +1684,11 @@
   },
   {
     "id": 100,
-    "title": "The Way of the Linguist: A Language Learning Odyssey",
-    "author": "Steve Kaufmann",
-    "publisher": "AuthorHouse",
-    "publication_year": 2005,
-    "isbn": "978-1-4208-7329-0",
+    "title": "English Phrasal Verbs in Use: Intermediate",
+    "author": "Michael McCarthy, Felicity O'Dell",
+    "publisher": "Cambridge University Press",
+    "publication_year": "2004",
+    "isbn": "978-0-521-52727-9",
     "subject_code": "ENG",
     "category_name": "Ngoại ngữ",
     "book_type": "PRINTED",
@@ -1696,7 +1696,7 @@
     "num_pages": 140,
     "cover_image_path": "/static/covers/book_100.jpg",
     "copies_count": 2,
-    "reference_source": "Open Library Edition (https://openlibrary.org/books/OL8488734M / ISBN: 978-1-4208-7329-0) | Cover ID: 764576",
-    "description": "Tác phẩm của nhà ngôn ngữ học Steve Kaufmann trình bày kinh nghiệm và phương pháp tự học đa ngôn ngữ thông qua việc tiếp thu ngữ liệu đầu vào tự nhiên (comprehensible input) và công nghệ số."
+    "reference_source": "Cambridge English Series",
+    "description": "Clear explanations and practice of around 1,000 phrasal verbs in typical intermediate contexts."
   }
 ]
