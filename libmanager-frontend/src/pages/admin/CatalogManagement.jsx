@@ -242,7 +242,7 @@ export default function CatalogManagement() {
   
   // Form State for Validation
   const [bookForm, setBookForm] = useState({ 
-    title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
+    title: '', isbn: '', author: '', publisher: '', year: '', 
     bookType: 'Vật lý', categoryId: '', subject: '', courseCode: '', description: '', keywords: '',
     price: '', numPages: '', previewPages: '', bookAttribute: ''
   });
@@ -410,7 +410,7 @@ export default function CatalogManagement() {
 
   const handleOpenAdd = () => {
     setBookForm({ 
-      title: '', otherTitle: '', isbn: '', author: '', publisher: '', year: '', 
+      title: '', isbn: '', author: '', publisher: '', year: '', 
       bookType: 'Vật lý', categoryId: '', subject: '', courseCode: '', description: '', keywords: '',
       price: '', numPages: '', previewPages: '', bookAttribute: ''
     });
@@ -421,7 +421,6 @@ export default function CatalogManagement() {
   const handleOpenEdit = (book) => {
     setBookForm({
       title: book.title || '',
-      otherTitle: book.otherTitle || '',
       isbn: book.isbn || '',
       author: book.author || '',
       publisher: book.publisher || '',
@@ -1205,16 +1204,6 @@ export default function CatalogManagement() {
               />
             </div>
             
-            <div className="col-span-1 sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên khác</label>
-              <Input 
-                value={bookForm.otherTitle}
-                onChange={(e) => handleFieldChange('otherTitle', e.target.value)}
-                className="w-full" 
-                placeholder="Nhập tên khác (nếu có)..."
-              />
-            </div>
-
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">ISBN</label>
               <Input 
