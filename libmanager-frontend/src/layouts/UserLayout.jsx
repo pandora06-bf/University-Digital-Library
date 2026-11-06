@@ -6,6 +6,7 @@ import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
 import { Button } from '../components/Button';
 import { PageTransition } from '../components/motion/PageTransition';
+import '../styles/user-mobile.css'; // bản vá CSS điện thoại (4-14.a)
 
 export default function UserLayout() {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export default function UserLayout() {
   const showMobileBottomNav = ['/catalog', '/my-books', '/rooms', '/wallet/top-up'].includes(location.pathname);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F6F8FC] text-[#172033]">
+    <div className="user-portal min-h-screen flex flex-col bg-[#F6F8FC] text-[#172033]">
       {/* Top Header */}
       <header className="bg-white border-b border-[#D9E2EE] sticky top-0 z-30 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 h-20 sm:h-24 lg:h-32 flex items-center justify-between gap-4">

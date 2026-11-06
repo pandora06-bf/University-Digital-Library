@@ -1,67 +1,89 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Sparkles, ArrowRight, ShieldCheck, Clock, Bookmark } from 'lucide-react';
+import { BookOpen, Sparkles, ArrowRight, Bookmark, AlertTriangle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { BookCard } from '../../components/BookCard';
 import { CursorRipple } from '../../components/motion/CursorRipple';
 import { HeroParallax } from '../../components/motion/HeroParallax';
 import { ScrollReveal } from '../../components/motion/ScrollReveal';
-import { getStoredBooks, borrowBookAction } from '../../mocks/loans';
+import { bookService } from '../../services/bookService';
+
+const SHELF_SIZE = 4;
+
+// Một kệ sách trên Trang chủ: đang tải → khung xám, lỗi → thông báo nhỏ, có dữ liệu → BookCard.
+function BookShelf({ state }) {
+  if (state.error) {
+    return (
+      <div className="py-8 bg-white rounded-2xl border border-rose-200 text-center text-sm text-slate-600 flex items-center justify-center gap-2">
+        <AlertTriangle className="w-4 h-4 text-rose-500" /> Không tải được danh sách sách. Vui lòng tải lại trang.
+      </div>
+    );
+  }
+  if (!state.books) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" aria-busy="true">
+        {Array.from({ length: SHELF_SIZE }, (_, i) => (
+          <div key={i} className="h-[380px] rounded-[20px] border border-[#D9E2EE] bg-white p-4 animate-pulse">
+            <div className="h-48 rounded-xl bg-slate-100 mb-4" />
+            <div className="h-5 w-4/5 rounded bg-slate-100 mb-2" />
+            <div className="h-4 w-1/2 rounded bg-slate-100" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (state.books.length === 0) {
+    return <p className="py-8 text-center text-sm text-slate-500">Chưa có tài liệu nào.</p>;
+  }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {state.books.map((book, idx) => (
+        <ScrollReveal key={book.id} delay={idx * 0.06}>
+          <BookCard book={book} />
+        </ScrollReveal>
+      ))}
+    </div>
+  );
+}
+
+// Gọi bookService.search một lần khi mở trang, trả về { books, error } cho BookShelf.
+function useShelf(filters, pageSize = SHELF_SIZE) {
+  const [state, setState] = useState({ books: null, error: null });
+  const key = JSON.stringify(filters);
+  useEffect(() => {
+    let cancelled = false;
+    bookService.search({ ...JSON.parse(key), page: 1, pageSize })
+      .then((data) => !cancelled && setState({ books: data.items, error: null }))
+      .catch((error) => !cancelled && setState({ books: null, error }));
+    return () => { cancelled = true; };
+  }, [key, pageSize]);
+  return state;
+}
 
 /**
- * Trang Chủ (Home Page) — Cổng Độc giả
+ * Trang Chủ (Home Page) — Cổng Độc giả, nối API ở 2B-12
  * Tham chiếu Figma Node 46:3 (Desktop) & Node 66:3 (Mobile)
- * 
+ *
+ * - "Tài liệu mới cập nhật": GET /api/books/search không từ khóa (backend xếp sách mới thêm lên đầu)
+ * - "Đọc online ngay": cùng API, lọc book_type=EBOOK. Backend chưa có thống kê lượt mượn nên
+ *   chưa làm mục "Được mượn nhiều nhất".
+ *
  * Hiệu ứng tích hợp:
  * - Cursor Ripple trên Hero banner
  * - Hero Parallax trên cụm hình collage 440×240px
  * - Scroll Reveal & Stagger trên các danh mục và thẻ sách
  */
 export default function HomePage() {
-  const [books, setBooks] = useState(getStoredBooks);
-  const [toast, setToast] = useState(null);
-  const [borrowingId, setBorrowingId] = useState(null);
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  const handleBorrow = (book) => {
-    setBorrowingId(book.id);
-    setTimeout(() => {
-      const result = borrowBookAction(book.id);
-      setBorrowingId(null);
-      if (result.success) {
-        showToast(`Đã mượn thành công cuốn "${book.title}"! Vui lòng kiểm tra ở mục "Sách của tôi".`, 'success');
-        setBooks(getStoredBooks());
-      } else {
-        showToast(result.message, 'error');
-      }
-    }, 400);
-  };
-
-  const featuredBooks = books.slice(0, 4);
-  const popularBooks = books.slice(2, 6);
+  const latest = useShelf({});
+  // Lấy dư 2 kệ rồi bỏ sách đã có ở "Tài liệu mới cập nhật" để hai kệ không lặp cùng một cuốn.
+  const ebookPool = useShelf({ bookType: 'EBOOK' }, SHELF_SIZE * 2);
+  const shownIds = new Set((latest.books ?? []).map((book) => book.id));
+  const ebooks = latest.books && ebookPool.books
+    ? { ...ebookPool, books: ebookPool.books.filter((book) => !shownIds.has(book.id)).slice(0, SHELF_SIZE) }
+    : { books: null, error: ebookPool.error };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-6 sm:py-10 space-y-12 sm:space-y-16">
-      
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-6 right-6 z-50 animate-bounce">
-          <div
-            className={`px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2 border ${
-              toast.type === 'success'
-                ? 'bg-emerald-600 text-white border-emerald-500'
-                : 'bg-rose-600 text-white border-rose-500'
-            }`}
-          >
-            {toast.type === 'success' ? <ShieldCheck className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
-            <span>{toast.message}</span>
-          </div>
-        </div>
-      )}
 
       {/* 1. HERO BANNER (1344×320px tại 1440, radius 28px theo Figma Node 46:3) */}
       <section className="relative w-full rounded-[24px] sm:rounded-[28px] overflow-hidden bg-gradient-to-r from-[#312E81] via-[#4F46E5] to-[#0E7490] text-white p-6 sm:p-10 lg:p-14 shadow-lg shadow-indigo-900/10 flex flex-col lg:flex-row items-center justify-between gap-8 min-h-[300px] sm:min-h-[320px]">
@@ -165,31 +187,21 @@ export default function HomePage() {
         </div>
 
         {/* Grid BookCards với Stagger */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {featuredBooks.map((book, idx) => (
-            <ScrollReveal key={book.id} delay={idx * 0.06}>
-              <BookCard
-                book={book}
-                onBorrow={handleBorrow}
-                isBorrowing={borrowingId === book.id}
-              />
-            </ScrollReveal>
-          ))}
-        </div>
+        <BookShelf state={latest} />
       </ScrollReveal>
 
-      {/* 3. SECTION: TÀI LIỆU MƯỢN NHIỀU NHẤT */}
+      {/* 3. SECTION: SÁCH CÓ BẢN ĐIỆN TỬ */}
       <ScrollReveal className="space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-4">
           <div>
             <h2 className="text-xl sm:text-headline-lg text-[#172033] font-semibold tracking-tight">
-              Được mượn nhiều nhất
+              Đọc online ngay
             </h2>
             <p className="text-body-md text-[#5B6B82] mt-0.5">
-              Các giáo trình và tài liệu tham khảo được sinh viên tìm đọc nhiều nhất
+              Giáo trình và tài liệu có bản điện tử, đọc trực tiếp trên trình duyệt
             </p>
           </div>
-          <Link to="/catalog">
+          <Link to="/catalog?ebook=1">
             <Button variant="ghost" size="sm" icon={<ArrowRight className="w-4 h-4" />}>
               Xem tất cả
             </Button>
@@ -197,17 +209,7 @@ export default function HomePage() {
         </div>
 
         {/* Grid BookCards với Stagger */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {popularBooks.map((book, idx) => (
-            <ScrollReveal key={book.id} delay={idx * 0.06}>
-              <BookCard
-                book={book}
-                onBorrow={handleBorrow}
-                isBorrowing={borrowingId === book.id}
-              />
-            </ScrollReveal>
-          ))}
-        </div>
+        <BookShelf state={ebooks} />
       </ScrollReveal>
 
     </div>
