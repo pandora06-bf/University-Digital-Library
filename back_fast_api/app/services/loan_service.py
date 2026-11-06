@@ -334,6 +334,23 @@ def checkout_at_counter_service(
     borrow_days = user.max_borrow_days if (user.max_borrow_days and user.max_borrow_days > 0) else 14
     due_date = now + timedelta(days=borrow_days)  # GĐ-04 / BR-17 (Mặc định 14 ngày)
 
+    # Kiểm tra danh sách giữ chỗ còn hiệu lực (Waitlist HELD)
+    active_holds = list(db.scalars(
+        select(Waitlist).where(
+            Waitlist.book_id == copy.book_id,
+            Waitlist.status == "HELD",
+            Waitlist.hold_expires_at > now,
+        ).order_by(Waitlist.queue_position, Waitlist.id)
+    ).all())
+    own_hold = next((item for item in active_holds if item.user_code == user.user_code), None)
+
+    # Nếu người nhận không phải chính chủ giữ chỗ mà số sách khả dụng <= số lượng đang HELD -> Chặn lại
+    if own_hold is None and book.available_stock <= len(active_holds):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách đang được giữ cho người đặt trước khác (Waitlist HELD)",
+        )
+
     # 4. Xử lý theo từng trường hợp
     if loan:
         # ------------------------------------------------------------------
@@ -438,6 +455,13 @@ def checkout_at_counter_service(
     # 5. Cập nhật trạng thái bản sao vật lý (BookCopy)
     copy.status = "BORROWED"
     copy.damage_notes = condition_notes
+
+    # Giải phóng lượt giữ chỗ trong Waitlist nếu có
+    if own_hold is not None:
+        db.delete(own_hold)
+        db.flush()
+        from app.services.waitlist_logic import compact_queue
+        compact_queue(db, copy.book_id)
 
     db.commit()
     db.refresh(loan)
