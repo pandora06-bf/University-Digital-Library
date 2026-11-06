@@ -9,7 +9,9 @@ from app.routers import auth, books, loans, users
 from app.routers.admin_book_router import router as admin_book_router
 from app.routers.admin_category_router import router as admin_category_router
 from app.routers.admin_inventory_router import router as admin_inventory_router
-from app.services.upload_service import COVERS_DIR, EBOOKS_DIR
+from app.routers.ebook_router import router as ebook_router
+from app.routers.fines_router import router as fines_router
+from app.services.upload_service import COVERS_DIR
 from app.routers.admin_counter_router import router as admin_counter_router
 from app.routers.waitlist_router import router as waitlist_router
 from app.routers.wallet_router import router as wallet_router
@@ -59,6 +61,8 @@ app.include_router(admin_counter_router)
 app.include_router(waitlist_router)
 app.include_router(wallet_router)
 app.include_router(webhook_router)
+app.include_router(ebook_router)
+app.include_router(fines_router)
 
 
 @app.get("/")

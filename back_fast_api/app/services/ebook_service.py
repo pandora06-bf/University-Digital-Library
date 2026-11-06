@@ -23,7 +23,7 @@ def utcnow():
 
 def get_ebook(db: Session, book_id: int) -> Book:
     book = db.get(Book, book_id)
-    if book is None or book.book_type != "EBOOK" or book.ebook is None:
+    if book is None or book.book_type not in ("EBOOK", "BOTH") or book.ebook is None:
         raise HTTPException(404, "Không tìm thấy eBook")
     return book
 

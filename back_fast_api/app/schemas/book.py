@@ -4,7 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-BookType = Literal["PRINTED", "EBOOK"]
+BookType = Literal["PRINTED", "EBOOK", "BOTH"]
 
 
 class BookBase(BaseModel):

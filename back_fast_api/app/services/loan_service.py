@@ -102,7 +102,7 @@ def request_physical_loan_service(db: Session, user_code: str, book_id: int) -> 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sách"
         )
-    if book.book_type != "PRINTED":
+    if book.book_type not in ("PRINTED", "BOTH"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Sách này không có bản vật lý để đặt mượn tại quầy",
@@ -217,6 +217,94 @@ def run_pickup_expiry_job(session_factory=SessionLocal, now: Optional[datetime] 
             db.close()
 
     return {"cancelled": cancelled, "errors": errors}
+
+
+# ----------------------------------------------------------------------
+# 1c. Gia hạn sách vật lý (POST /api/loans/{loan_id}/renew) — 3-02 / UC06
+# ----------------------------------------------------------------------
+MAX_RENEWALS = 1
+MIN_HOURS_BEFORE_DUE_TO_RENEW = 6
+RENEWAL_EXTENSION = timedelta(days=3)
+
+
+def renew_loan_service(db: Session, user_code: str, loan_id: int) -> Loan:
+    """UC06: Gia hạn phiếu mượn vật lý. Đủ cả 4 điều kiện mới cho gia hạn:
+      (1) không có ai trong hàng đợi (Waitlist WAITING/HELD) của sách này
+      (2) Total_Fines = 0
+      (3) chưa gia hạn quá 1 lần (renewal_count < MAX_RENEWALS)
+      (4) còn tối thiểu 6 giờ trước hạn trả
+    Đạt đủ: Due_Date + 3 ngày, renewal_count + 1.
+    """
+    loan = db.scalar(select(Loan).where(Loan.id == loan_id).with_for_update())
+    if loan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiếu mượn"
+        )
+    if loan.user_code != user_code:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền gia hạn phiếu mượn này",
+        )
+    if loan.loan_type != "PHYSICAL":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Chỉ áp dụng gia hạn cho sách vật lý",
+        )
+    if loan.loan_status not in ("BORROWED", "OVERDUE"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Phiếu mượn không ở trạng thái có thể gia hạn",
+        )
+
+    user = db.scalar(select(User).where(User.user_code == user_code).with_for_update())
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy hồ sơ bạn đọc"
+        )
+
+    # (2) Total_Fines = 0
+    if user.total_fines > 0:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Còn nợ phạt chưa thanh toán, không thể gia hạn",
+        )
+
+    # (3) Chưa gia hạn quá 1 lần
+    if loan.renewal_count >= MAX_RENEWALS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Đã gia hạn tối đa {MAX_RENEWALS} lần",
+        )
+
+    # (4) Còn tối thiểu 6 giờ trước hạn trả
+    now = datetime.now()
+    if loan.due_date - now < timedelta(hours=MIN_HOURS_BEFORE_DUE_TO_RENEW):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Phải còn tối thiểu {MIN_HOURS_BEFORE_DUE_TO_RENEW} giờ trước hạn mới được gia hạn",
+        )
+
+    # (1) Không ai trong hàng đợi của sách này
+    waiting = db.scalar(
+        select(Waitlist.id)
+        .where(
+            Waitlist.book_id == loan.book_id,
+            Waitlist.status.in_(["WAITING", "HELD"]),
+        )
+        .limit(1)
+    )
+    if waiting:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách đang có người chờ đặt trước, không thể gia hạn",
+        )
+
+    loan.due_date = loan.due_date + RENEWAL_EXTENSION
+    loan.renewal_count += 1
+
+    db.commit()
+    db.refresh(loan)
+    return loan
 
 
 # ----------------------------------------------------------------------

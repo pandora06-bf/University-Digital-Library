@@ -8,7 +8,11 @@ from app.core.dependencies import get_current_account
 from app.models.loan import Loan
 from app.models.user import Account
 from app.schemas.loan import LoanResponse, PhysicalLoanRequest
-from app.services.loan_service import request_physical_loan_service
+from app.services.loan_service import renew_loan_service, request_physical_loan_service
+
+# Trạng thái coi là "đang mượn" (chưa đóng phiếu) cho /my-loans; phần còn lại
+# (RETURNED/CANCELLED/LOST/EXPIRED) thuộc /my-history.
+OPEN_LOAN_STATUSES = ("PENDING_PICKUP", "REQUESTED", "BORROWED", "OVERDUE")
 
 router = APIRouter(
     prefix="/api/loans",
@@ -59,6 +63,85 @@ def request_physical_loan(
             detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
         )
     return request_physical_loan_service(db, account.user.user_code, payload.book_id)
+
+
+# ----------------------------------------------------------------------
+# Gia hạn sách vật lý (3-02 / UC06)
+# ----------------------------------------------------------------------
+@router.post(
+    "/{loan_id}/renew",
+    response_model=LoanResponse,
+    summary="Gia hạn phiếu mượn sách vật lý",
+)
+def renew_loan(
+    loan_id: int,
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+) -> Loan:
+    if not account.user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
+        )
+    return renew_loan_service(db, account.user.user_code, loan_id)
+
+
+# ----------------------------------------------------------------------
+# Bảng điều khiển cá nhân: sách đang mượn / lịch sử (3-08)
+# ----------------------------------------------------------------------
+@router.get("/my-loans")
+def get_my_active_loans(
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+):
+    """Sách đang mượn (kèm Due_Date và số lần gia hạn) + đang chờ nhận tại quầy."""
+    if not account.user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
+        )
+    query = (
+        select(Loan)
+        .where(
+            Loan.user_code == account.user.user_code,
+            Loan.loan_status.in_(OPEN_LOAN_STATUSES),
+        )
+        .order_by(Loan.due_date.asc())
+    )
+    loans = db.scalars(query).all()
+    return {"total": len(loans), "data": [format_loan_response(loan) for loan in loans]}
+
+
+@router.get("/my-history")
+def get_my_loan_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    account: Account = Depends(get_current_account),
+    db: Session = Depends(get_db),
+):
+    """Lịch sử các phiếu mượn đã đóng (trả, hủy, báo mất, hết hạn)."""
+    if not account.user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản chưa được liên kết với hồ sơ người dùng",
+        )
+    query = (
+        select(Loan)
+        .where(
+            Loan.user_code == account.user.user_code,
+            Loan.loan_status.notin_(OPEN_LOAN_STATUSES),
+        )
+        .order_by(desc(Loan.borrow_date))
+        .offset(skip)
+        .limit(limit)
+    )
+    loans = db.scalars(query).all()
+    return {
+        "total": len(loans),
+        "skip": skip,
+        "limit": limit,
+        "data": [format_loan_response(loan) for loan in loans],
+    }
 
 
 @router.get("/me")

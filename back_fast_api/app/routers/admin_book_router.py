@@ -174,10 +174,10 @@ async def upload_pdf(
     _: Account = Depends(require_roles("ADMIN")),
 ) -> UploadResponse:
     book = _get_book_or_404(db, book_id)
-    if book.book_type != "EBOOK":
+    if book.book_type not in ("EBOOK", "BOTH"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Chỉ sách có book_type=EBOOK mới được upload PDF",
+            detail="Chỉ sách có book_type=EBOOK hoặc BOTH mới được upload PDF",
         )
 
     if not 5 <= preview_pages <= 10 or not 1 <= borrow_days <= 365:

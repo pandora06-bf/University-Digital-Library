@@ -15,6 +15,7 @@ class LoanResponse(BaseModel):
     due_date: Optional[datetime] = None
     pickup_deadline: Optional[datetime] = None
     loan_status: str
+    renewal_count: int = 0
     checkout_condition: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
