@@ -71,13 +71,10 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
   });
 
   test('Thủ thư tra cứu nợ phạt của độc giả, mở modal và xác nhận thu tiền thành công', async ({ page }) => {
-    // Chuyển sang trang Thu phạt từ thanh điều hướng sidebar (tránh hard reload mất state)
+    // Chờ thanh điều hướng Admin sẵn sàng rồi click vào Thu phạt & Công nợ (điều hướng client-side SPA)
     const finesNavLink = page.getByRole('link', { name: /Thu phạt & Công nợ/i });
-    if (await finesNavLink.isVisible()) {
-      await finesNavLink.click();
-    } else {
-      await page.goto('/admin/fines');
-    }
+    await expect(finesNavLink).toBeVisible({ timeout: 10000 });
+    await finesNavLink.click();
     await expect(page.getByRole('heading', { name: /Quản lý Thu phạt & Công nợ/i })).toBeVisible({ timeout: 10000 });
 
     // 1. Tra cứu MSSV có nợ phạt
