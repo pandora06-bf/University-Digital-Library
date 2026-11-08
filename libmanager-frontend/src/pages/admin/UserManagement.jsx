@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Search, Plus, RotateCcw, Lock, Unlock, KeyRound, Pencil, Eye,
-  UserX, ShieldAlert, GraduationCap,
+  UserX, ShieldAlert, GraduationCap, Upload,
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
@@ -33,6 +33,8 @@ const EMPTY_FORM = {
 
 function mapApiUser(u) {
   return {
+    // BE reset-password cần Account.id (int), không phải user_code
+    account_id: u.account_id ?? u.account?.id ?? (Number.isInteger(u.id) ? u.id : null),
     user_code: u.user_code || u.student_id || u.username || u.id,
     full_name: u.full_name || u.name || '',
     email: u.email || '',
@@ -65,6 +67,7 @@ export default function UserManagement() {
   const [lockTarget, setLockTarget] = useState(null);
   const [tempPassword, setTempPassword] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -84,15 +87,12 @@ export default function UserManagement() {
       const { data } = await axiosInstance.get('/api/admin/users', {
         params: { q: debouncedQ || undefined, page, page_size: PAGE_SIZE },
       });
+      // Response 2xx (kể cả danh sách rỗng) = API list đã có — không ép mock
       const items = data?.items || data?.users || (Array.isArray(data) ? data : []);
-      if (!items.length && !data?.total) {
-        setUseMock(true);
-        refreshMock();
-        return;
-      }
       setUseMock(false);
       setAllUsers(items.map(mapApiUser));
     } catch {
+      // Chỉ fallback mock khi request lỗi (404/5xx) — đúng với BE hiện tại
       setUseMock(true);
       refreshMock();
     } finally {
@@ -290,9 +290,10 @@ export default function UserManagement() {
 
   const handleResetPassword = async (row) => {
     try {
-      if (!useMock) {
+      const accountId = row.account_id;
+      if (!useMock && accountId != null) {
         const { data } = await axiosInstance.post(
-          `/api/admin/users/${encodeURIComponent(row.user_code)}/reset-password`
+          `/api/admin/users/${accountId}/reset-password`
         );
         const temp = data?.temporary_password || data?.temp_password || data?.password;
         if (!temp) {
@@ -303,11 +304,41 @@ export default function UserManagement() {
         showToast('Mật khẩu tạm chỉ hiện một lần — hãy ghi lại.', 'success');
         return;
       }
+      if (!useMock && accountId == null) {
+        showToast('Thiếu account_id — API đặt lại mật khẩu cần Account.id, không dùng MSSV.', 'warning');
+        return;
+      }
       const temp = issueTempPassword(row.user_code);
       setTempPassword({ user_code: row.user_code, password: temp });
       showToast('Mật khẩu tạm (dữ liệu mẫu) — chỉ hiện một lần.', 'success');
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đặt lại mật khẩu.'), 'error');
+    }
+  };
+
+  const handleImportFile = async (file) => {
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.csv') && !name.endsWith('.xlsx')) {
+      showToast('Chỉ hỗ trợ tệp CSV hoặc XLSX.', 'warning');
+      return;
+    }
+    setImporting(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await axiosInstance.post('/api/admin/users/import', form);
+      const created = data?.created_accounts?.length ?? data?.created ?? 0;
+      const skipped = data?.skipped ?? data?.errors?.length ?? 0;
+      showToast(
+        `Import xong: ${created} tài khoản mới` + (skipped ? `, ${skipped} bỏ qua/lỗi` : ''),
+        'success'
+      );
+      // Danh sách vẫn mock vì BE chưa có GET /users — chỉ báo kết quả import
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Import thất bại.'), 'error');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -419,13 +450,34 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quản lý tài khoản bạn đọc: tìm kiếm, tạo/sửa hồ sơ, khóa–mở khóa và đặt lại mật khẩu tạm.
+            BE hiện chỉ có import CSV/XLSX và đặt lại mật khẩu theo Account.id — danh sách/CRUD/khóa vẫn dùng mẫu.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button variant="outline" onClick={() => navigate('/admin/fines')}>
             Thu phạt &amp; Công nợ
           </Button>
+          <label className={`inline-flex ${importing ? 'opacity-60 pointer-events-none' : ''}`}>
+            <Button
+              variant="outline"
+              icon={<Upload className="w-4 h-4" />}
+              disabled={importing}
+              onClick={() => document.getElementById('admin-user-import-input')?.click()}
+            >
+              {importing ? 'Đang import…' : 'Import CSV/XLSX'}
+            </Button>
+            <input
+              id="admin-user-import-input"
+              type="file"
+              accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                handleImportFile(f);
+              }}
+            />
+          </label>
           <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
             Thêm người dùng
           </Button>
@@ -434,9 +486,10 @@ export default function UserManagement() {
 
       {useMock && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+          <p className="font-semibold">Danh sách đang dùng dữ liệu mẫu</p>
           <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            API quản trị người dùng chưa sẵn sàng. Thao tác chỉ lưu trên trình duyệt, không ghi máy chủ.
+            BE chưa có GET/CRUD/khóa <code className="bg-amber-100 px-1 rounded">/api/admin/users</code>.
+            Chỉ <strong>Import CSV/XLSX</strong> và reset mật khẩu (Account.id) ghi máy chủ; thêm/sửa/khóa trên bảng chỉ lưu trình duyệt.
           </p>
         </div>
       )}
