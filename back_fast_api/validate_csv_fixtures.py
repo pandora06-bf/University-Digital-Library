@@ -4,10 +4,11 @@ import csv
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-HEADERS = [
+LEGACY_HEADERS = [
     "username", "full_name", "email", "phone_number", "department",
     "user_type", "academic_title",
 ]
+IMPORT_HEADERS = ["username", "user_code", "full_name", "email", "department", "role"]
 FILES = {
     "template": ROOT / "users_template.csv",
     "valid": ROOT / "tests" / "data" / "users_valid.csv",
@@ -16,18 +17,28 @@ FILES = {
 }
 
 
-def read_rows(path: Path) -> list[dict[str, str]]:
+def read_rows(path: Path, headers: list[str]) -> list[dict[str, str]]:
     if not path.is_file():
         raise ValueError(f"Missing fixture: {path}")
     with path.open(encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames != HEADERS:
-            raise ValueError(f"{path.name}: expected headers {HEADERS}, got {reader.fieldnames}")
+        if reader.fieldnames != headers:
+            raise ValueError(f"{path.name}: expected headers {headers}, got {reader.fieldnames}")
         return list(reader)
 
 
 def validate() -> None:
-    rows = {name: read_rows(path) for name, path in FILES.items()}
+    # Import mới (2B-08) dùng cột user_code/role; fixture Sprint 2C cũ
+    # dùng phone_number/user_type/academic_title. Kiểm tra riêng từng hợp đồng.
+    rows = {name: read_rows(path, IMPORT_HEADERS if name == "template" else LEGACY_HEADERS)
+            for name, path in FILES.items()}
+    if not rows["template"]:
+        raise ValueError("users_template.csv must contain at least one example row")
+    for line, row in enumerate(rows["template"], start=2):
+        if any(not (row.get(key) or "").strip() for key in IMPORT_HEADERS):
+            raise ValueError(f"users_template.csv:{line}: required field is empty")
+        if row["role"].upper() not in {"STUDENT", "LECTURER", "LIBRARIAN", "ADMIN"}:
+            raise ValueError(f"users_template.csv:{line}: invalid role")
     valid = rows["valid"]
     for line, row in enumerate(valid, start=2):
         if not row["username"].strip() or not row["full_name"].strip():
@@ -72,7 +83,7 @@ def validate() -> None:
     print("CSV fixture validation passed:")
     for name, data in rows.items():
         print(f"  {FILES[name].relative_to(ROOT)}: {len(data)} rows")
-    print("CSV import API is not present in the current backend; API-level acceptance remains pending.")
+    print("CSV fixture schemas checked; API-level acceptance requires separate integration tests.")
 
 
 if __name__ == "__main__":

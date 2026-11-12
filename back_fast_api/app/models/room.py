@@ -12,6 +12,7 @@ from sqlalchemy import (
     Time,
     TIMESTAMP,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
@@ -42,6 +43,7 @@ class Room(Base):
 class RoomBooking(Base):
     __tablename__ = "room_bookings"
     __table_args__ = (
+        CheckConstraint("attendee_count > 0", name="chk_room_booking_attendees_positive"),
         # Partial Index: UNIQUE room_id + booking_date + slot_start khi CONFIRMED hoặc CHECKED_IN
         Index(
             "uq_room_booking_active_slot",
@@ -49,7 +51,8 @@ class RoomBooking(Base):
             "booking_date",
             "slot_start",
             unique=True,
-            postgresql_where="status IN ('CONFIRMED', 'CHECKED_IN')",
+            postgresql_where=text("status IN ('CONFIRMED', 'CHECKED_IN')"),
+            sqlite_where=text("status IN ('CONFIRMED', 'CHECKED_IN')"),
         ),
     )
 
@@ -63,6 +66,7 @@ class RoomBooking(Base):
     booking_date: Mapped[date] = mapped_column(Date, nullable=False)
     slot_start: Mapped[time] = mapped_column(Time, nullable=False)
     slot_end: Mapped[time] = mapped_column(Time, nullable=False)
+    attendee_count: Mapped[int] = mapped_column(Integer, server_default="1", nullable=False)
     status: Mapped[str] = mapped_column(String(30), server_default="CONFIRMED", nullable=False)
     checkin_time: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=False), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
