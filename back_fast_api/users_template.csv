@@ -1,4 +1,3 @@
-username,full_name,email,phone_number,department,user_type,academic_title
-sv_demo_001,Nguyễn Văn A,nguyen.van.a@tdtu.edu.vn,0901234567,Khoa Công nghệ thông tin,STUDENT,
-sv_demo_002,Trần Thị B,tran.thi.b@tdtu.edu.vn,0912345678,Khoa Ngoại ngữ,STUDENT,
-gv_demo_003,Lê Văn C,le.van.c@tdtu.edu.vn,0923456789,Khoa Khoa học cơ bản,LECTURER,Thạc sĩ
+﻿username,user_code,full_name,email,department,role
+sv52400222,52400222,Nguyen Van A,sv52400222@example.edu.vn,Khoa CNTT,STUDENT
+gv52400223,52400223,Tran Thi B,gv52400223@example.edu.vn,Khoa CNTT,LECTURER

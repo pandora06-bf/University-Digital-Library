@@ -113,6 +113,11 @@ def delete_static_file(file_path: str | None) -> None:
 
 def resolve_private_pdf(file_path: str) -> Path:
     """Never interpret an arbitrary DB path as a filesystem path."""
+    # Seed cũ lưu demo/ebook-NNN.pdf trong khi file thật nằm ở private_storage/ebooks/.
+    if isinstance(file_path, str) and file_path.startswith("demo/ebook-") and file_path.endswith(".pdf"):
+        name = file_path.rsplit("/", 1)[-1]
+        if "/" not in name and "\\" not in name and (EBOOKS_DIR / name).is_file():
+            file_path = f"private:ebooks/{name}"
     if not file_path.startswith("private:ebooks/"):
         raise HTTPException(status_code=404, detail="PDF cũ phải được chuyển sang kho riêng")
     target = (EBOOKS_DIR / file_path.removeprefix("private:ebooks/")).resolve()

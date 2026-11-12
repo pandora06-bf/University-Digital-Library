@@ -44,6 +44,7 @@ engine = create_engine(
 def _set_sqlite_custom_functions(dbapi_connection, connection_record):
     dbapi_connection.create_function("to_tsvector", -1, lambda *args: "")
     dbapi_connection.create_function("plainto_tsquery", -1, lambda *args: "")
+    dbapi_connection.create_function("to_tsquery", -1, lambda *args: "")
     dbapi_connection.create_function("ts_rank_cd", -1, lambda *args: 1.0)
 
 

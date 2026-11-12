@@ -1,0 +1,33 @@
+/*
+ * 4-14.a — Bản vá CSS điện thoại cho Cổng Độc giả (Đạt).
+ * Chỉ áp dụng bên trong .user-portal (UserLayout) để không ảnh hưởng Cổng Quản trị.
+ */
+
+/* Tailwind v4 không có sẵn lớp scrollbar-none: ẩn thanh cuộn của hàng chip thể loại nhưng vẫn vuốt ngang được */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bỏ ô xám nhấp nháy khi chạm vào nút/link trên điện thoại */
+.user-portal {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 639px) {
+  /* iOS Safari tự phóng to trang khi chạm vào ô nhập có chữ nhỏ hơn 16px */
+  .user-portal input:not([type='checkbox']):not([type='radio']),
+  .user-portal select,
+  .user-portal textarea {
+    font-size: 16px;
+  }
+
+  /* Chữ dài (tên sách, mã phiếu) tự xuống dòng thay vì đẩy bố cục tràn ngang */
+  .user-portal main h1,
+  .user-portal main h2,
+  .user-portal main h3 {
+    overflow-wrap: anywhere;
+  }
+}

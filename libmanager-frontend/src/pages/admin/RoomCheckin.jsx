@@ -6,6 +6,8 @@ import { Table, StatusBadge } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
+import axiosInstance from '../../services/axios_instance';
+import { getApiErrorMessage } from '../../services/errorHandler';
 import {
   getTodayBookings,
   checkInByCode,
@@ -24,12 +26,22 @@ const statusMeta = (s) => {
   return { label: s, type: 'neutral' };
 };
 
+/** BE CheckinBody chỉ nhận booking_id (int). Cho phép số thuần hoặc mã có đuôi số. */
+function resolveBookingId(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  const tail = value.match(/(\d+)$/);
+  return tail ? parseInt(tail[1], 10) : null;
+}
+
 export default function RoomCheckin() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
   const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   const todayList = useMemo(() => {
     void revision;
@@ -41,24 +53,70 @@ export default function RoomCheckin() {
 
   const refresh = () => setRevision((n) => n + 1);
 
-  const handleCheckin = (preset) => {
+  const handleCheckin = async (preset) => {
     const value = (preset || code).trim();
     if (!value) {
-      setCodeError('Nhập mã đặt phòng');
-      showToast('Vui lòng nhập mã đặt phòng.', 'warning');
+      setCodeError('Nhập booking_id hoặc mã đặt phòng');
+      showToast('Vui lòng nhập booking_id (số) hoặc mã đặt mẫu.', 'warning');
       return;
     }
     setCodeError('');
+    setBusy(true);
+
+    const bookingId = resolveBookingId(value);
+
+    // Ưu tiên API thật khi suy ra được booking_id
+    if (bookingId != null) {
+      try {
+        const { data } = await axiosInstance.post('/api/admin/room-bookings/checkin', {
+          booking_id: bookingId,
+        });
+        showToast(
+          `Check-in OK (API): #${data?.id ?? bookingId}` +
+            (data?.user_code ? ` · ${data.user_code}` : '') +
+            (data?.status ? ` · ${data.status}` : ''),
+          'success'
+        );
+        // Đồng bộ mock list nếu có cùng id/code
+        try {
+          checkInByCode(String(data?.id ?? bookingId));
+        } catch {
+          /* danh sách hôm nay vẫn mock — bỏ qua nếu không khớp */
+        }
+        setCode('');
+        refresh();
+        setBusy(false);
+        return;
+      } catch (error) {
+        // Fallback mock theo mã nếu API lỗi (booking không tồn tại / ngoài khung giờ)
+        const status = error?.response?.status;
+        if (status && status !== 404 && status !== 409) {
+          showToast(getApiErrorMessage(error, 'Check-in API thất bại.'), 'error');
+          setBusy(false);
+          return;
+        }
+        // 404/409: thử mock theo mã mẫu để demo UI
+      }
+    }
+
     try {
       const booking = checkInByCode(value);
       showToast(
-        `Check-in OK: ${booking.booking_code} · ${booking.user_name} · ${booking.room_name}`,
+        `Check-in OK (mẫu): ${booking.booking_code} · ${booking.user_name} · ${booking.room_name}`,
         'success'
       );
       setCode('');
       refresh();
     } catch (e) {
-      showToast(e.message || 'Check-in thất bại.', 'error');
+      showToast(
+        getApiErrorMessage(
+          { response: { data: { detail: e.message } } },
+          e.message || 'Check-in thất bại. BE cần booking_id (int); danh sách hôm nay vẫn là mẫu.'
+        ),
+        'error'
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -66,7 +124,14 @@ export default function RoomCheckin() {
     {
       key: 'booking_code',
       header: 'Mã đặt',
-      render: (val) => <span className="font-mono text-sm font-semibold text-indigo-700">{val}</span>,
+      render: (val, row) => (
+        <div>
+          <span className="font-mono text-sm font-semibold text-indigo-700">{val}</span>
+          {row.id != null && (
+            <p className="text-[11px] text-slate-400 font-mono">id={row.id}</p>
+          )}
+        </div>
+      ),
     },
     {
       key: 'user_name',
@@ -104,8 +169,14 @@ export default function RoomCheckin() {
       align: 'right',
       render: (_, row) =>
         row.status === 'CONFIRMED' ? (
-          <Button size="sm" variant="primary" onClick={() => handleCheckin(row.booking_code)}>
-            Check-in</Button>
+          <Button
+            size="sm"
+            variant="primary"
+            disabled={busy}
+            onClick={() => handleCheckin(row.id != null ? String(row.id) : row.booking_code)}
+          >
+            Check-in
+          </Button>
         ) : (
           <span className="text-xs text-slate-400">—</span>
         ),
@@ -120,7 +191,8 @@ export default function RoomCheckin() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Check-in phòng học nhóm</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Xác nhận check-in theo mã đặt phòng và theo dõi các lượt đặt trong ngày.
+            API thật: <code className="bg-slate-100 px-1 rounded text-xs">POST /api/admin/room-bookings/checkin</code>
+            {' '}với <code className="bg-slate-100 px-1 rounded text-xs">booking_id</code>. Danh sách hôm nay vẫn là mẫu (BE chưa có list admin).
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -142,9 +214,11 @@ export default function RoomCheckin() {
       </div>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
+        <p className="font-semibold">Danh sách hôm nay = dữ liệu mẫu</p>
         <p className="text-amber-800/90 mt-0.5 text-[13px]">
-          API check-in phòng chưa sẵn sàng. Thao tác chỉ lưu trên trình duyệt, không ghi máy chủ.
+          Nhập <strong>booking_id số</strong> (id trên DB) để gọi API check-in thật. Mã mẫu kiểu{' '}
+          <code className="bg-amber-100 px-1 rounded">RB-2026-1001</code> chỉ cập nhật localStorage khi API 404/409.
+          BE chỉ cho check-in trong 15 phút đầu khung giờ.
         </p>
       </div>
 
@@ -158,7 +232,7 @@ export default function RoomCheckin() {
             {todayList.length} <span className="text-sm font-medium text-slate-500">lượt đặt</span>
           </p>
           <p className="mt-3 text-[11px] font-medium text-slate-500">
-            Tất cả đặt phòng trong ngày hiện tại
+            Tất cả đặt phòng trong ngày hiện tại (mẫu)
           </p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40">
@@ -167,7 +241,7 @@ export default function RoomCheckin() {
             {waiting} <span className="text-sm font-medium text-amber-500">lượt đặt</span>
           </p>
           <p className="mt-3 text-[11px] font-medium text-amber-600">
-            Đã xác nhận, chờ quầy check-in mã đặt phòng
+            Đã xác nhận, chờ quầy check-in
           </p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40">
@@ -187,7 +261,7 @@ export default function RoomCheckin() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
           <ScanLine className="w-5 h-5 text-indigo-600" />
-          <h2 className="text-lg font-bold text-slate-800">Quét / nhập mã đặt phòng</h2>
+          <h2 className="text-lg font-bold text-slate-800">Quét / nhập booking_id</h2>
         </div>
         <form
           className="flex flex-col sm:flex-row gap-3 sm:items-end"
@@ -198,30 +272,35 @@ export default function RoomCheckin() {
         >
           <div className="flex-1">
             <Input
-              label="Mã đặt (vd RB-2026-1001)"
+              label="booking_id (số) hoặc mã mẫu"
               autoFocus
               value={code}
               error={codeError}
-              placeholder="RB-2026-…"
+              placeholder="vd 12 hoặc RB-2026-1001"
               onChange={(e) => {
                 setCode(e.target.value);
                 setCodeError('');
               }}
             />
           </div>
-          <Button type="submit" variant="primary" icon={<CheckCircle2 className="w-4 h-4" />}>
-            Xác nhận check-in
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={busy}
+            icon={<CheckCircle2 className="w-4 h-4" />}
+          >
+            {busy ? 'Đang xử lý…' : 'Xác nhận check-in'}
           </Button>
         </form>
         <p className="text-xs text-slate-500 mt-3">
-          Gợi ý mẫu: <code className="bg-slate-100 px-1 rounded">RB-2026-1001</code>,{' '}
+          Gợi ý mẫu UI: <code className="bg-slate-100 px-1 rounded">RB-2026-1001</code>,{' '}
           <code className="bg-slate-100 px-1 rounded">RB-2026-1002</code>
           {getStoredAdminBookings().length ? '' : ''}
         </p>
       </div>
 
       <div>
-        <h2 className="text-base font-bold text-slate-800 mb-3">Lượt đặt trong ngày</h2>
+        <h2 className="text-base font-bold text-slate-800 mb-3">Lượt đặt trong ngày (mẫu)</h2>
         <Table columns={columns} data={todayList} emptyMessage="Chưa có lượt đặt hôm nay." />
       </div>
     </div>
