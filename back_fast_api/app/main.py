@@ -14,6 +14,10 @@ from app.routers.admin_counter_router import router as admin_counter_router
 from app.routers.waitlist_router import router as waitlist_router
 from app.routers.wallet_router import router as wallet_router
 from app.routers.webhook_router import router as webhook_router
+from app.routers.admin_user_import_router import router as admin_user_import_router
+from app.routers.room_booking_router import router as room_booking_router
+from app.routers.fine_wallet_router import router as fine_wallet_router
+from app.routers.admin_incident_router import router as admin_incident_router
 from app.core.exception_handlers import register_exception_handlers
 
 app = FastAPI(
@@ -59,6 +63,14 @@ app.include_router(admin_counter_router)
 app.include_router(waitlist_router)
 app.include_router(wallet_router)
 app.include_router(webhook_router)
+<<<<<<< HEAD
+=======
+app.include_router(fines_router)
+app.include_router(admin_user_import_router)
+app.include_router(room_booking_router)
+app.include_router(fine_wallet_router)
+app.include_router(admin_incident_router)
+>>>>>>> origin/main
 
 
 @app.get("/")
@@ -72,6 +84,7 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+<<<<<<< HEAD
 
 from app.routers.admin_user_import_router import router as admin_user_import_router
 from app.routers.room_booking_router import router as room_booking_router
@@ -84,3 +97,5 @@ app.include_router(admin_incident_router)
 
 from app.routers.admin_user_router import router as admin_user_router
 app.include_router(admin_user_router)
+=======
+>>>>>>> origin/main

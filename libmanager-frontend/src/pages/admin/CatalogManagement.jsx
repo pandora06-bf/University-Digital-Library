@@ -67,7 +67,9 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
     render: (value, row) => {
       const priceVal = resolveBookPrice(row);
       const priceText = formatVND(priceVal);
-      const isEbook = row.book_type === 'EBOOK' || row.bookType === 'eBook';
+      const bookType = row.book_type || row.bookType;
+      const isEbook = bookType === 'EBOOK' || bookType === 'eBook';
+      const isBoth = bookType === 'BOTH';
       const isbnText = row.isbn && row.isbn !== 'N/A' ? row.isbn : null;
       // Chỉ hiện barcode thật từ dữ liệu; không tạo mã giả kiểu BC-{id}000
       const realBarcode = row.copy_barcode || (row.barcode && !String(row.barcode).startsWith('BC-') ? row.barcode : null);
@@ -82,7 +84,11 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
             >
               {row.title}
             </button>
-            {isEbook ? (
+            {isBoth ? (
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                Cả hai
+              </span>
+            ) : isEbook ? (
               <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
                 eBook
               </span>
@@ -287,7 +293,11 @@ export default function CatalogManagement() {
       author: b.author || 'Đang cập nhật',
       publisher: b.publisher || 'Đang cập nhật',
       category_id: b.category_id,
-      category: b.category_id ? 'Thể loại ' + b.category_id : 'Chưa phân loại',
+      category:
+        b.category_name
+        || (b.category_id ? `Thể loại ${b.category_id}` : null)
+        || mockMatch?.category
+        || 'Chưa phân loại',
       categoryColor: 'blue',
       year: b.publication_year || b.published_year || 2024,
       copies: b.available_stock ?? 0,
@@ -295,7 +305,12 @@ export default function CatalogManagement() {
       status: (b.available_stock === 0) ? 'Hết bản in' : 'Sẵn sàng',
       statusColor: (b.available_stock === 0) ? 'rose' : 'emerald',
       book_type: b.book_type || 'PRINTED',
-      bookType: (b.book_type === 'EBOOK' || b.bookType === 'eBook') ? 'eBook' : 'Vật lý',
+      bookType:
+        b.book_type === 'BOTH'
+          ? 'BOTH'
+          : (b.book_type === 'EBOOK' || b.bookType === 'eBook')
+            ? 'eBook'
+            : 'Vật lý',
       price: uiPrice,
       book_price: uiPrice,
       num_pages: b.num_pages ?? mockMatch?.num_pages ?? null,
@@ -425,7 +440,12 @@ export default function CatalogManagement() {
       author: book.author || '',
       publisher: book.publisher || '',
       year: book.year || book.publication_year || '',
-      bookType: (book.bookType === 'eBook' || book.book_type === 'EBOOK') ? 'eBook' : 'Vật lý',
+      bookType:
+        book.bookType === 'BOTH' || book.book_type === 'BOTH'
+          ? 'BOTH'
+          : (book.bookType === 'eBook' || book.book_type === 'EBOOK')
+            ? 'eBook'
+            : 'Vật lý',
       categoryId: book.category_id !== undefined && book.category_id !== null ? book.category_id.toString() : '',
       subject: book.subject || book.subject_name || '',
       courseCode: book.subject_code || book.courseCode || '',
@@ -555,7 +575,7 @@ export default function CatalogManagement() {
 
     // 7. Số trang xem trước (previewPages): Chỉ áp dụng cho eBook (PDF) theo đặc tả UC09 (5–10 trang)
     let validPreviewPages = null;
-    if (bookForm.bookType === 'eBook') {
+    if (bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') {
       const trimmedPreview = bookForm.previewPages !== undefined && bookForm.previewPages !== null
         ? bookForm.previewPages.toString().trim()
         : '';
@@ -608,7 +628,12 @@ export default function CatalogManagement() {
       publication_year: parseInt(trimmedYear, 10),
       price: validPrice,
       description: bookForm.description?.trim() || null,
-      book_type: bookForm.bookType === "eBook" ? "EBOOK" : "PRINTED",
+      book_type:
+        bookForm.bookType === 'eBook'
+          ? 'EBOOK'
+          : bookForm.bookType === 'BOTH'
+            ? 'BOTH'
+            : 'PRINTED',
       category_id: parseInt(trimmedCatId, 10),
       keywords: bookForm.keywords?.trim() || null,
       num_pages: validNumPages,
@@ -634,17 +659,16 @@ export default function CatalogManagement() {
         if (bookId && coverFile) {
           const coverData = new FormData();
           coverData.append('file', coverFile);
-          await axiosInstance.post(`/api/admin/books/${bookId}/upload-cover`, coverData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
+          // Không gắn Content-Type tay — Axios tự thêm boundary cho FormData.
+          await axiosInstance.post(`/api/admin/books/${bookId}/upload-cover`, coverData);
         }
 
-        // Gọi API Upload PDF (nếu có chọn file và sách là eBook)
-        if (bookId && pdfFile && payload.book_type === 'EBOOK') {
+        // Upload PDF khi sách EBOOK hoặc BOTH (BE đã cho phép cả hai)
+        if (bookId && pdfFile && (payload.book_type === 'EBOOK' || payload.book_type === 'BOTH')) {
           const pdfData = new FormData();
           pdfData.append('file', pdfFile);
           await axiosInstance.post(`/api/admin/books/${bookId}/upload-pdf`, pdfData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
+            params: { preview_pages: validPreviewPages || 10, is_free: false, borrow_days: 14 },
           });
         }
 
@@ -1205,12 +1229,15 @@ export default function CatalogManagement() {
             </div>
             
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">ISBN</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                ISBN <span className="normal-case font-medium text-slate-400">(chỉ hiển thị — BE chưa lưu)</span>
+              </label>
               <Input 
                 value={bookForm.isbn}
                 onChange={(e) => handleFieldChange('isbn', e.target.value)}
                 className="w-full" 
-                placeholder="Nhập mã ISBN..."
+                placeholder="Chưa có trên API sách"
+                disabled
               />
             </div>
             <div>
@@ -1279,10 +1306,11 @@ export default function CatalogManagement() {
               >
                 <option value="Vật lý">Vật lý</option>
                 <option value="eBook">eBook</option>
+                <option value="BOTH">Cả hai</option>
               </select>
             </div>
 
-            {bookForm.bookType === 'eBook' && (
+            {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                   Số trang xem trước (Preview Pages)
@@ -1414,11 +1442,11 @@ export default function CatalogManagement() {
               )}
             </div>
 
-            {bookForm.bookType === 'eBook' && (
+            {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
               <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4">
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
                   <Upload className="w-3.5 h-3.5 text-rose-500" />
-                  Tải lên tệp PDF (eBook)
+                  Tải lên tệp PDF (eBook / Cả hai)
                 </label>
                 <label className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-rose-400 transition-colors">
                   <span className="text-sm font-medium text-slate-700 truncate">

@@ -43,3 +43,5 @@ node_modules/
 htmlcov/
 .venv_seed/
 back_fast_api/.venv_seed/
+
+*.pdf

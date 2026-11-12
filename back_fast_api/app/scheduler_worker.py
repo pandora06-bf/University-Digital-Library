@@ -137,7 +137,7 @@ def configure_scheduler():
     scheduler.add_job(run_ebook_expiry_job, "interval", minutes=5, id="JOB-05", replace_existing=True)
     for job_id, module, func in [
         ("JOB-04", "app.services.job_hold_expiry", "job_hold_expiry"),
-        ("JOB-06", "app.services.qr_service", "run_qr_expiry_job"),
+        ("JOB-06", "app.services.room_booking_service", "run_room_noshow_job"),
         ("JOB-07", "app.services.wallet_service", "run_topup_expiry_job"),
         # SRS gọi đây là JOB-03, nhưng id đó đã dùng cho run_due_reminder_job ở
         # trên nên hủy phiếu PENDING_PICKUP quá hạn nhận sách (3-01.a / UC05)

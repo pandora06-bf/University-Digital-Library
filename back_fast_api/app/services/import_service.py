@@ -24,10 +24,10 @@ def parse_upload(data: bytes, filename: str):
             text = data.decode('utf-8-sig')
         except UnicodeDecodeError as exc:
             raise ValueError('CSV phải có mã hóa UTF-8') from exc
-        reader = csv.DictReader(io.StringIO(text))
-        if not reader.fieldnames or not all(x in reader.fieldnames for x in REQUIRED):
+        reader = csv.DictReader(io.StringIO(text, newline=''))
+        if not reader.fieldnames or len(set(reader.fieldnames)) != len(reader.fieldnames) or not all(x in reader.fieldnames for x in REQUIRED):
             raise ValueError('Thiếu cột bắt buộc: ' + ', '.join(REQUIRED))
-        return [(n, row) for n, row in enumerate(reader, start=2)]
+        return [(n, row) for n, row in enumerate(reader, start=2) if any(str(v or '').strip() for v in row.values() if v is not None)]
     if lower.endswith('.xlsx'):
         try:
             from openpyxl import load_workbook
@@ -38,9 +38,9 @@ def parse_upload(data: bytes, filename: str):
             sheet = wb.active
             iterator = sheet.iter_rows(values_only=True)
             headers = [str(x).strip() if x is not None else '' for x in next(iterator, ())]
-            if not all(x in headers for x in REQUIRED):
+            if len(set(headers)) != len(headers) or not all(x in headers for x in REQUIRED):
                 raise ValueError('Thiếu cột bắt buộc: ' + ', '.join(REQUIRED))
-            return [(n, dict(zip(headers, vals))) for n, vals in enumerate(iterator, start=2)]
+            return [(n, dict(zip(headers, vals))) for n, vals in enumerate(iterator, start=2) if any(str(v or '').strip() for v in vals)]
         finally:
             wb.close()
     raise ValueError('Chỉ hỗ trợ tệp .csv hoặc .xlsx')
@@ -50,6 +50,8 @@ def import_accounts(db: Session, rows):
     for number, raw in rows:
         row = {k: str(raw.get(k) or '').strip() for k in REQUIRED}
         try:
+            if raw.get(None):
+                raise ValueError('Dòng có nhiều cột hơn tiêu đề CSV')
             if any(not row[x] for x in REQUIRED):
                 raise ValueError('Thiếu trường bắt buộc')
             if row['role'].upper() not in ROLES:
@@ -58,6 +60,8 @@ def import_accounts(db: Session, rows):
                 raise ValueError('Email không hợp lệ')
             if len(row['username']) > 50 or len(row['user_code']) > 50 or len(row['full_name']) > 100 or len(row['email']) > 100 or len(row['department']) > 100:
                 raise ValueError('Dữ liệu vượt độ dài cho phép')
+            if not re.fullmatch(r'[A-Za-z0-9_.-]+', row['username']):
+                raise ValueError('Username chỉ được chứa chữ Latin, số, dấu chấm, gạch dưới hoặc gạch ngang')
             if db.scalar(select(Account.id).where(Account.username == row['username'])):
                 raise ValueError('Trùng username')
             if db.get(User, row['user_code']):
