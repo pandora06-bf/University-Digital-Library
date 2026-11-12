@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, books, loans, users
+from app.routers import auth, books, users, loans, fines_router
 from app.routers.admin_book_router import router as admin_book_router
 from app.routers.admin_category_router import router as admin_category_router
 from app.routers.admin_inventory_router import router as admin_inventory_router
@@ -52,6 +52,7 @@ app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(users.router)
 app.include_router(loans.router)
+app.include_router(fines_router.router)
 app.include_router(admin_book_router)
 app.include_router(admin_category_router)
 app.include_router(admin_inventory_router)
