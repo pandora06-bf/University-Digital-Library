@@ -1,5 +1,6 @@
 """4-01.b: Hoàn tất báo mất/hỏng từ phiếu đang mượn, toàn bộ transaction do caller commit."""
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -13,6 +14,7 @@ RATE = Decimal('5000')
 
 def record_incident(db: Session, loan_id: int, incident_type: str, description: str,
                     manual_penalty=None, manual_reason=None):
+    incident_type = incident_type.upper().strip()
     if incident_type not in ('BOOK_LOST', 'BOOK_DAMAGED'):
         raise HTTPException(422, 'Loại sự cố không hợp lệ')
     loan = db.scalar(select(Loan).where(Loan.id == loan_id).with_for_update())
@@ -24,13 +26,17 @@ def record_incident(db: Session, loan_id: int, incident_type: str, description: 
         raise HTTPException(409, 'Phiếu mượn đã có biên bản sự cố')
     user = db.scalar(select(User).where(User.user_code == loan.user_code).with_for_update())
     book = db.get(Book, loan.book_id)
+    if not loan.copy_barcode:
+        raise HTTPException(409, 'Phiếu không gắn với bản sao sách giấy để báo mất/hỏng')
     copy = db.scalar(select(BookCopy).where(BookCopy.copy_barcode == loan.copy_barcode).with_for_update()) if loan.copy_barcode else None
+    if copy is None:
+        raise HTTPException(409, 'Không tìm thấy bản sao sách của phiếu mượn')
     price = Decimal(book.price or 0) if book else Decimal(0)
     if price <= 0:
         if manual_penalty is None or Decimal(str(manual_penalty)) <= 0 or not (manual_reason or '').strip():
             raise HTTPException(422, 'Sách thiếu giá bìa: phải nhập số tiền bồi thường và lý do')
         price = Decimal(str(manual_penalty))
-    now = datetime.now()
+    now = datetime.now(ZoneInfo('Asia/Ho_Chi_Minh')).replace(tzinfo=None)
     days = max((now.date() - loan.due_date.date()).days, 0)
     fine = db.scalar(select(Fine).where(Fine.loan_id == loan.id).with_for_update())
     # Không nhân đôi khoản quá hạn đã ghi nhận, chỉ tính phần chưa phản ánh trong fine.

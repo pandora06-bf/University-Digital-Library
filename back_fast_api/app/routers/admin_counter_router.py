@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_roles
-from app.models.user import Account
+from app.models.user import Account, User
+from app.models.loan import Loan
+from app.services.email_notifier import send_incident_notice, send_fine_paid
 from app.schemas.loan import (
     FineCollectRequest,
     LoanCheckinRequest,
@@ -99,9 +101,10 @@ def api_checkout_loan(
 @router.post("/loans/checkin", summary="Nhận sách trả lại, tính phạt quá hạn hoặc báo sự cố")
 def api_checkin_loan(
     payload: LoanCheckinRequest,
+    tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    return checkin_at_counter_service(
+    result = checkin_at_counter_service(
         db=db,
         copy_barcode=payload.copy_barcode,
         condition_notes=payload.condition_notes,
@@ -109,6 +112,15 @@ def api_checkin_loan(
         is_damaged=payload.is_damaged,
         damage_penalty=payload.damage_penalty,
     )
+    if result.get('incident') == 'INCIDENT_RECORDED':
+        loan = db.get(Loan, result['loan_id'])
+        debtor = db.get(User, loan.user_code) if loan else None
+        if debtor and debtor.email:
+            tasks.add_task(send_incident_notice, debtor.email, debtor.full_name,
+                           result['incident_id'],
+                           'BOOK_LOST' if payload.is_lost else 'BOOK_DAMAGED',
+                           str(result['penalty_amount']))
+    return result
 
 
 # ----------------------------------------------------------------------
@@ -128,6 +140,7 @@ def api_lookup_fines(
 @router.post("/fines/collect", summary="Xác nhận đã thu đủ tiền phạt bằng tiền mặt tại quầy")
 def api_collect_fines(
     payload: FineCollectRequest,
+    tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: Account = Depends(require_roles("ADMIN", "LIBRARIAN")),
 ):
@@ -155,5 +168,9 @@ def api_collect_fines(
     }
     if warning:
         response["warning"] = warning
+    payer = db.get(User, payload.user_code)
+    if payer and payer.email:
+        tasks.add_task(send_fine_paid, payer.email, payer.full_name,
+                       str(payment.amount_paid), int(payer.service_balance or 0))
 
     return response
