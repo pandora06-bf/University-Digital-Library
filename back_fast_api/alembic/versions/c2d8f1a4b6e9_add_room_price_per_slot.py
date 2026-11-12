@@ -1,7 +1,7 @@
 """add_room_price_per_slot
 
 Revision ID: c2d8f1a4b6e9
-Revises: f3b6a2c9e7d1
+Revises: n1311room01
 Create Date: 2026-11-12 09:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "c2d8f1a4b6e9"
-down_revision: Union[str, Sequence[str], None] = "f3b6a2c9e7d1"
+down_revision: Union[str, Sequence[str], None] = "n1311room01"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
