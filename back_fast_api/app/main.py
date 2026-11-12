@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.routers import auth, books, loans, users
+from app.routers import auth, books, users, loans, fines_router
 from app.routers.admin_book_router import router as admin_book_router
 from app.routers.admin_category_router import router as admin_category_router
 from app.routers.admin_inventory_router import router as admin_inventory_router
@@ -14,10 +14,6 @@ from app.routers.admin_counter_router import router as admin_counter_router
 from app.routers.waitlist_router import router as waitlist_router
 from app.routers.wallet_router import router as wallet_router
 from app.routers.webhook_router import router as webhook_router
-from app.routers.admin_user_import_router import router as admin_user_import_router
-from app.routers.room_booking_router import router as room_booking_router
-from app.routers.fine_wallet_router import router as fine_wallet_router
-from app.routers.admin_incident_router import router as admin_incident_router
 from app.core.exception_handlers import register_exception_handlers
 
 app = FastAPI(
@@ -56,6 +52,7 @@ app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(users.router)
 app.include_router(loans.router)
+app.include_router(fines_router.router)
 app.include_router(admin_book_router)
 app.include_router(admin_category_router)
 app.include_router(admin_inventory_router)
@@ -63,14 +60,6 @@ app.include_router(admin_counter_router)
 app.include_router(waitlist_router)
 app.include_router(wallet_router)
 app.include_router(webhook_router)
-<<<<<<< HEAD
-=======
-app.include_router(fines_router)
-app.include_router(admin_user_import_router)
-app.include_router(room_booking_router)
-app.include_router(fine_wallet_router)
-app.include_router(admin_incident_router)
->>>>>>> origin/main
 
 
 @app.get("/")
@@ -84,7 +73,6 @@ def root():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-<<<<<<< HEAD
 
 from app.routers.admin_user_import_router import router as admin_user_import_router
 from app.routers.room_booking_router import router as room_booking_router
@@ -97,5 +85,3 @@ app.include_router(admin_incident_router)
 
 from app.routers.admin_user_router import router as admin_user_router
 app.include_router(admin_user_router)
-=======
->>>>>>> origin/main

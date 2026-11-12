@@ -75,7 +75,6 @@ export default function UserManagement() {
       const { data } = await axiosInstance.get('/api/admin/users', {
         params: { q: debouncedQ || undefined, role: roleFilter === 'ALL' ? undefined : roleFilter, page, page_size: PAGE_SIZE },
       });
-<<<<<<< HEAD
       setAllUsers((data?.items || []).map(mapApiUser));
       setTotalCount(data?.total || 0);
       setApiError('');
@@ -83,16 +82,6 @@ export default function UserManagement() {
       setApiError(getApiErrorMessage(error, 'Không tải được danh sách người dùng từ API.'));
       setAllUsers([]);
       setTotalCount(0);
-=======
-      // Response 2xx (kể cả danh sách rỗng) = API list đã có — không ép mock
-      const items = data?.items || data?.users || (Array.isArray(data) ? data : []);
-      setUseMock(false);
-      setAllUsers(items.map(mapApiUser));
-    } catch {
-      // Chỉ fallback mock khi request lỗi (404/5xx) — đúng với BE hiện tại
-      setUseMock(true);
-      refreshMock();
->>>>>>> origin/main
     } finally {
       setLoading(false);
     }
@@ -248,7 +237,6 @@ export default function UserManagement() {
   const handleResetPassword = async (row) => {
     try {
       const accountId = row.account_id;
-<<<<<<< HEAD
       if (accountId == null) {
         showToast('Thiếu Account.id, không thể reset mật khẩu.', 'error');
         return;
@@ -257,28 +245,6 @@ export default function UserManagement() {
       const temp = data?.temporary_password;
       if (temp) setTempPassword({ user_code: row.user_code, password: temp });
       showToast('Đã cấp mật khẩu tạm.', 'success');
-=======
-      if (!useMock && accountId != null) {
-        const { data } = await axiosInstance.post(
-          `/api/admin/users/${accountId}/reset-password`
-        );
-        const temp = data?.temporary_password || data?.temp_password || data?.password;
-        if (!temp) {
-          showToast('Máy chủ không trả mật khẩu tạm.', 'warning');
-          return;
-        }
-        setTempPassword({ user_code: row.user_code, password: temp });
-        showToast('Mật khẩu tạm chỉ hiện một lần — hãy ghi lại.', 'success');
-        return;
-      }
-      if (!useMock && accountId == null) {
-        showToast('Thiếu account_id — API đặt lại mật khẩu cần Account.id, không dùng MSSV.', 'warning');
-        return;
-      }
-      const temp = issueTempPassword(row.user_code);
-      setTempPassword({ user_code: row.user_code, password: temp });
-      showToast('Mật khẩu tạm (dữ liệu mẫu) — chỉ hiện một lần.', 'success');
->>>>>>> origin/main
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đặt lại mật khẩu.'), 'error');
     }
@@ -302,11 +268,7 @@ export default function UserManagement() {
         `Import xong: ${created} tài khoản mới` + (skipped ? `, ${skipped} bỏ qua/lỗi` : ''),
         'success'
       );
-<<<<<<< HEAD
       await fetchUsers();
-=======
-      // Danh sách vẫn mock vì BE chưa có GET /users — chỉ báo kết quả import
->>>>>>> origin/main
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Import thất bại.'), 'error');
     } finally {
@@ -422,11 +384,7 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-<<<<<<< HEAD
             Quản lý tài khoản qua API thật: danh sách, thêm, sửa, khóa và đặt lại mật khẩu.
-=======
-            BE hiện chỉ có import CSV/XLSX và đặt lại mật khẩu theo Account.id — danh sách/CRUD/khóa vẫn dùng mẫu.
->>>>>>> origin/main
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -460,19 +418,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-<<<<<<< HEAD
       {apiError && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{apiError}</div>}
-=======
-      {useMock && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Danh sách đang dùng dữ liệu mẫu</p>
-          <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            BE chưa có GET/CRUD/khóa <code className="bg-amber-100 px-1 rounded">/api/admin/users</code>.
-            Chỉ <strong>Import CSV/XLSX</strong> và reset mật khẩu (Account.id) ghi máy chủ; thêm/sửa/khóa trên bảng chỉ lưu trình duyệt.
-          </p>
-        </div>
-      )}
->>>>>>> origin/main
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
