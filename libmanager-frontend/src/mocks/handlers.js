@@ -82,7 +82,10 @@ const categories = () => [
 
 export const handlers = [
   http.post('*/api/auth/login', async ({ request }) => {
-    const { username = '' } = await request.json();
+    const { username = '', password = '' } = await request.json();
+    if (password === 'WrongPassword@999' || password === 'wrong_password') {
+      return HttpResponse.json({ detail: 'Sai tên đăng nhập hoặc mật khẩu' }, { status: 401 });
+    }
     const isAdmin = /admin|thuthu/i.test(username);
     return HttpResponse.json({
       access_token: 'mock-jwt-demo-token',
@@ -129,7 +132,9 @@ export const handlers = [
   http.get('*/api/books/categories', () => HttpResponse.json(categories())),
   http.get('*/api/admin/categories', () => HttpResponse.json(categories())),
   http.get('*/api/books/:id', ({ params }) => {
-    const book = API_BOOKS.find((item) => String(item.id) === String(params.id));
+    const rawId = String(params.id);
+    const numId = rawId.replace(/^b/i, '');
+    const book = API_BOOKS.find((item) => String(item.id) === rawId || String(item.id) === numId);
     return book ? HttpResponse.json(book) : HttpResponse.json({ detail: 'Khong tim thay sach' }, { status: 404 });
   }),
   http.get('*/api/admin/books/:id/copies', ({ params }) => {

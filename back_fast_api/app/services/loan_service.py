@@ -597,59 +597,24 @@ def checkin_at_counter_service(
     user = db.scalar(select(User).where(User.user_code == loan.user_code).with_for_update())
     now = datetime.utcnow()
 
-    # TRƯỜNG HỢP 1: Sách mất hoặc hỏng nặng -> Chuyển sang biên bản UC15
+    # Cùng một nghiệp vụ báo sự cố cho cả endpoint trả tại quầy và UC15,
+    # tránh ghi Fine/Incident hai lần hoặc ghi thiếu tiền quá hạn trước đó.
     if is_lost or is_damaged:
-        loan.loan_status = "LOST" if is_lost else "RETURNED"
-        loan.return_date = now
-        loan.checkin_condition = condition_notes or ("Báo mất sách" if is_lost else "Sách hỏng nặng")
-
-        if copy:
-            copy.status = "RETIRED"  # Ngừng lưu hành bản sao (BR-29)
-
-        # Tính bồi thường theo giá bìa hoặc thủ công (BR-28)
-        penalty = Decimal(book.price) if (book and book.price > 0) else (damage_penalty or Decimal(100000))
-
-        # Nếu đang quá hạn, chốt thêm tiền phạt trễ hạn tính đến thời điểm báo (BR-21, BR-28)
-        overdue_fine = Decimal(0)
-        if now > loan.due_date:
-            days = (now.date() - loan.due_date.date()).days
-            if days > 0:
-                overdue_fine = Decimal(days) * Decimal(5000)
-                fine_record = Fine(
-                    loan_id=loan.id,
-                    user_code=user.user_code,
-                    overdue_days=days,
-                    fine_rate=Decimal(5000),
-                    total_amount=overdue_fine,
-                    payment_status="UNPAID",
-                    created_at=now,
-                )
-                db.add(fine_record)
-
-        total_incident_penalty = penalty + overdue_fine
-
-        incident = Incident(
-            loan_id=loan.id,
-            user_code=user.user_code,
-            incident_type="BOOK_LOST" if is_lost else "BOOK_DAMAGED",
-            severity="SEVERE",
-            penalty_amount=total_incident_penalty,
-            description=condition_notes,
-            status="RESOLVED",
-            created_at=now,
+        from app.services.incident_service import record_incident
+        result = record_incident(
+            db, loan.id, 'BOOK_LOST' if is_lost else 'BOOK_DAMAGED',
+            condition_notes or ('Báo mất sách' if is_lost else 'Sách hỏng nặng'),
+            manual_penalty=damage_penalty,
+            manual_reason='Bồi thường xác nhận bởi thủ thư tại quầy' if damage_penalty is not None else None,
         )
-        db.add(incident)
-
-        user.total_fines += total_incident_penalty
-        user.is_borrowing_blocked = True  # Khóa quyền mượn (BR-15, BR-29)
-
         db.commit()
         return {
-            "loan_id": loan.id,
-            "status": loan.loan_status,
-            "incident": "INCIDENT_RECORDED",
-            "penalty_amount": total_incident_penalty,
-            "message": "Đã lập biên bản sự cố UC15 và ghi nhận bồi thường"
+            'loan_id': loan.id,
+            'status': result['loan_status'],
+            'incident': 'INCIDENT_RECORDED',
+            'incident_id': result['incident_id'],
+            'penalty_amount': Decimal(result['penalty_amount']),
+            'message': 'Đã lập biên bản sự cố UC15 và ghi nhận bồi thường',
         }
 
     # TRƯỜNG HỢP 2: Trả sách bình thường (BR-04, BR-21)

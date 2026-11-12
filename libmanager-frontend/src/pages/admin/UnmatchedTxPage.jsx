@@ -152,7 +152,8 @@ export default function UnmatchedTxPage() {
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
         <p className="text-amber-800/90 mt-0.5 text-[13px]">
-          API giao dịch chưa khớp chưa sẵn sàng. Gán người dùng chỉ mô phỏng trên trình duyệt, không cộng ví thật.
+          BE chưa có endpoint admin list/gán unmatched — bảng <code className="bg-amber-100 px-1 rounded">unmatched_tx</code> chỉ được webhook ngân hàng ghi.
+          Gán người dùng trên trang này chỉ mô phỏng localStorage, không cộng ví thật.
         </p>
       </div>
 

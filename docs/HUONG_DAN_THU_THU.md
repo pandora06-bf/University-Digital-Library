@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **06/11/2026** |
+| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **08/11/2026** |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **URL (Docker)** | http://localhost:5174 |
@@ -27,12 +27,12 @@ Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đủ các mục qu
 | Màn hình | Đường dẫn | Máy chủ |
 |----------|-----------|---------|
 | Danh mục sách | `/admin/catalog` | **Đã nối** (CRUD + thể loại + bìa/PDF) |
-| eBook / PDF | `/admin/ebooks` | **Danh sách + tải PDF** đã nối. **Xem trước** đang lỗi với dữ liệu mẫu |
+| eBook / PDF | `/admin/ebooks` | **Đã nối** list + upload + preview (`ebook_router`). Chỉ hiện «Sẵn sàng» khi `has_pdf` |
 | Tồn kho | `/admin/inventory` | **Đã nối** (bản sao / thanh lý) |
 | Mượn / Trả | `/admin/loans` | **Đã nối** tra cứu / xuất mượn / nhận trả |
 | Thu phạt | `/admin/fines` | **Đã nối** tra một mã bạn đọc + thu đủ nợ. Không có danh sách mọi phiếu |
-| Báo mất / Hỏng | `/admin/incidents` | **Tạo** qua nhận trả khi phiếu còn đang mượn. **Danh sách** lưu trên trình duyệt |
-| Người dùng | `/admin/users` | **Mẫu FE** |
+| Báo mất / Hỏng | `/admin/incidents` | **Đã nối** `GET /api/admin/incidents` + tạo `POST /api/admin/loans/incident` |
+| Người dùng | `/admin/users` | **Mẫu FE** (chưa có list-all; có import/reset riêng) |
 | Phòng học nhóm | `/admin/rooms` | **Mẫu FE** |
 | Check-in phòng | `/admin/rooms/checkin` | **Mẫu FE** |
 | GD chưa khớp | `/admin/unmatched` | **Mẫu FE** (không cộng ví thật) |
@@ -81,13 +81,12 @@ Mất hoặc hỏng nặng: lập tiếp ở **Báo mất / Hỏng**. Tiền ph�
 
 ## 4. Báo mất / hỏng — `/admin/incidents`
 
-1. **Lập biên bản** → nhập **mã bạn đọc** hoặc **số id phiếu** → **Tra cứu**.
-2. Chỉ phiếu **BORROWED** hoặc **OVERDUE** được điền vào form. Quét barcode ở ô này hiện chưa ra phiếu.
-3. Chọn mất hoặc hỏng, mô tả, tiền bồi thường (tra cứu chưa trả giá bìa, nhập tay nếu ô tiền bằng 0) → Lưu.
+1. Bảng danh sách lấy từ `GET /api/admin/incidents`.
+2. **Lập biên bản** → nhập **mã bạn đọc** hoặc **số id phiếu** → **Tra cứu**.
+3. Chỉ phiếu **BORROWED** hoặc **OVERDUE** được điền vào form. Quét barcode ở ô này hiện chưa ra phiếu.
+4. Chọn mất hoặc hỏng, mô tả, tiền bồi thường (tra cứu chưa trả giá bìa, nhập tay nếu ô tiền bằng 0) → Lưu.
 
-Máy chủ ghi sự cố qua luồng nhận trả. Bảng trên màn hình vẫn là dữ liệu trình duyệt, không hiện biên bản đã có sẵn trong database (mẫu mất sách `SV-DEMO-005`).
-
-Phiếu quá hạn đã có phạt thì lưu biên bản bị từ chối.
+Lưu ưu tiên `POST /api/admin/loans/incident`. Nếu thiếu `loan_id` hợp lệ mới thử luồng nhận trả. Phiếu quá hạn đã có phạt có thể bị từ chối.
 
 ---
 
@@ -109,11 +108,11 @@ Sau thanh lý, bản sao ở lại danh sách của đầu sách với trạng t
 
 ### `/admin/ebooks`
 
-Danh sách gồm sách `EBOOK` và `BOTH`. Tải PDF lên đầu sách loại `EBOOK`.
+Danh sách gồm sách `EBOOK` và `BOTH` từ search. Cột trạng thái: **Sẵn sàng** chỉ khi máy chủ báo `has_pdf`; chưa có PDF thì **Chưa có PDF** (không bịa tên `ebook-{id}.pdf`).
 
-Form tải có **trang xem trước (5–10)** và **miễn phí đọc toàn bộ**. Số ngày mượn ebook gửi sẵn 14 ngày, không có ô nhập.
+Tải / thay PDF được với đầu sách `EBOOK` hoặc `BOTH`. Form có **trang xem trước (5–10)** và **miễn phí đọc toàn bộ**; `borrow_days` gửi sẵn 14.
 
-**Xem trước** với dữ liệu mẫu hiện báo **Không tìm thấy eBook**: sách demo loại `BOTH` bị máy chủ từ chối, sách loại `EBOOK` chưa có file đính kèm.
+**Xem trước** gọi `GET /api/ebooks/{id}/preview` (router đã gắn). Nút mắt khóa khi chưa có PDF. Seed cũ ghi `demo/ebook-NNN.pdf` vẫn mở được nếu file `ebook-NNN.pdf` có trong `private_storage/ebooks/`.
 
 ---
 
@@ -167,6 +166,7 @@ Gán giao dịch nạp tiền chưa khớp. Chỉ mô phỏng trên trình duy�
 - `GET /api/admin/fines/lookup`
 - `POST /api/admin/fines/collect`
 - Sách, thể loại, tồn kho
-- `GET /api/ebooks/{id}/preview` đã được gắn. Dữ liệu mẫu vẫn chưa xem trước được
+- `GET /api/ebooks/{id}/preview` — đã gắn; search trả `has_pdf` / `preview_pages` / `is_free`
+- `GET /api/admin/incidents`, `POST /api/admin/loans/incident`
 
 Swagger: http://localhost:8010/docs (đăng nhập admin lấy JWT trước khi thử).

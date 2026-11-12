@@ -139,7 +139,11 @@ def search_books_advanced(
 
     # 4. Phân trang + eager loading
     paginated_stmt = (
-        stmt.options(joinedload(Book.category), joinedload(Book.subject))
+        stmt.options(
+            joinedload(Book.category),
+            joinedload(Book.subject),
+            joinedload(Book.ebook),
+        )
         .limit(page_size)
         .offset(offset)
     )
