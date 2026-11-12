@@ -187,9 +187,7 @@ export default function RoomManagement() {
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
         <p className="text-amber-800/90 mt-0.5 text-[13px]">
-          BE chưa có CRUD admin cho phòng — chỉ có đặt phòng phía bạn đọc và{' '}
-          <code className="bg-amber-100 px-1 rounded">POST /api/admin/room-bookings/checkin</code>.
-          Thêm/sửa/xóa phòng trên trang này chỉ lưu trình duyệt.
+          API quản trị phòng học chưa sẵn sàng. Thao tác chỉ lưu trên trình duyệt, không ghi máy chủ.
         </p>
       </div>
 

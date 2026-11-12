@@ -1,6 +1,6 @@
 from datetime import date, time
 from fastapi import APIRouter, Depends, Query, status, BackgroundTasks
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -17,7 +17,6 @@ class RoomBookingCreate(BaseModel):
     booking_date: date
     slot_start: time
     slot_end: time
-    attendee_count: int = Field(default=1, ge=1)
 
 class CheckinBody(BaseModel):
     booking_id: int
@@ -25,7 +24,7 @@ class CheckinBody(BaseModel):
 @router.post('/api/room-bookings', status_code=status.HTTP_201_CREATED)
 def book(data: RoomBookingCreate, tasks: BackgroundTasks, user=Depends(get_current_user), db: Session = Depends(get_db)):
     try:
-        result = svc.reserve(db, user.user_code, data.room_id, data.booking_date, data.slot_start, data.slot_end, data.attendee_count)
+        result = svc.reserve(db, user.user_code, data.room_id, data.booking_date, data.slot_start, data.slot_end)
         payload = svc.booking_data(result)
         room = db.get(Room, data.room_id)
         name = room.room_name if room else str(data.room_id)

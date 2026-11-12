@@ -24,30 +24,18 @@ function formatSize(file) {
 }
 
 function mapApiEbook(book) {
-  const hasPdf = Boolean(
-    book.has_pdf
-      ?? book.hasPdf
-      ?? book.ebook
-      ?? book.filename
-      ?? book.file_path
-  );
-  const filename = book.filename
-    || (typeof book.file_path === 'string' ? book.file_path.split('/').pop() : null)
-    || (typeof book.ebook?.file_path === 'string' ? book.ebook.file_path.split('/').pop() : null);
   return {
     id: book.id,
     title: book.title || `Sách #${book.id}`,
-    bookType: book.book_type || book.bookType || 'EBOOK',
-    filename: hasPdf ? (filename || 'PDF đã gắn') : '—',
+    filename: book.filename || `ebook-${book.id}.pdf`,
     size: book.size || '—',
     uploadDate: book.uploadDate
       || (book.updated_at
         ? new Date(book.updated_at).toLocaleDateString('vi-VN')
         : '—'),
-    status: hasPdf ? 'Sẵn sàng' : 'Chưa có PDF',
-    hasPdf,
-    previewPages: book.preview_pages ?? book.previewPages ?? book.ebook?.preview_pages ?? 10,
-    isFree: Boolean(book.is_free ?? book.isFree ?? book.ebook?.is_free),
+    status: 'Sẵn sàng',
+    previewPages: book.preview_pages ?? book.previewPages ?? 10,
+    isFree: Boolean(book.is_free ?? book.isFree),
     fromApi: true,
   };
 }
@@ -69,7 +57,7 @@ export default function EbookManagement() {
   const [isFree, setIsFree] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const readyCount = rows.filter((r) => r.hasPdf || r.status === 'Sẵn sàng').length;
+  const readyCount = rows.filter((r) => r.status === 'Sẵn sàng').length;
 
   const loadFromApi = useCallback(async () => {
     setLoading(true);
@@ -137,12 +125,10 @@ export default function EbookManagement() {
       const nextRow = {
         id: Number(bookId),
         title: book?.title || titleHint || `Sách #${bookId}`,
-        bookType: book?.bookType || 'EBOOK',
         filename: file.name,
         size: formatSize(file),
         uploadDate: new Date().toLocaleDateString('vi-VN'),
         status: 'Sẵn sàng',
-        hasPdf: true,
         previewPages: pages,
         isFree,
         fromApi: true,
@@ -158,8 +144,8 @@ export default function EbookManagement() {
     const form = new FormData();
     form.append('file', file);
     const pages = Math.min(10, Math.max(5, parseInt(previewPages, 10) || 10));
-    // Không gắn Content-Type tay — Axios tự thêm boundary cho FormData.
     await axiosInstance.post(`/api/admin/books/${bookId}/upload-pdf`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
       params: { preview_pages: pages, is_free: isFree, borrow_days: 14 },
     });
   };
@@ -254,10 +240,6 @@ export default function EbookManagement() {
   };
 
   const handlePreview = async (row) => {
-    if (!row.hasPdf && row.status !== 'Sẵn sàng') {
-      showToast('Đầu sách này chưa có tệp PDF để xem trước.', 'warning');
-      return;
-    }
     try {
       const { data } = await axiosInstance.get(`/api/ebooks/${row.id}/preview`, {
         responseType: 'blob',
@@ -274,7 +256,7 @@ export default function EbookManagement() {
       const status = error?.response?.status;
       if (status === 404) {
         showToast(
-          'Không tìm thấy PDF xem trước. Kiểm tra đầu sách đã có tệp và máy chủ đã bật /api/ebooks/{id}/preview.',
+          'Xem trước PDF chưa khả dụng: endpoint chưa bật trên máy chủ hoặc đầu sách chưa có tệp PDF.',
           'error'
         );
         return;
@@ -300,20 +282,13 @@ export default function EbookManagement() {
     {
       key: 'title',
       header: 'Tên Sách',
-      render: (val, row) => (
-        <div>
-          <span className="font-semibold text-slate-800 block">{val}</span>
-          {row.bookType && (
-            <span className="text-[11px] text-slate-400 font-medium">{row.bookType}</span>
-          )}
-        </div>
-      ),
+      render: (val) => <span className="font-semibold text-slate-800">{val}</span>,
     },
     {
       key: 'filename',
       header: 'Tên File PDF',
-      render: (val, row) => (
-        <div className={`flex items-center gap-2 ${row.hasPdf === false ? 'text-slate-400' : 'text-indigo-600'}`}>
+      render: (val) => (
+        <div className="flex items-center gap-2 text-indigo-600">
           <FileText className="w-4 h-4 shrink-0" />
           <span className="font-medium text-sm truncate max-w-[240px]" title={val}>{val}</span>
         </div>
@@ -344,9 +319,8 @@ export default function EbookManagement() {
           <button
             type="button"
             onClick={() => handlePreview(row)}
-            disabled={row.hasPdf === false}
-            className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={row.hasPdf === false ? 'Chưa có PDF' : 'Xem trước PDF'}
+            className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors"
+            title="Xem trước PDF"
           >
             <Eye className="w-4 h-4" />
           </button>

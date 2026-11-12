@@ -364,10 +364,8 @@ def seed_database():
                 db.add(
                     Ebook(
                         id=book.id,
-                        file_path=f"private:ebooks/ebook-{index:03d}.pdf",
+                        file_path=f"demo/ebook-{index:03d}.pdf",
                         is_free=index % 5 == 0,
-                        preview_pages=10,
-                        borrow_days=14,
                     )
                 )
 

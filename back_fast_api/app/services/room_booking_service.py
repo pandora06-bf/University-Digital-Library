@@ -9,34 +9,27 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.models.room import Room, RoomBooking
-from app.models.user import User, Account
+from app.models.user import User
 
 ACTIVE = ('CONFIRMED', 'CHECKED_IN')
 
 def booking_data(booking):
     return {'id': booking.id, 'room_id': booking.room_id, 'user_code': booking.user_code,
-            'booking_date': booking.booking_date, 'attendee_count': booking.attendee_count, 'slot_start': booking.slot_start,
+            'booking_date': booking.booking_date, 'slot_start': booking.slot_start,
             'slot_end': booking.slot_end, 'status': booking.status, 'checkin_time': booking.checkin_time}
 
-def reserve(db: Session, user_code: str, room_id: int, booking_date, slot_start, slot_end, attendee_count: int = 1):
+def reserve(db: Session, user_code: str, room_id: int, booking_date, slot_start, slot_end):
     now = local_now()
     start = datetime.combine(booking_date, slot_start)
     end = datetime.combine(booking_date, slot_end)
-    if slot_start.tzinfo is not None or slot_end.tzinfo is not None:
-        raise HTTPException(422, 'Khung giờ phải dùng giờ địa phương không có timezone')
     if start <= now or end <= start or end - start != timedelta(hours=2):
         raise HTTPException(422, 'Phải chọn khung 2 giờ trong tương lai')
     # Lock phòng tuần tự hóa đặt chỗ cạnh tranh cho cùng phòng.
     room = db.scalar(select(Room).where(Room.id == room_id).with_for_update())
     if not room or not room.is_active:
         raise HTTPException(404, 'Phòng không tồn tại hoặc ngừng hoạt động')
-    if attendee_count < 1 or attendee_count > room.capacity:
-        raise HTTPException(422, f'Số người tham dự phải từ 1 đến {room.capacity}')
     user = db.scalar(select(User).where(User.user_code == user_code).with_for_update())
-    if user is None:
-        raise HTTPException(404, 'Không tìm thấy hồ sơ người dùng')
-    account = db.get(Account, user.account_id)
-    if user.is_borrowing_blocked or (account is not None and not account.is_active):
+    if user.is_borrowing_blocked:
         raise HTTPException(403, 'Tài khoản đang bị khóa')
     today_existing = db.scalar(select(RoomBooking.id).where(RoomBooking.user_code == user_code,
         RoomBooking.booking_date == booking_date, RoomBooking.status.in_(ACTIVE)))
@@ -48,7 +41,7 @@ def reserve(db: Session, user_code: str, room_id: int, booking_date, slot_start,
     if conflicting:
         raise HTTPException(409, 'Khung giờ đã có người đặt')
     booking = RoomBooking(room_id=room_id, user_code=user_code, booking_date=booking_date,
-                          slot_start=slot_start, slot_end=slot_end, attendee_count=attendee_count, status='CONFIRMED')
+                          slot_start=slot_start, slot_end=slot_end, status='CONFIRMED')
     db.add(booking)
     try:
         db.flush()

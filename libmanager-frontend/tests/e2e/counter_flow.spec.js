@@ -7,9 +7,7 @@ const CORS_HEADERS = {
 };
 
 test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
-  test.beforeEach(async ({ page, context }) => {
-    await context.clearCookies();
-
+  test.beforeEach(async ({ page }) => {
     await page.route(/\/api\/auth\/login/, async (route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({ status: 204, headers: CORS_HEADERS });
@@ -56,19 +54,20 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
 
     // Đăng nhập tài khoản admin để vào portal thủ thư
     await page.goto('/login');
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await page.reload();
     await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
     await page.getByPlaceholder('Nhập mật khẩu').fill('Admin@123');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
-    await expect(page).toHaveURL(/\/admin/);
+    await expect(page).toHaveURL(/\/admin(\/catalog)?$/);
   });
 
   test('Kiểm tra giao diện quầy lưu thông và tra cứu độc giả', async ({ page }) => {
-    // Chờ thanh điều hướng Admin sẵn sàng rồi click vào Quản lý Mượn / Trả
-    const loansNavLink = page.getByRole('link', { name: /Quản lý Mượn \/ Trả/i });
-    await expect(loansNavLink).toBeVisible({ timeout: 10000 });
-    await loansNavLink.click();
-
-    await expect(page.getByRole('heading', { name: /Quản lý Mượn \/ Trả Sách/i })).toBeVisible({ timeout: 10000 });
+    await page.goto('/admin/loans');
+    await expect(page.getByRole('heading', { name: 'Quản lý Mượn / Trả Sách' })).toBeVisible();
 
     // 1. Kiểm tra quầy trả sách
     await expect(page.getByRole('heading', { name: 'Quầy Nhận Trả Sách Nhanh' })).toBeVisible();

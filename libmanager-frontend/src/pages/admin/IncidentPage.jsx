@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { 
   AlertOctagon, Plus, Search, RotateCcw, Eye, 
   FileText, AlertTriangle, DollarSign,
@@ -34,72 +34,15 @@ const EMPTY_CREATE_FORM = {
   borrower_class: '',
 };
 
-function mapApiIncident(item) {
-  const rawType = String(item.incident_type || '').toUpperCase();
-  const incidentType = rawType.includes('LOST')
-    ? 'LOST'
-    : rawType.includes('DAMAGE')
-      ? 'DAMAGED'
-      : rawType || 'DAMAGED';
-  const created = item.created_at
-    ? new Date(item.created_at).toLocaleDateString('vi-VN')
-    : '—';
-  return {
-    id: String(item.id),
-    incident_code: `BB-${item.id}`,
-    loan_code: String(item.loan_id ?? item.loan_code ?? ''),
-    barcode: item.barcode || item.copy_barcode || '',
-    book_title: item.book_title || `Phiếu #${item.loan_id ?? item.id}`,
-    borrower_name: item.borrower_name || item.full_name || '',
-    borrower_code: item.user_code || item.borrower_code || '',
-    borrower_class: item.department || item.borrower_class || '',
-    incident_type: incidentType,
-    description: item.description || '',
-    book_price: Number(item.penalty_amount || item.book_price || 0),
-    compensation_amount: Number(item.penalty_amount || item.compensation_amount || 0),
-    created_at: created,
-    created_by: item.created_by || 'Máy chủ',
-    status: item.status || 'RESOLVED',
-    fromApi: true,
-  };
-}
-
 export default function IncidentPage() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
 
-  const [incidents, setIncidents] = useState([]);
-  const [usingMock, setUsingMock] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Danh sách biên bản sự cố từ mock data (khởi tạo qua lazy initializer)
+  const [incidents, setIncidents] = useState(() => getStoredIncidents());
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-
-  const loadIncidents = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await axiosInstance.get('/api/admin/incidents', {
-        params: { page: 1, size: 100 },
-      });
-      const items = data?.data || data?.items || (Array.isArray(data) ? data : []);
-      setIncidents(items.map(mapApiIncident));
-      setUsingMock(false);
-      return true;
-    } catch {
-      setIncidents(getStoredIncidents());
-      setUsingMock(true);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      loadIncidents();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadIncidents]);
 
   // Modal states
   const [detailRow, setDetailRow] = useState(null);
@@ -250,22 +193,8 @@ export default function IncidentPage() {
     let apiOk = false;
     let apiPenalty = compensation;
     let apiLoanId = createForm.loan_code;
-    let apiIncidentId = null;
     try {
-      const loanId = Number(createForm.loan_code);
-      if (Number.isFinite(loanId) && loanId > 0) {
-        const { data } = await axiosInstance.post('/api/admin/loans/incident', {
-          loan_id: loanId,
-          incident_type: isLost ? 'BOOK_LOST' : 'BOOK_DAMAGED',
-          description: createForm.description.trim(),
-          manual_penalty: compensation,
-          manual_reason: createForm.description.trim(),
-        });
-        apiOk = true;
-        if (data?.penalty_amount != null) apiPenalty = Number(data.penalty_amount);
-        if (data?.loan_id != null) apiLoanId = String(data.loan_id);
-        if (data?.incident_id != null) apiIncidentId = data.incident_id;
-      } else if (createForm.barcode) {
+      if (createForm.barcode) {
         const { data } = await axiosInstance.post('/api/admin/loans/checkin', {
           copy_barcode: createForm.barcode,
           condition_notes: createForm.description.trim(),
@@ -287,19 +216,7 @@ export default function IncidentPage() {
       showToast(msg, 'warning');
     }
 
-    if (apiOk && !usingMock) {
-      setShowCreateModal(false);
-      setLoanLookedUp(false);
-      setCreateForm({ ...EMPTY_CREATE_FORM });
-      await loadIncidents();
-      showToast(
-        `Đã lập biên bản${apiIncidentId ? ` BB-${apiIncidentId}` : ''} và ghi sự cố lên máy chủ.`,
-        'success'
-      );
-      return;
-    }
-
-    // Fallback local khi API chưa ghi được
+    // BE ghi incidents (BOOK_LOST/BOOK_DAMAGED, RESOLVED); FE giữ LOST/DAMAGED cho bộ lọc UI
     const newIncident = {
       id: apiOk && apiLoanId ? `INC-LOAN-${apiLoanId}` : `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`,
       incident_code: apiOk && apiLoanId ? `BB-LOAN-${apiLoanId}` : `BB-2026-${String(incidents.length + 1).padStart(3, '0')}`,
@@ -321,7 +238,6 @@ export default function IncidentPage() {
 
     const updated = addStoredIncident(newIncident);
     setIncidents(updated);
-    setUsingMock(true);
     setShowCreateModal(false);
     setLoanLookedUp(false);
     setCreateForm({ ...EMPTY_CREATE_FORM });
@@ -495,9 +411,7 @@ export default function IncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {loading
-              ? 'Đang tải danh sách biên bản từ máy chủ…'
-              : 'Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.'}
+            Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -521,6 +435,13 @@ export default function IncidentPage() {
             Lập biên bản sự cố
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <p className="font-semibold">Danh sách biên bản đang lưu trên trình duyệt</p>
+        <p className="text-amber-800/90 mt-0.5 text-[13px]">
+          Lập biên bản có thể ghi sự cố lên máy chủ qua nhận trả sách; bảng danh sách chưa có API đồng bộ toàn bộ.
+        </p>
       </div>
 
       {/* 4 Stats Cards */}
@@ -636,20 +557,14 @@ export default function IncidentPage() {
               variant="ghost"
               size="sm"
               icon={<RotateCcw className="w-4 h-4" />}
-              disabled={loading}
-              onClick={async () => {
+              onClick={() => {
                 setSearchTerm('');
                 setTypeFilter('ALL');
                 setStatusFilter('ALL');
-                const ok = await loadIncidents();
-                showToast(
-                  ok ? 'Đã đồng bộ danh sách sự cố từ máy chủ.' : 'API chưa sẵn — đang dùng dữ liệu mẫu.',
-                  ok ? 'success' : 'warning'
-                );
               }}
               className="!text-slate-500"
             >
-              Nạp lại
+              Đặt lại
             </Button>
           </div>
         </div>

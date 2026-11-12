@@ -59,10 +59,13 @@ export default function InventoryManagement() {
   useEffect(() => {
     axiosInstance.get('/api/books/search?page_size=50')
       .then(res => {
-        // Mảng rỗng = DB thật không có sách — không coi là API lỗi / ép mock
-        const items = res.data?.items || [];
-        setBooksList(items);
-        setUsingMock(false);
+        if (res.data?.items && res.data.items.length > 0) {
+          setBooksList(res.data.items);
+          setUsingMock(false);
+        } else {
+          setBooksList(ADMIN_MOCK_BOOKS);
+          setUsingMock(true);
+        }
       })
       .catch(err => {
         console.warn('API sách chưa sẵn sàng, nạp danh sách sách mock:', err?.message);
