@@ -24,11 +24,13 @@ class Room(Base):
     __tablename__ = "rooms"
     __table_args__ = (
         CheckConstraint("capacity > 0", name="chk_room_capacity_positive"),
+        CheckConstraint("price_per_slot > 0", name="chk_room_price_per_slot_positive"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     room_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     capacity: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_per_slot: Mapped[int] = mapped_column(Integer, server_default="20000", nullable=False)
     room_type: Mapped[str] = mapped_column(String(50), server_default="STUDY", nullable=False)
     floor: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
