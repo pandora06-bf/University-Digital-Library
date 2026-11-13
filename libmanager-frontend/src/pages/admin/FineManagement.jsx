@@ -338,7 +338,6 @@ export default function FineManagement() {
               variant="primary"
               className="!h-10 shrink-0 px-3 sm:px-4"
               icon={<Search className="w-4 h-4" />}
-              aria-label="Tra cứu công nợ theo MSSV"
               onClick={handleSearchSubmit}
             >
               Tra cứu
