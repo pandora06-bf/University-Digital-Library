@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DEFAULT_MOCK_DATA } from '../mocks/tableMock';
 import { Button } from './Button';
+import { AdminIconButton } from './AdminIconButton';
 
 /**
  * Component hiển thị Status Badge theo chuẩn thiết kế LibManager
@@ -128,7 +129,7 @@ export const Table = ({
       )}
 
       {/* Table responsive container */}
-      <div className="w-full overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-slate-200">
+      <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
         <table className="w-full text-left border-collapse">
           {/* Header Row */}
           <thead>
@@ -200,7 +201,7 @@ export const Table = ({
                         const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
                         const cellValue = row[col.key];
                         return (
-                          <td key={col.key || colIdx} className={`py-4 px-4 text-sm text-slate-700 border-b border-slate-100 ${alignClass}`}>
+                          <td key={col.key || colIdx} className={`py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle ${alignClass}`}>
                             {col.render ? col.render(cellValue, row, rowIndex) : cellValue}
                           </td>
                         );
@@ -216,16 +217,16 @@ export const Table = ({
                     className="hover:bg-slate-50/70 transition-colors duration-150"
                   >
                     {/* Barcode */}
-                    <td className="py-4 px-4 text-sm font-semibold text-indigo-600 border-b border-slate-100">
+                    <td className="py-3 px-4 text-sm font-semibold text-indigo-600 border-b border-slate-100 align-middle">
                       <span className="bg-indigo-50 px-2 py-1 rounded-md text-xs font-mono">
                         {row.barcode}
                       </span>
                     </td>
 
                     {/* Title & Author */}
-                    <td className="py-4 px-4 border-b border-slate-100">
-                      <div className="flex flex-col max-w-xs sm:max-w-md">
-                        <span className="text-sm font-semibold text-slate-900 truncate">
+                    <td className="py-3 px-4 border-b border-slate-100 align-middle">
+                      <div className="flex flex-col max-w-xs sm:max-w-md min-w-0">
+                        <span className="text-sm font-semibold text-slate-900 truncate" title={row.title}>
                           {row.title}
                         </span>
                         <span className="text-xs text-slate-500 truncate mt-0.5">
@@ -235,53 +236,51 @@ export const Table = ({
                     </td>
 
                     {/* Category */}
-                    <td className="py-4 px-4 text-sm text-slate-700 border-b border-slate-100">
-                      <span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-md font-medium">
+                    <td className="py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle">
+                      <span className="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-md font-medium whitespace-nowrap">
                         {row.category}
                       </span>
                     </td>
 
                     {/* Location */}
-                    <td className="py-4 px-4 text-sm text-slate-700 border-b border-slate-100">
+                    <td className="py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle max-w-[140px] truncate" title={row.location}>
                       {row.location}
                     </td>
 
                     {/* Copies count */}
-                    <td className="py-4 px-4 text-sm text-slate-700 font-medium border-b border-slate-100">
+                    <td className="py-3 px-4 text-sm text-slate-700 font-medium border-b border-slate-100 align-middle whitespace-nowrap">
                       {row.availableCopies}
                     </td>
 
                     {/* Status badge */}
-                    <td className="py-4 px-4 border-b border-slate-100">
+                    <td className="py-3 px-4 border-b border-slate-100 align-middle">
                       <StatusBadge status={row.status} type={row.statusType} />
                     </td>
 
                     {/* Actions */}
-                    <td className="py-4 px-4 text-right border-b border-slate-100">
-                      <div className="inline-flex items-center gap-1.5">
+                    <td className="py-3 px-4 text-right border-b border-slate-100 align-middle">
+                      <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
                         {onEdit && (
-                          <button
-                            type="button"
+                          <AdminIconButton
                             onClick={() => onEdit(row)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
                             title="Chỉnh sửa"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                             </svg>
-                          </button>
+                          </AdminIconButton>
                         )}
                         {onDelete && (
-                          <button
-                            type="button"
+                          <AdminIconButton
                             onClick={() => onDelete(row)}
-                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-colors"
                             title="Xóa"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                          </button>
+                          </AdminIconButton>
                         )}
                       </div>
                     </td>

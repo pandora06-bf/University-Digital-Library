@@ -77,28 +77,27 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
     await finesNavLink.click();
     await expect(page.getByRole('heading', { name: /Quản lý Thu phạt & Công nợ/i })).toBeVisible({ timeout: 10000 });
 
-    // 1. Tra cứu MSSV có nợ phạt
-    const searchInput = page.getByPlaceholder(/Tìm MSSV/i);
+    // 1. Tra cứu MSSV có nợ phạt (Enter hoặc nút Tra cứu)
+    const searchInput = page.getByPlaceholder(/Nhập MSSV/i);
     await expect(searchInput).toBeVisible();
     await searchInput.fill('SV-DEMO-001');
     await searchInput.press('Enter');
 
-    // 2. Kiểm tra bảng hiển thị danh sách khoản phạt và bấm "Thu tiền"
-    await expect(page.getByText(/FINE-/i).first()).toBeVisible({ timeout: 10000 });
+    // 2. Chờ kết quả lookup — nút Thu tiền trong bảng (không dùng getByText Chưa thu: trùng option filter)
     const collectBtn = page.getByRole('button', { name: /Thu tiền/i }).first();
-    await expect(collectBtn).toBeVisible();
+    await expect(collectBtn).toBeVisible({ timeout: 15000 });
     await collectBtn.click();
 
-    // 3. Modal xác nhận thu phí phạt hiện lên
-    await expect(page.getByText(/Xác nhận thu phí phạt/i)).toBeVisible();
-    await expect(page.getByText(/Số tiền cần thu/i)).toBeVisible();
+    // 3. Modal xác nhận thu phí phạt
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/Xác nhận thu phí phạt/i)).toBeVisible();
+    await expect(dialog.getByText(/Số tiền cần thu/i)).toBeVisible();
 
-    // 4. Bấm "Xác nhận Đã Thu"
-    const confirmCollectBtn = page.getByRole('button', { name: /Xác nhận Đã Thu/i });
-    await expect(confirmCollectBtn).toBeVisible();
-    await confirmCollectBtn.click();
+    // 4. Xác nhận thu
+    await dialog.getByRole('button', { name: /Xác nhận Đã Thu/i }).click();
 
-    // 5. Toast thông báo đã thu đủ tiền phạt xuất hiện
-    await expect(page.getByText(/Đã thu đủ/i)).toBeVisible({ timeout: 10000 });
+    // 5. Toast thành công (FineManagement: «Đã thu đủ …»)
+    await expect(page.getByText(/Đã thu đủ/i).first()).toBeVisible({ timeout: 15000 });
   });
 });

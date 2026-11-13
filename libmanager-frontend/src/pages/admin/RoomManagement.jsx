@@ -13,6 +13,7 @@ import {
   setRoomActive,
   resetAdminRooms,
 } from '../../mocks/adminRoomsMock';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 const EMPTY = { name: '', floor: '', capacity: '4', slot_price: '20000', is_active: true };
 
@@ -108,9 +109,9 @@ export default function RoomManagement() {
       key: 'name',
       header: 'Phòng',
       render: (val, row) => (
-        <div>
-          <p className="font-semibold text-slate-800">{val}</p>
-          <p className="text-xs text-slate-500">{row.floor || '—'}</p>
+        <div className="min-w-0 max-w-[220px]">
+          <p className="font-semibold text-slate-800 truncate" title={val}>{val}</p>
+          <p className="text-xs text-slate-500 truncate">{row.floor || '—'}</p>
         </div>
       ),
     },
@@ -137,27 +138,25 @@ export default function RoomManagement() {
       header: 'Thao tác',
       align: 'right',
       render: (_, row) => (
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            type="button"
-            title="Sửa"
+        <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+          <AdminIconButton
+            title="Chỉnh sửa"
             onClick={() => openEdit(row)}
-            className="w-8 h-8 rounded-lg bg-slate-50 text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+            className="w-8 h-8 rounded-full bg-slate-50 text-slate-600 hover:bg-slate-100"
           >
             <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            title={row.is_active ? 'Ngừng sử dụng' : 'Mở lại'}
+          </AdminIconButton>
+          <AdminIconButton
+            title={row.is_active ? 'Ngừng sử dụng phòng' : 'Mở lại phòng'}
             onClick={() => toggleActive(row)}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+            className={`w-8 h-8 rounded-full ${
               row.is_active
                 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
                 : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
             }`}
           >
             <Power className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
         </div>
       ),
     },

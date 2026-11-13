@@ -20,6 +20,7 @@ import {
   findMockActiveLoan,
   MOCK_ACTIVE_LOANS,
 } from '../../mocks/incidents';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 const EMPTY_CREATE_FORM = {
   code: '',
@@ -369,9 +370,9 @@ export default function IncidentPage() {
       key: 'borrower',
       header: 'Người Mượn',
       render: (_, row) => (
-        <div className="min-w-[150px]">
-          <span className="font-semibold text-slate-800 block text-sm">{row.borrower_name}</span>
-          <span className="text-xs text-slate-500 font-mono block mt-0.5">
+        <div className="min-w-0 max-w-[180px]">
+          <span className="font-semibold text-slate-800 block text-sm truncate" title={row.borrower_name}>{row.borrower_name}</span>
+          <span className="text-xs text-slate-500 font-mono block mt-0.5 truncate">
             {row.borrower_code} ({row.borrower_class})
           </span>
         </div>
@@ -398,8 +399,8 @@ export default function IncidentPage() {
       key: 'description',
       header: 'Mô Tả Tình Trạng',
       render: (val) => (
-        <div className="min-w-[200px] max-w-xs">
-          <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed" title={val}>
+        <div className="min-w-0 max-w-xs">
+          <p className="text-xs text-slate-600 truncate" title={val}>
             {val}
           </p>
         </div>
@@ -446,20 +447,19 @@ export default function IncidentPage() {
       header: 'Thao Tác',
       align: 'right',
       render: (_, row) => (
-        <div className="flex items-center justify-end gap-1.5 min-w-[140px]">
-          <button
+        <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
+          <AdminIconButton
             onClick={() => setDetailRow(row)}
-            className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors cursor-pointer"
-            title="Xem chi tiết biên bản"
+            className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
+            title="Xem chi tiết"
           >
             <Eye className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
           {/* 4-15.c: chuyển trạng thái biên bản */}
           {row.status === 'PENDING' && (
             <button
               type="button"
               className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-              title="Ghi công nợ"
               onClick={() => {
                 setIncidents(updateStoredIncidentStatus(row.id, 'RECORDED'));
                 showToast('Đã ghi công nợ bồi thường.', 'success');
@@ -472,7 +472,6 @@ export default function IncidentPage() {
             <button
               type="button"
               className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              title="Xác nhận đã bồi thường"
               onClick={() => {
                 setIncidents(updateStoredIncidentStatus(row.id, 'RESOLVED'));
                 showToast('Đã đánh dấu bồi thường xong.', 'success');
@@ -593,10 +592,9 @@ export default function IncidentPage() {
       {/* Main Content Area */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
         {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            {/* Search */}
-            <div className="w-full sm:w-80">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          <div className="flex items-stretch gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
                 placeholder="Tìm mã biên bản, mã vạch, tên sách, độc giả…"
@@ -604,39 +602,43 @@ export default function IncidentPage() {
                 className="!h-10 !rounded-lg placeholder:font-sans"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const n = filteredData.length;
+                    showToast(
+                      searchTerm.trim()
+                        ? `Hiển thị ${n} biên bản khớp bộ lọc.`
+                        : 'Nhập từ khóa rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                      searchTerm.trim() ? 'success' : 'warning'
+                    );
+                  }
+                }}
               />
             </div>
-
-            {/* Filter Loại sự cố */}
-            <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[190px]"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                const n = filteredData.length;
+                showToast(
+                  searchTerm.trim()
+                    ? `Hiển thị ${n} biên bản khớp bộ lọc.`
+                    : 'Nhập từ khóa rồi bấm Tra cứu (lọc theo bảng bên dưới).',
+                  searchTerm.trim() ? 'success' : 'warning'
+                );
+              }}
             >
-              <option value="ALL">Loại sự cố (Tất cả)</option>
-              <option value="LOST">Mất sách</option>
-              <option value="DAMAGED">Hỏng nặng</option>
-            </select>
-
-            {/* Filter Trạng thái */}
-            <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[190px]"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">Trạng thái (Tất cả)</option>
-              <option value="PENDING">Chờ xử lý</option>
-              <option value="RECORDED">Đã ghi nhận công nợ</option>
-              <option value="RESOLVED">Đã bồi thường</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
+              Tra cứu
+            </Button>
             <Button
               variant="ghost"
-              size="sm"
+              className="!h-10 shrink-0 !text-slate-500 px-2 sm:px-3"
               icon={<RotateCcw className="w-4 h-4" />}
               disabled={loading}
+              aria-label="Nạp lại danh sách"
               onClick={async () => {
                 setSearchTerm('');
                 setTypeFilter('ALL');
@@ -647,10 +649,30 @@ export default function IncidentPage() {
                   ok ? 'success' : 'warning'
                 );
               }}
-              className="!text-slate-500"
             >
-              Nạp lại
+              <span className="hidden sm:inline">Nạp lại</span>
             </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <select
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="ALL">Loại sự cố (Tất cả)</option>
+              <option value="LOST">Mất sách</option>
+              <option value="DAMAGED">Hỏng nặng</option>
+            </select>
+            <select
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="ALL">Trạng thái (Tất cả)</option>
+              <option value="PENDING">Chờ xử lý</option>
+              <option value="RECORDED">Đã ghi nhận công nợ</option>
+              <option value="RESOLVED">Đã bồi thường</option>
+            </select>
           </div>
         </div>
 
@@ -790,12 +812,12 @@ export default function IncidentPage() {
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
               Mã vạch hoặc mã phiếu mượn <span className="text-rose-500">*</span>
             </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="flex items-stretch gap-2 min-w-0">
+              <div className="min-w-0 flex-1">
                 <Input
-                  placeholder="VD: BC-2026-0012 hoặc PM-2026-0089"
+                  placeholder="VD: SV-DEMO-005 hoặc mã phiếu"
                   leftIcon={<ScanLine className="w-4 h-4" />}
-                  className="font-mono text-sm"
+                  className="!h-11 font-mono text-sm"
                   value={createForm.code}
                   error={formErrors.code}
                   onChange={(e) => {
@@ -812,12 +834,14 @@ export default function IncidentPage() {
                 />
               </div>
               <Button
-                variant="outline"
-                className="shrink-0"
+                type="button"
+                variant="primary"
+                className="!h-11 shrink-0 px-3 sm:px-4"
+                icon={<Search className="w-4 h-4" />}
                 disabled={isSearchingBook}
                 onClick={handleLookupLoan}
               >
-                {isSearchingBook ? 'Đang tìm...' : 'Tra cứu'}
+                {isSearchingBook ? 'Đang tìm…' : 'Tra cứu'}
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">

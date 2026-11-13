@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WalletCards, Link2, RotateCcw } from 'lucide-react';
+import { WalletCards, Link2, RotateCcw, Search } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -76,9 +76,9 @@ export default function UnmatchedTxPage() {
       key: 'bank_tx_id',
       header: 'Mã ngân hàng',
       render: (val, row) => (
-        <div>
-          <p className="font-mono text-sm font-semibold text-slate-800">{val}</p>
-          <p className="text-xs text-slate-500">{formatWhen(row.received_at)}</p>
+        <div className="min-w-0 max-w-[200px]">
+          <p className="font-mono text-sm font-semibold text-slate-800 truncate" title={val}>{val}</p>
+          <p className="text-xs text-slate-500 truncate">{formatWhen(row.received_at)}</p>
         </div>
       ),
     },
@@ -91,16 +91,20 @@ export default function UnmatchedTxPage() {
     {
       key: 'transfer_content',
       header: 'Nội dung CK',
-      render: (val) => <span className="text-sm text-slate-700 line-clamp-2">{val}</span>,
+      render: (val) => (
+        <span className="text-sm text-slate-700 block max-w-xs truncate" title={val}>{val}</span>
+      ),
     },
     {
       key: 'status',
       header: 'Trạng thái',
       render: (val, row) =>
         val === 'ASSIGNED' ? (
-          <div>
+          <div className="flex items-center gap-2 min-w-0">
             <StatusBadge status="Đã gán" type="success" />
-            <p className="text-[11px] text-slate-500 mt-1">{row.assigned_user_code}</p>
+            <span className="text-[11px] text-slate-500 font-mono truncate" title={row.assigned_user_code}>
+              {row.assigned_user_code}
+            </span>
           </div>
         ) : (
           <StatusBadge status="Chưa khớp" type="warning" />
@@ -112,7 +116,13 @@ export default function UnmatchedTxPage() {
       align: 'right',
       render: (_, row) =>
         row.status === 'UNRESOLVED' ? (
-          <Button size="sm" variant="primary" icon={<Link2 className="w-3.5 h-3.5" />} onClick={() => openAssign(row)}>
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<Link2 className="w-3.5 h-3.5" />}
+            title="Gán giao dịch cho bạn đọc"
+            onClick={() => openAssign(row)}
+          >
             Gán người dùng
           </Button>
         ) : (
@@ -199,16 +209,33 @@ export default function UnmatchedTxPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
-          <Input
-            placeholder="Tìm mã ngân hàng, nội dung chuyển khoản, MSSV đã gán…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4 space-y-3">
+        <div className="flex items-stretch gap-2 min-w-0">
+          <div className="min-w-0 flex-1">
+            <Input
+              placeholder="Tìm mã ngân hàng, nội dung CK, MSSV…"
+              leftIcon={<Search className="w-4 h-4" />}
+              className="!h-10 !rounded-lg"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            className="!h-10 shrink-0 px-3 sm:px-4"
+            icon={<Search className="w-4 h-4" />}
+            onClick={() => {
+              if (!q.trim()) {
+                showToast('Nhập từ khóa rồi bấm Tra cứu (lọc bảng bên dưới).', 'warning');
+              }
+            }}
+          >
+            Tra cứu
+          </Button>
         </div>
         <select
-          className="h-11 px-3 rounded-xl border border-slate-200 text-sm bg-white"
+          className="h-10 w-full sm:w-auto sm:min-w-[180px] px-3 rounded-lg border border-slate-200 text-sm bg-white"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, Search, Plus, RotateCcw, Lock, Unlock, KeyRound, Pencil, Eye,
@@ -12,15 +12,7 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
-import {
-  getStoredAdminUsers,
-  upsertStoredAdminUser,
-  setStoredUserLock,
-  issueTempPassword,
-  resetStoredAdminUsers,
-  MOCK_TEST_HINTS,
-} from '../../mocks/adminUsersMock';
-
+import { AdminIconButton } from '../../components/AdminIconButton';
 const PAGE_SIZE = 8;
 const EMPTY_FORM = {
   user_code: '',
@@ -50,8 +42,9 @@ function mapApiUser(u) {
 export default function UserManagement() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
-  const [useMock, setUseMock] = useState(true);
-  const [allUsers, setAllUsers] = useState(() => getStoredAdminUsers());
+  const [apiError, setApiError] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
+  const [allUsers, setAllUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
@@ -77,28 +70,23 @@ export default function UserManagement() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  const refreshMock = useCallback(() => {
-    setAllUsers(getStoredAdminUsers());
-  }, []);
-
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await axiosInstance.get('/api/admin/users', {
-        params: { q: debouncedQ || undefined, page, page_size: PAGE_SIZE },
+        params: { q: debouncedQ || undefined, role: roleFilter === 'ALL' ? undefined : roleFilter, page, page_size: PAGE_SIZE },
       });
-      // Response 2xx (kể cả danh sách rỗng) = API list đã có — không ép mock
-      const items = data?.items || data?.users || (Array.isArray(data) ? data : []);
-      setUseMock(false);
-      setAllUsers(items.map(mapApiUser));
-    } catch {
-      // Chỉ fallback mock khi request lỗi (404/5xx) — đúng với BE hiện tại
-      setUseMock(true);
-      refreshMock();
+      setAllUsers((data?.items || []).map(mapApiUser));
+      setTotalCount(data?.total || 0);
+      setApiError('');
+    } catch (error) {
+      setApiError(getApiErrorMessage(error, 'Không tải được danh sách người dùng từ API.'));
+      setAllUsers([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, page, refreshMock]);
+  }, [debouncedQ, roleFilter, page]);
 
   useEffect(() => {
     // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
@@ -108,26 +96,10 @@ export default function UserManagement() {
     return () => window.clearTimeout(timer);
   }, [fetchUsers]);
 
-  const filtered = useMemo(() => {
-    const q = debouncedQ.toLowerCase();
-    return allUsers.filter((u) => {
-      const matchQ =
-        !q ||
-        u.user_code.toLowerCase().includes(q) ||
-        u.full_name.toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q);
-      const matchRole = roleFilter === 'ALL' || u.role === roleFilter;
-      return matchQ && matchRole;
-    });
-  }, [allUsers, debouncedQ, roleFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = useMock
-    ? filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
-    : filtered;
-
-  const totalUsers = allUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = page;
+  const pageRows = allUsers;
+  const totalUsers = totalCount;
   const lockedCount = allUsers.filter((u) => u.is_locked).length;
   const debtCount = allUsers.filter((u) => Number(u.total_fines) > 0).length;
   const studentCount = allUsers.filter((u) => u.role === 'STUDENT').length;
@@ -213,35 +185,17 @@ export default function UserManagement() {
     };
 
     try {
-      if (!useMock) {
-        if (editing) {
-          await axiosInstance.put(`/api/admin/users/${encodeURIComponent(payload.user_code)}`, payload);
-        } else {
-          await axiosInstance.post('/api/admin/users', payload);
+      if (editing) {
+        await axiosInstance.put(`/api/admin/users/${encodeURIComponent(payload.user_code)}`, payload);
+      } else {
+        const { data } = await axiosInstance.post('/api/admin/users', payload);
+        if (data?.temporary_password) {
+          setTempPassword({ user_code: data.user_code, password: data.temporary_password });
         }
-        showToast(editing ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.', 'success');
-        setFormOpen(false);
-        await fetchUsers();
-        return;
       }
-
-      // Mock: chống trùng khi tạo mới
-      const existing = getStoredAdminUsers();
-      if (!editing && existing.some((u) => u.user_code === payload.user_code)) {
-        const msg = 'MSSV/mã đã tồn tại. Vui lòng dùng mã khác.';
-        showToast(msg, 'error');
-        setFormErrors((e) => ({ ...e, user_code: msg }));
-        return;
-      }
-      upsertStoredAdminUser({
-        ...payload,
-        is_locked: editing?.is_locked || false,
-        total_fines: editing?.total_fines || 0,
-        max_borrow_limit: payload.role === 'LECTURER' ? 5 : payload.role === 'ADMIN' ? 0 : 3,
-      });
-      refreshMock();
-      showToast(editing ? 'Đã cập nhật (dữ liệu mẫu).' : 'Đã tạo người dùng (dữ liệu mẫu).', 'success');
+      showToast(editing ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.', 'success');
       setFormOpen(false);
+      await fetchUsers();
     } catch (error) {
       const status = error?.response?.status;
       const msg = getApiErrorMessage(error, 'Không lưu được người dùng.');
@@ -256,7 +210,7 @@ export default function UserManagement() {
   const confirmLockToggle = async () => {
     if (!lockTarget) return;
     const nextLocked = !lockTarget.is_locked;
-    // BR-16: không mở khóa khi còn nợ (mock)
+    // BR-16: không mở khóa khi còn công nợ
     if (!nextLocked && Number(lockTarget.total_fines) > 0) {
       showToast('Còn công nợ, không mở khóa. Thu phạt trước tại quầy.', 'error');
       setLockTarget(null);
@@ -269,19 +223,12 @@ export default function UserManagement() {
     }
 
     try {
-      if (!useMock) {
-        await axiosInstance.patch(`/api/admin/users/${encodeURIComponent(lockTarget.user_code)}/lock`, {
-          is_locked: nextLocked,
-        });
-        showToast(nextLocked ? 'Đã khóa tài khoản.' : 'Đã mở khóa.', 'success');
-        setLockTarget(null);
-        await fetchUsers();
-        return;
-      }
-      setStoredUserLock(lockTarget.user_code, nextLocked);
-      refreshMock();
-      showToast(nextLocked ? 'Đã khóa (dữ liệu mẫu).' : 'Đã mở khóa (dữ liệu mẫu).', 'success');
+      await axiosInstance.patch(`/api/admin/users/${encodeURIComponent(lockTarget.user_code)}/lock`, {
+        is_locked: nextLocked,
+      });
+      showToast(nextLocked ? 'Đã khóa tài khoản.' : 'Đã mở khóa.', 'success');
       setLockTarget(null);
+      await fetchUsers();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đổi trạng thái khóa.'), 'error');
       setLockTarget(null);
@@ -291,26 +238,14 @@ export default function UserManagement() {
   const handleResetPassword = async (row) => {
     try {
       const accountId = row.account_id;
-      if (!useMock && accountId != null) {
-        const { data } = await axiosInstance.post(
-          `/api/admin/users/${accountId}/reset-password`
-        );
-        const temp = data?.temporary_password || data?.temp_password || data?.password;
-        if (!temp) {
-          showToast('Máy chủ không trả mật khẩu tạm.', 'warning');
-          return;
-        }
-        setTempPassword({ user_code: row.user_code, password: temp });
-        showToast('Mật khẩu tạm chỉ hiện một lần — hãy ghi lại.', 'success');
+      if (accountId == null) {
+        showToast('Thiếu Account.id, không thể reset mật khẩu.', 'error');
         return;
       }
-      if (!useMock && accountId == null) {
-        showToast('Thiếu account_id — API đặt lại mật khẩu cần Account.id, không dùng MSSV.', 'warning');
-        return;
-      }
-      const temp = issueTempPassword(row.user_code);
-      setTempPassword({ user_code: row.user_code, password: temp });
-      showToast('Mật khẩu tạm (dữ liệu mẫu) — chỉ hiện một lần.', 'success');
+      const { data } = await axiosInstance.post(`/api/admin/users/${accountId}/reset-password`);
+      const temp = data?.temporary_password;
+      if (temp) setTempPassword({ user_code: row.user_code, password: temp });
+      showToast('Đã cấp mật khẩu tạm.', 'success');
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đặt lại mật khẩu.'), 'error');
     }
@@ -334,7 +269,7 @@ export default function UserManagement() {
         `Import xong: ${created} tài khoản mới` + (skipped ? `, ${skipped} bỏ qua/lỗi` : ''),
         'success'
       );
-      // Danh sách vẫn mock vì BE chưa có GET /users — chỉ báo kết quả import
+      await fetchUsers();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Import thất bại.'), 'error');
     } finally {
@@ -343,7 +278,7 @@ export default function UserManagement() {
   };
 
   const iconBtn =
-    'w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer';
+    'w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer';
 
   const columns = [
     {
@@ -378,18 +313,22 @@ export default function UserManagement() {
     {
       key: 'department',
       header: 'Khoa / Ngành',
-      render: (val) => <span className="text-sm font-medium text-slate-600">{val || '—'}</span>,
+      render: (val) => (
+        <span className="text-sm font-medium text-slate-600 block max-w-[160px] truncate" title={val || undefined}>
+          {val || '—'}
+        </span>
+      ),
     },
     {
       key: 'is_locked',
       header: 'Trạng thái',
       render: (val, row) => (
-        <div className="space-y-1 min-w-[110px]">
+        <div className="flex items-center gap-2 min-w-0 whitespace-nowrap">
           <StatusBadge status={val ? 'Đã khóa' : 'Hoạt động'} type={val ? 'danger' : 'success'} />
           {Number(row.total_fines) > 0 && (
-            <p className="text-[11px] text-rose-500 font-medium">
+            <span className="text-[11px] text-rose-500 font-medium truncate">
               Nợ {Number(row.total_fines).toLocaleString('vi-VN')} ₫
-            </p>
+            </span>
           )}
         </div>
       ),
@@ -399,43 +338,39 @@ export default function UserManagement() {
       header: 'Thao tác',
       align: 'right',
       render: (_, row) => (
-        <div className="flex items-center justify-end gap-1.5 min-w-[140px]">
-          <button
-            type="button"
+        <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
+          <AdminIconButton
             onClick={() => setDetailRow(row)}
             className={`${iconBtn} bg-indigo-50 text-indigo-600 hover:bg-indigo-100`}
             title="Xem chi tiết"
           >
             <Eye className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => openEdit(row)}
             className={`${iconBtn} bg-slate-50 text-slate-600 hover:bg-slate-100`}
-            title="Sửa"
+            title="Chỉnh sửa"
           >
             <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => setLockTarget(row)}
             className={`${iconBtn} ${
               row.is_locked
                 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                 : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
             }`}
-            title={row.is_locked ? 'Mở khóa' : 'Khóa'}
+            title={row.is_locked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
           >
             {row.is_locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => handleResetPassword(row)}
             className={`${iconBtn} bg-amber-50 text-amber-600 hover:bg-amber-100`}
             title="Đặt lại mật khẩu"
           >
             <KeyRound className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
         </div>
       ),
     },
@@ -450,7 +385,7 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-            BE hiện chỉ có import CSV/XLSX và đặt lại mật khẩu theo Account.id — danh sách/CRUD/khóa vẫn dùng mẫu.
+            Quản lý tài khoản qua API thật: danh sách, thêm, sửa, khóa và đặt lại mật khẩu.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -484,15 +419,7 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {useMock && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Danh sách đang dùng dữ liệu mẫu</p>
-          <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            BE chưa có GET/CRUD/khóa <code className="bg-amber-100 px-1 rounded">/api/admin/users</code>.
-            Chỉ <strong>Import CSV/XLSX</strong> và reset mật khẩu (Account.id) ghi máy chủ; thêm/sửa/khóa trên bảng chỉ lưu trình duyệt.
-          </p>
-        </div>
-      )}
+      {apiError && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{apiError}</div>}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -504,7 +431,7 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-slate-800 leading-none">
             {totalUsers} <span className="text-sm font-medium text-slate-500">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">SV / GV / Admin trong danh sách</p>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Tổng tài khoản theo bộ lọc</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/30">
           <div className="absolute top-4 right-4">
@@ -514,7 +441,7 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-indigo-600 leading-none">
             {studentCount} <span className="text-sm font-medium text-indigo-400">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-indigo-600">Hạn mức mượn mặc định 3 cuốn</p>
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Số sinh viên trên trang hiện tại</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30">
           <div className="absolute top-4 right-4">
@@ -524,7 +451,7 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
             {lockedCount} <span className="text-sm font-medium text-rose-400">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-rose-600">Không mở khóa nếu còn công nợ</p>
+          <p className="mt-3 text-[11px] font-medium text-rose-600">Số đang khóa trên trang hiện tại</p>
         </div>
         <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30">
           <div className="absolute top-4 right-4">
@@ -534,15 +461,15 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-amber-600 leading-none">
             {debtCount} <span className="text-sm font-medium text-amber-400">người</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-amber-600">Thu tại quầy Thu phạt & Công nợ</p>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Số có nợ trên trang hiện tại</p>
         </div>
       </div>
 
       {/* Bảng + filter trong một card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="w-full sm:w-80">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          <div className="flex items-stretch gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
                 placeholder="Tìm MSSV, họ tên, email…"
@@ -550,10 +477,45 @@ export default function UserManagement() {
                 className="!h-10 !rounded-lg placeholder:font-sans"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setDebouncedQ(searchTerm.trim());
+                    setPage(1);
+                  }
+                }}
               />
             </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                setDebouncedQ(searchTerm.trim());
+                setPage(1);
+              }}
+            >
+              Tra cứu
+            </Button>
+            <Button
+              variant="ghost"
+              className="!h-10 shrink-0 !text-slate-500 px-2 sm:px-3"
+              icon={<RotateCcw className="w-4 h-4" />}
+              aria-label="Đặt lại bộ lọc"
+              onClick={() => {
+                setSearchTerm('');
+                setDebouncedQ('');
+                setRoleFilter('ALL');
+                setPage(1);
+              }}
+            >
+              <span className="hidden sm:inline">Đặt lại</span>
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[180px]"
+              className="h-10 w-full sm:w-auto sm:min-w-[180px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
@@ -566,49 +528,7 @@ export default function UserManagement() {
               <option value="ADMIN">Admin</option>
             </select>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<RotateCcw className="w-4 h-4" />}
-              onClick={() => {
-                setSearchTerm('');
-                setDebouncedQ('');
-                setRoleFilter('ALL');
-                setPage(1);
-                refreshMock();
-              }}
-            >
-              Đặt lại bộ lọc
-            </Button>
-            {useMock && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  resetStoredAdminUsers();
-                  refreshMock();
-                  setSearchTerm('');
-                  setDebouncedQ('');
-                  setRoleFilter('ALL');
-                  setPage(1);
-                  showToast('Đã nạp lại dữ liệu mẫu để kiểm thử.', 'success');
-                }}
-              >
-                Nạp lại dữ liệu mẫu
-              </Button>
-            )}
-          </div>
         </div>
-
-        {useMock && (
-          <div className="px-4 py-2.5 border-b border-amber-100 bg-amber-50/60 text-[11px] text-amber-900 space-y-0.5">
-            <p className="font-bold uppercase tracking-wide text-amber-800">Gợi ý kiểm thử mẫu</p>
-            {MOCK_TEST_HINTS.map((h) => (
-              <p key={h}>• {h}</p>
-            ))}
-          </div>
-        )}
 
         <Table
           columns={columns}
@@ -617,7 +537,7 @@ export default function UserManagement() {
           pagination
           page={safePage}
           totalPages={totalPages}
-          totalItems={filtered.length}
+          totalItems={totalCount}
           onPageChange={setPage}
           emptyMessage="Không tìm thấy người dùng nào"
           rowKey={(r) => r.user_code}

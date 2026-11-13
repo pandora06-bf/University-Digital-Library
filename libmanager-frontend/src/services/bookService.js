@@ -1,4 +1,5 @@
 import axiosInstance from './axios_instance';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 // 2B-12: các trang sách luôn gọi API. Khi VITE_USE_MOCK=true, MSW (mocks/handlers.js) trả lời thay backend.
 export const PAGE_SIZE = 20; // NFR-PE-02, trùng DEFAULT_PAGE_SIZE trong back_fast_api/app/services/search_crud.py
@@ -27,9 +28,11 @@ const toBook = (data) => {
     category: data.category_name ?? null,
     categoryId: data.category_id ?? null,
     description: data.description,
-    coverUrl: data.cover_image_url ?? null,
+    coverUrl: resolveMediaUrl(data.cover_image_url ?? data.cover_image_path) ?? null,
     bookType: data.book_type ?? null,
-    pdfAvailable: EBOOK_TYPES.includes(data.book_type),
+    // Ưu tiên has_pdf từ API; không có thì suy từ book_type (EBOOK/BOTH).
+    pdfAvailable: data.has_pdf === true
+      || (data.has_pdf == null && EBOOK_TYPES.includes(data.book_type)),
     // /api/books/search chưa trả available_stock (đã báo Hiền): null nghĩa là "chưa rõ", khác 0 là "hết sách".
     availableCopies: data.available_stock ?? null,
     location: shelf?.label ?? null,

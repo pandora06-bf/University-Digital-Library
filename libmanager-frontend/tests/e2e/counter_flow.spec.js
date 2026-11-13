@@ -71,8 +71,8 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
     await expect(page.getByRole('heading', { name: /Quản lý Mượn \/ Trả Sách/i })).toBeVisible({ timeout: 10000 });
 
     // 1. Kiểm tra quầy trả sách
-    await expect(page.getByRole('heading', { name: 'Quầy Nhận Trả Sách Nhanh' })).toBeVisible();
-    const returnInput = page.getByPlaceholder(/Quét Barcode sách trả/i);
+    await expect(page.getByRole('heading', { name: 'Quầy Nhận Trả Sách' })).toBeVisible();
+    const returnInput = page.getByPlaceholder(/DEMO-BC-100-02|Enter để nhận mã/i);
     await expect(returnInput).toBeVisible();
 
     // Thử nhập mã vạch sách trả
@@ -82,7 +82,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
 
     // 2. Kiểm tra quầy mượn sách & tra cứu MSSV
     await expect(page.getByRole('heading', { name: 'Quầy Xuất Phiếu Mượn' })).toBeVisible();
-    const mssvInput = page.getByPlaceholder(/Nhập và nhấn phím Enter/i);
+    const mssvInput = page.getByPlaceholder(/SV-DEMO-001/i);
     await expect(mssvInput).toBeVisible();
 
     await mssvInput.fill('SV-DEMO-001');

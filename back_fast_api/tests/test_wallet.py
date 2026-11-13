@@ -218,3 +218,54 @@ def test_job07_expires_pending(db_session, test_account):
     assert ws.expire_topups(db_session, topup.created_at + timedelta(minutes=16)) == 1
     db_session.refresh(topup)
     assert topup.status == "EXPIRED"
+
+
+def test_webhook_different_amount_credited_accurately(client, auth_headers, db_session):
+    """Khi nạp tiền khác số tiền đã đăng ký (ví dụ tạo 50,000đ nhưng chuyển 70,000đ),
+    hệ thống ghi nhận nạp thành công và cộng đúng số tiền thực chuyển vào ví."""
+    topup_data = _create(client, auth_headers, 50_000)
+    code = topup_data["pay_code"]
+
+    payload = {
+        "id": "BANK-DIFF-001",
+        "transferAmount": 70_000,
+        "content": f"Chuyen khoan {code} thanh toan",
+    }
+    r = _hook(client, payload)
+    assert r.status_code == 200
+    assert r.json()["result"] == "MATCHED"
+
+    wallet = client.get("/api/wallet", headers=auth_headers).json()
+    assert wallet["balance"] == 70_000
+
+    topup_detail = client.get(f"/api/wallet/topups/{code}", headers=auth_headers).json()
+    assert topup_detail["status"] == "PAID"
+    assert topup_detail["amount"] == 70_000
+
+
+def test_webhook_duplicate_bank_tx_id_preserves_single_credit(client, auth_headers, db_session):
+    """Gửi lặp cùng một bank_tx_id nhiều lần phải trả về DUPLICATE và chỉ cộng tiền đúng một lần."""
+    code = _create(client, auth_headers, 20_000)["pay_code"]
+    payload = {
+        "id": "BANK-DUP-UNIQUE-999",
+        "transferAmount": 20_000,
+        "content": f"Thanh toan ma {code}",
+    }
+
+    # Lần 1: Thành công
+    r1 = _hook(client, payload)
+    assert r1.status_code == 200
+    assert r1.json()["result"] == "MATCHED"
+
+    # Lần 2 và 3: Trả về DUPLICATE
+    r2 = _hook(client, payload)
+    assert r2.status_code == 200
+    assert r2.json()["result"] == "DUPLICATE"
+
+    r3 = _hook(client, payload)
+    assert r3.status_code == 200
+    assert r3.json()["result"] == "DUPLICATE"
+
+    # Số dư ví chỉ cộng đúng 20,000đ, không nhân đôi hay nhân ba
+    wallet = client.get("/api/wallet", headers=auth_headers).json()
+    assert wallet["balance"] == 20_000

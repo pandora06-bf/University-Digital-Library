@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileText, Search, UploadCloud, Eye, Edit2,
-  CheckCircle2, FilePlus, RotateCcw,
+  CheckCircle2, FilePlus,
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
@@ -13,10 +13,10 @@ import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import {
   getStoredAdminEbooks,
-  resetAdminEbooks,
   upsertAdminEbook,
   DEMO_EBOOK_BOOK_OPTIONS,
 } from '../../mocks/adminEbooksMock';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 function formatSize(file) {
   if (!file?.size) return '—';
@@ -258,19 +258,42 @@ export default function EbookManagement() {
       showToast('Đầu sách này chưa có tệp PDF để xem trước.', 'warning');
       return;
     }
+    // Mở tab ngay lúc click (đồng bộ) — sau await browser hay chặn popup.
+    const previewTab = window.open('about:blank', '_blank');
+    if (previewTab) {
+      try {
+        previewTab.document.title = `Xem trước · ${row.title}`;
+        previewTab.document.body.innerHTML =
+          '<p style="font-family:sans-serif;padding:24px;color:#475569">Đang tải bản xem trước…</p>';
+      } catch {
+        /* cross-origin / opaque about:blank — bỏ qua */
+      }
+    }
     try {
       const { data } = await axiosInstance.get(`/api/ebooks/${row.id}/preview`, {
         responseType: 'blob',
       });
       // Một số BE trả JSON lỗi nhưng status 200 + blob — kiểm tra content-type
       if (data?.type && data.type.includes('json')) {
+        previewTab?.close();
         showToast('Máy chủ chưa trả được PDF xem trước cho đầu sách này.', 'error');
         return;
       }
       const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-      window.open(url, '_blank', 'noopener,noreferrer');
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (previewTab && !previewTab.closed) {
+        previewTab.location.href = url;
+      } else {
+        // Popup bị chặn: tải file trong tab hiện tại
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.click();
+        showToast('Trình duyệt chặn cửa sổ mới — đã mở bản xem trước bằng liên kết tải.', 'warning');
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
     } catch (error) {
+      previewTab?.close();
       const status = error?.response?.status;
       if (status === 404) {
         showToast(
@@ -301,10 +324,12 @@ export default function EbookManagement() {
       key: 'title',
       header: 'Tên Sách',
       render: (val, row) => (
-        <div>
-          <span className="font-semibold text-slate-800 block">{val}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-semibold text-slate-800 truncate" title={val}>{val}</span>
           {row.bookType && (
-            <span className="text-[11px] text-slate-400 font-medium">{row.bookType}</span>
+            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+              {row.bookType}
+            </span>
           )}
         </div>
       ),
@@ -313,19 +338,17 @@ export default function EbookManagement() {
       key: 'filename',
       header: 'Tên File PDF',
       render: (val, row) => (
-        <div className={`flex items-center gap-2 ${row.hasPdf === false ? 'text-slate-400' : 'text-indigo-600'}`}>
+        <div className={`flex items-center gap-2 min-w-0 ${row.hasPdf === false ? 'text-slate-400' : 'text-indigo-600'}`}>
           <FileText className="w-4 h-4 shrink-0" />
-          <span className="font-medium text-sm truncate max-w-[240px]" title={val}>{val}</span>
+          <span className="font-medium text-sm truncate" title={val}>{val}</span>
         </div>
       ),
     },
-    { key: 'size', header: 'Kích Thước' },
-    { key: 'uploadDate', header: 'Ngày Tải Lên' },
     {
       key: 'status',
       header: 'Trạng Thái',
       render: (val) => (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
           val === 'Sẵn sàng'
             ? 'bg-emerald-50 text-emerald-600'
             : 'bg-amber-50 text-amber-700'
@@ -340,28 +363,26 @@ export default function EbookManagement() {
       header: 'Thao Tác',
       align: 'right',
       render: (_val, row) => (
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
+        <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+          <AdminIconButton
             onClick={() => handlePreview(row)}
             disabled={row.hasPdf === false}
-            className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title={row.hasPdf === false ? 'Chưa có PDF' : 'Xem trước PDF'}
           >
             <Eye className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => {
               setSelectedEbook(row);
               setReplaceFile(null);
               setShowReplaceModal(true);
             }}
-            className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
             title="Thay thế tệp PDF"
           >
             <Edit2 className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
         </div>
       ),
     },
@@ -400,7 +421,7 @@ export default function EbookManagement() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng tài liệu</p>
           <p className="text-3xl font-extrabold text-slate-800 leading-none">
@@ -419,42 +440,35 @@ export default function EbookManagement() {
             Đã gắn tệp PDF, sẵn sàng xem trước
           </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Làm mới</p>
-            <p className="text-sm text-slate-600">{loading ? 'Đang tải…' : 'Cập nhật danh sách mới nhất'}</p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            icon={<RotateCcw className="w-3.5 h-3.5" />}
-            disabled={loading}
-            onClick={async () => {
-              const ok = await loadFromApi();
-              if (!ok) {
-                setRows(resetAdminEbooks());
-                showToast('API chưa sẵn — đã nạp danh sách eBook mẫu.', 'warning');
-              } else {
-                showToast('Đã đồng bộ danh sách eBook từ máy chủ.', 'success');
-              }
-            }}
-          >
-            Nạp lại
-          </Button>
-        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50">
-          <div className="w-full sm:w-96">
-            <Input
-              type="text"
-              placeholder="Tìm theo tên sách hoặc tên file…"
-              leftIcon={<Search className="w-4 h-4" />}
-              className="!h-10 !rounded-lg"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-stretch gap-2 min-w-0 w-full sm:max-w-xl">
+            <div className="min-w-0 flex-1">
+              <Input
+                type="text"
+                placeholder="Tìm theo tên sách hoặc tên file…"
+                leftIcon={<Search className="w-4 h-4" />}
+                className="!h-10 !rounded-lg"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                /* lọc client-side đã theo searchTerm; nút để thủ thư bấm rõ ràng */
+                if (!searchTerm.trim()) {
+                  showToast('Nhập từ khóa rồi bấm Tra cứu (hoặc để trống để xem tất cả).', 'warning');
+                }
+              }}
+            >
+              Tra cứu
+            </Button>
           </div>
         </div>
 
@@ -462,7 +476,7 @@ export default function EbookManagement() {
           columns={columns}
           data={filteredData}
           emptyMessage={loading ? 'Đang tải danh sách eBook…' : 'Chưa có đầu sách điện tử trong danh mục.'}
-          className="border-0 shadow-none rounded-none"
+          className="border-0 shadow-none rounded-none [&_table]:table-fixed [&_th:nth-child(1)]:w-[46%] [&_th:nth-child(2)]:w-[24%] [&_th:nth-child(3)]:w-[16%] [&_th:nth-child(4)]:w-[14%]"
           pagination
           itemsPerPage={5}
         />

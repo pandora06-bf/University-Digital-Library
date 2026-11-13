@@ -59,12 +59,6 @@ export default function LoginPage({ onLogin }) {
     }
   };
 
-  const fillDemoAccount = (demoUsername, demoPassword) => {
-    setUsername(demoUsername);
-    setPassword(demoPassword);
-    setErrorMsg('');
-  };
-
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#F6F8FC] relative overflow-x-hidden">
       
@@ -180,24 +174,6 @@ export default function LoginPage({ onLogin }) {
               </Button>
             </div>
           </form>
-
-          {/* Hỗ trợ Đăng nhập mẫu nhanh (Demo Pills) */}
-          <div className="mt-8 pt-6 border-t border-slate-100 space-y-3">
-            <span className="text-[12px] font-medium text-[#667085] block text-center">
-              Chọn nhanh tài khoản kiểm thử (cần backend đang chạy):
-            </span>
-            <div className="grid grid-cols-1 gap-2.5">
-              {/* Tài khoản ADMIN do backend tự tạo (bootstrap_admin.py / docker .env) */}
-              <button
-                type="button"
-                onClick={() => fillDemoAccount('admin', 'Admin@123')}
-                className="p-2.5 text-left rounded-xl border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/50 transition-all text-xs"
-              >
-                <div className="font-semibold text-slate-800">Thủ thư / Quản trị viên</div>
-                <div className="text-[11px] text-slate-500 font-mono truncate">admin / Admin@123</div>
-              </button>
-            </div>
-          </div>
 
         </div>
       </div>
