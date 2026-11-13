@@ -226,11 +226,7 @@ def test_webhook_different_amount_credited_accurately(client, auth_headers, db_s
     topup_data = _create(client, auth_headers, 50_000)
     code = topup_data["pay_code"]
 
-    payload = {
-        "id": "BANK-DIFF-001",
-        "transferAmount": 70_000,
-        "content": f"Chuyen khoan {code} thanh toan",
-    }
+    payload = _sepay("BANK-DIFF-001", 70_000, f"Chuyen khoan {code} thanh toan")
     r = _hook(client, payload)
     assert r.status_code == 200
     assert r.json()["result"] == "MATCHED"
@@ -246,11 +242,7 @@ def test_webhook_different_amount_credited_accurately(client, auth_headers, db_s
 def test_webhook_duplicate_bank_tx_id_preserves_single_credit(client, auth_headers, db_session):
     """Gửi lặp cùng một bank_tx_id nhiều lần phải trả về DUPLICATE và chỉ cộng tiền đúng một lần."""
     code = _create(client, auth_headers, 20_000)["pay_code"]
-    payload = {
-        "id": "BANK-DUP-UNIQUE-999",
-        "transferAmount": 20_000,
-        "content": f"Thanh toan ma {code}",
-    }
+    payload = _sepay("BANK-DUP-UNIQUE-999", 20_000, f"Thanh toan ma {code}")
 
     # Lần 1: Thành công
     r1 = _hook(client, payload)

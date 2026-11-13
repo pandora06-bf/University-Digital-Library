@@ -195,6 +195,161 @@ khóa mẫu trong môi trường thật.
 - `GET /api/books`: API sách mẫu, hiện trả danh sách rỗng.
 - `GET /api/users`: API người dùng mẫu, chỉ role `ADMIN` truy cập.
 - `GET /api/loans`: API phiếu mượn mẫu, hiện trả danh sách rỗng.
+- `GET /api/wallet`: lấy số dư ví dịch vụ của người dùng đang đăng nhập.
+- `GET /api/wallet/transactions`: xem lịch sử giao dịch ví.
+- `POST /api/wallet/topups`: tạo yêu cầu nạp tiền và thông tin QR.
+- `GET /api/wallet/topups/{pay_code}`: xem trạng thái yêu cầu nạp tiền.
+- `POST /api/webhooks/bank`: nhận thông báo giao dịch từ ngân hàng.
+- `POST /api/dev/topups/{pay_code}/simulate`: giả lập ngân hàng báo có; mặc định tắt.
+
+## Quy trình API ví và nạp tiền
+
+### Cách chạy
+
+Từ thư mục gốc repository, khởi động Docker Compose:
+
+```powershell
+docker compose up --build -d
+```
+
+Compose khởi động PostgreSQL, API và scheduler; API tự áp dụng Alembic migration
+khi khởi động. Nếu cần chạy migration thủ công:
+
+```powershell
+docker compose exec api python -m alembic upgrade head
+```
+
+API mặc định ở `http://localhost:8010`, Swagger ở
+<http://localhost:8010/docs>. Khi chạy backend trực tiếp thay vì Docker, hãy làm
+theo mục [Chạy backend trực tiếp trên máy](#chạy-backend-trực-tiếp-trên-máy);
+các thiết lập như `ENABLE_DEV_SIMULATE` và `BANK_WEBHOOK_KEY` được đọc từ
+`back_fast_api/.env`.
+
+### Xác thực và lấy token
+
+Các API ví và API mô phỏng yêu cầu JWT của người dùng. Đăng nhập bằng tài khoản
+đã có trong database, sau đó dùng token trong header `Authorization: Bearer`.
+Các lệnh dưới đây chạy trong PowerShell:
+
+```powershell
+$baseUrl = "http://localhost:8010"
+$login = Invoke-RestMethod -Method Post `
+  -Uri "$baseUrl/api/auth/login" `
+  -ContentType "application/json" `
+  -Body (@{
+    username = "ten-dang-nhap"
+    password = "mat-khau"
+  } | ConvertTo-Json)
+$headers = @{ Authorization = "Bearer $($login.access_token)" }
+```
+
+### 1. Xem số dư — `GET /api/wallet`
+
+```powershell
+Invoke-RestMethod -Method Get -Uri "$baseUrl/api/wallet" -Headers $headers
+```
+
+Response gồm `user_code`, `balance` (VND) và `currency`.
+
+### 2. Xem lịch sử — `GET /api/wallet/transactions`
+
+```powershell
+Invoke-RestMethod -Method Get `
+  -Uri "$baseUrl/api/wallet/transactions?page=1&size=20" `
+  -Headers $headers
+```
+
+`page` bắt đầu từ 1; `size` mặc định là 20 và chấp nhận từ 1 đến 100. Response
+có `data`, `total`, `page`, `size`; giao dịch mới nhất được trả về trước. Số tiền
+dương là tiền vào, số tiền âm là tiền trừ khỏi ví.
+
+### 3. Tạo yêu cầu nạp — `POST /api/wallet/topups`
+
+Số tiền nạp hợp lệ mặc định từ 10.000 đến 500.000 VND. Endpoint trả HTTP 201
+cùng `pay_code`, số tiền, trạng thái `PENDING`, thời điểm hết hạn, URL QR và
+thông tin tài khoản ngân hàng.
+
+```powershell
+$topup = Invoke-RestMethod -Method Post `
+  -Uri "$baseUrl/api/wallet/topups" `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body (@{ amount = 50000 } | ConvertTo-Json)
+$topup
+```
+
+Mở `qr_url` hoặc quét QR, rồi chuyển đúng số tiền vào tài khoản được trả về.
+Nhập chính xác `pay_code` làm nội dung chuyển khoản để hệ thống tự nhận diện
+yêu cầu. Mỗi yêu cầu có thời hạn mặc định 15 phút.
+
+### 4. Kiểm tra yêu cầu — `GET /api/wallet/topups/{pay_code}`
+
+```powershell
+Invoke-RestMethod -Method Get `
+  -Uri "$baseUrl/api/wallet/topups/$($topup.pay_code)" `
+  -Headers $headers
+```
+
+Chỉ chủ sở hữu yêu cầu mới xem được. Trạng thái thường gặp là `PENDING`, `PAID`
+và `EXPIRED`; yêu cầu hết hạn được trả về `EXPIRED` ngay cả khi scheduler chưa
+cập nhật. Nếu ngân hàng báo có sau thời hạn, khoản tiền thực nhận vẫn được ghi
+nhận cho yêu cầu đó.
+
+### 5. Nhận webhook ngân hàng — `POST /api/webhooks/bank`
+
+Ngân hàng gửi webhook đến API này sau khi nhận chuyển khoản. Endpoint không dùng
+JWT người dùng; cần gửi khóa webhook được cấu hình trong `BANK_WEBHOOK_KEY` qua
+header `x-api-key` hoặc `Authorization: Apikey <khóa>`. Ví dụ payload tương thích
+với SePay:
+
+```powershell
+$webhookKey = "<BANK_WEBHOOK_KEY đã cấu hình cho backend>"
+$bankHeaders = @{ Authorization = "Apikey $webhookKey" }
+$event = @{
+  id = "BANK-TX-001"
+  transferAmount = 50000
+  content = "Chuyen tien $($topup.pay_code)"
+  transferType = "in"
+  subAccount = "<BANK_ACCOUNT_NO hoặc VA đã cấu hình>"
+}
+Invoke-RestMethod -Method Post `
+  -Uri "$baseUrl/api/webhooks/bank" `
+  -Headers $bankHeaders `
+  -ContentType "application/json" `
+  -Body ($event | ConvertTo-Json)
+```
+
+Backend chỉ xử lý giao dịch vào đúng tài khoản nhận đã cấu hình. Mã nạp được tìm
+trong `code`, `content` hoặc `description`. Kết quả `MATCHED` đánh dấu yêu cầu
+`PAID` và cộng số tiền thực nhận vào ví; gửi lại cùng mã giao dịch ngân hàng sẽ
+trả `DUPLICATE`, không cộng tiền lần nữa. Nội dung không khớp yêu cầu được lưu
+thành `UNMATCHED`; giao dịch chuyển ra hoặc sai tài khoản được `IGNORED`. Webhook
+hợp lệ trả HTTP 200 để ngân hàng không retry vô ích.
+
+### 6. Giả lập nạp tiền — `POST /api/dev/topups/{pay_code}/simulate`
+
+Chỉ dùng cho phát triển/kiểm thử; endpoint mặc định bị tắt. Khi dùng Docker
+Compose, thêm `ENABLE_DEV_SIMULATE=true` vào file `.env` ở thư mục gốc rồi tạo
+lại container API:
+
+```powershell
+docker compose up -d --force-recreate api
+```
+
+Khi chạy backend trực tiếp, đặt `ENABLE_DEV_SIMULATE=true` trong
+`back_fast_api/.env` rồi khởi động lại backend. Sau khi tạo yêu cầu nạp như bước
+3, gọi:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "$baseUrl/api/dev/topups/$($topup.pay_code)/simulate" `
+  -Headers $headers
+```
+
+Endpoint cần JWT của đúng người sở hữu yêu cầu, không nhận body. Nó gọi cùng
+luồng xử lý với webhook thật nhưng không yêu cầu chuyển khoản; gọi lại sẽ trả
+`DUPLICATE`. Đặt lại `ENABLE_DEV_SIMULATE=false` sau khi kiểm thử và không bật
+endpoint này trên môi trường thật.
 
 ## CORS
 

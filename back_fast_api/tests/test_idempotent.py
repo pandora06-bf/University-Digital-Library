@@ -24,6 +24,8 @@ VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 
 def _send_webhook(client, payload, key=KEY):
+    # SePay thật luôn gửi subAccount = VA nhận tiền; backend bỏ qua (IGNORED) nếu khác VA cấu hình.
+    payload = {"subAccount": settings.BANK_ACCOUNT_NO, "transferType": "in", **payload}
     return client.post(
         "/api/webhooks/bank",
         json=payload,

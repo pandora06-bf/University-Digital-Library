@@ -241,13 +241,15 @@ def list_unmatched(db: Session, page: int = 1, size: int = 20) -> Dict[str, Any]
 
 def assign_unmatched(db: Session, unmatched_id: int, user_code: str, admin_code: Optional[str] = None,
                      notes: Optional[str] = None) -> Dict[str, Any]:
-    """Gán giao dịch chưa khớp cho người dùng và cộng số dư trong một transaction."""
+    """Gán giao dịch chưa khớp cho người dùng và cộng số dư trong một transaction.
+    Kiểm tra mọi điều kiện (404/409) TRƯỚC khi ghi để lỗi nghiệp vụ không cần rollback."""
+    tx = db.scalar(select(UnmatchedTx).where(UnmatchedTx.id == unmatched_id).with_for_update())
+    if not tx:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy giao dịch chưa khớp")
+    if tx.assigned_user_code is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Giao dịch đã được gán")
+    _lock_user(db, user_code)  # 404 nếu user không tồn tại; khóa dòng trước khi cộng tiền
     try:
-        tx = db.scalar(select(UnmatchedTx).where(UnmatchedTx.id == unmatched_id).with_for_update())
-        if not tx:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy giao dịch chưa khớp")
-        if tx.assigned_user_code is not None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "Giao dịch đã được gán")
         # Cập nhật có điều kiện: chống hai admin gán song song.
         updated = db.execute(update(UnmatchedTx)
                              .where(UnmatchedTx.id == tx.id, UnmatchedTx.assigned_user_code.is_(None))
@@ -255,15 +257,18 @@ def assign_unmatched(db: Session, unmatched_id: int, user_code: str, admin_code:
                                      resolved_by=admin_code, resolution_notes=notes)
                              .execution_options(synchronize_session="fetch")).rowcount
         if updated != 1:
+            db.rollback()
             raise HTTPException(status.HTTP_409_CONFLICT, "Giao dịch đã được gán")
         txn = credit(db, user_code, tx.amount, TXN_TOPUP, reference_id=tx.bank_tx_id,
                      description=f"Admin gán giao dịch chưa khớp ({tx.bank_tx_id})")
         db.commit()
-        db.refresh(tx)
-        return {"unmatched": serialize_unmatched(tx), "transaction": serialize_txn(txn)}
+    except HTTPException:
+        raise
     except Exception:
         db.rollback()
         raise
+    db.refresh(tx)
+    return {"unmatched": serialize_unmatched(tx), "transaction": serialize_txn(txn)}
 
 
 # ---------------------------------------------------------------- JOB-07
