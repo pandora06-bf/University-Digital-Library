@@ -13,6 +13,7 @@ import { ADMIN_MOCK_BOOKS, ADMIN_MOCK_COPIES } from '../../mocks/adminCatalogMoc
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../services/errorHandler';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 export default function InventoryManagement() {
   const { bookId } = useParams();
@@ -407,13 +408,18 @@ export default function InventoryManagement() {
     },
     {
       key: 'location',
-      header: 'Vị Trí Kệ'
+      header: 'Vị Trí Kệ',
+      render: (val) => (
+        <span className="text-sm text-slate-700 block max-w-[140px] truncate" title={val || undefined}>
+          {val || '—'}
+        </span>
+      ),
     },
     {
       key: 'condition',
       header: 'Tình Trạng',
       render: (val, row) => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
           row.statusType === 'danger' ? 'bg-rose-50 text-rose-600 border-rose-200' : 
           'bg-slate-50 text-slate-700 border-slate-200'
         }`}>
@@ -457,10 +463,10 @@ export default function InventoryManagement() {
         const canRetire = !isBorrowed && !isRetired;
 
         return (
-          <div className="flex items-center justify-end gap-2 transition-opacity">
-            <button
+          <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+            <AdminIconButton
               onClick={() => handleOpenRetire(row)}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+              className={`w-8 h-8 rounded-full transition-colors ${
                 canRetire
                   ? 'bg-amber-50 text-amber-600 hover:bg-amber-100 cursor-pointer shadow-xs'
                   : 'bg-slate-100 text-slate-400 hover:bg-slate-200 cursor-pointer opacity-70'
@@ -474,21 +480,21 @@ export default function InventoryManagement() {
               }
             >
               <Archive className="w-4 h-4" />
-            </button>
-            <button
+            </AdminIconButton>
+            <AdminIconButton
               onClick={() => handleOpenEdit(row)}
-              className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors cursor-pointer"
-              title="Chỉnh sửa bản sao"
+              className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
+              title="Chỉnh sửa"
             >
               <Edit2 className="w-4 h-4" />
-            </button>
-            <button
+            </AdminIconButton>
+            <AdminIconButton
               onClick={() => setDeletingRow(row)}
-              className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
               title="Xóa bản sao"
             >
               <Trash2 className="w-4 h-4" />
-            </button>
+            </AdminIconButton>
           </div>
         );
       }
@@ -662,10 +668,9 @@ export default function InventoryManagement() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
         
         {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            {/* Search */}
-            <div className="w-full sm:w-80">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          <div className="flex items-stretch gap-2 min-w-0">
+            <div className="min-w-0 flex-1 sm:max-w-md">
               <Input
                 type="text"
                 placeholder="Lọc theo mã vạch hoặc tên sách…"
@@ -675,10 +680,23 @@ export default function InventoryManagement() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            
-            {/* Location Dropdown */}
-            <select 
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[200px]"
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                if (!searchTerm.trim()) {
+                  showToast('Nhập mã vạch/tên sách rồi bấm Tra cứu (lọc bảng bên dưới).', 'warning');
+                }
+              }}
+            >
+              Tra cứu
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
+            <select
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
             >
@@ -687,10 +705,8 @@ export default function InventoryManagement() {
                 <option key={loc} value={loc}>{loc}</option>
               ))}
             </select>
-
-            {/* Status Dropdown */}
-            <select 
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[180px]"
+            <select
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >

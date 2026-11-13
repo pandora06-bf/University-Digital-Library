@@ -12,6 +12,7 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
+import { AdminIconButton } from '../../components/AdminIconButton';
 const PAGE_SIZE = 8;
 const EMPTY_FORM = {
   user_code: '',
@@ -277,7 +278,7 @@ export default function UserManagement() {
   };
 
   const iconBtn =
-    'w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer';
+    'w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer';
 
   const columns = [
     {
@@ -312,18 +313,22 @@ export default function UserManagement() {
     {
       key: 'department',
       header: 'Khoa / Ngành',
-      render: (val) => <span className="text-sm font-medium text-slate-600">{val || '—'}</span>,
+      render: (val) => (
+        <span className="text-sm font-medium text-slate-600 block max-w-[160px] truncate" title={val || undefined}>
+          {val || '—'}
+        </span>
+      ),
     },
     {
       key: 'is_locked',
       header: 'Trạng thái',
       render: (val, row) => (
-        <div className="space-y-1 min-w-[110px]">
+        <div className="flex items-center gap-2 min-w-0 whitespace-nowrap">
           <StatusBadge status={val ? 'Đã khóa' : 'Hoạt động'} type={val ? 'danger' : 'success'} />
           {Number(row.total_fines) > 0 && (
-            <p className="text-[11px] text-rose-500 font-medium">
+            <span className="text-[11px] text-rose-500 font-medium truncate">
               Nợ {Number(row.total_fines).toLocaleString('vi-VN')} ₫
-            </p>
+            </span>
           )}
         </div>
       ),
@@ -333,43 +338,39 @@ export default function UserManagement() {
       header: 'Thao tác',
       align: 'right',
       render: (_, row) => (
-        <div className="flex items-center justify-end gap-1.5 min-w-[140px]">
-          <button
-            type="button"
+        <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
+          <AdminIconButton
             onClick={() => setDetailRow(row)}
             className={`${iconBtn} bg-indigo-50 text-indigo-600 hover:bg-indigo-100`}
             title="Xem chi tiết"
           >
             <Eye className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => openEdit(row)}
             className={`${iconBtn} bg-slate-50 text-slate-600 hover:bg-slate-100`}
-            title="Sửa"
+            title="Chỉnh sửa"
           >
             <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => setLockTarget(row)}
             className={`${iconBtn} ${
               row.is_locked
                 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                 : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
             }`}
-            title={row.is_locked ? 'Mở khóa' : 'Khóa'}
+            title={row.is_locked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
           >
             {row.is_locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
+          </AdminIconButton>
+          <AdminIconButton
             onClick={() => handleResetPassword(row)}
             className={`${iconBtn} bg-amber-50 text-amber-600 hover:bg-amber-100`}
             title="Đặt lại mật khẩu"
           >
             <KeyRound className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
         </div>
       ),
     },
@@ -466,9 +467,9 @@ export default function UserManagement() {
 
       {/* Bảng + filter trong một card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="w-full sm:w-80">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          <div className="flex items-stretch gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
                 placeholder="Tìm MSSV, họ tên, email…"
@@ -476,10 +477,45 @@ export default function UserManagement() {
                 className="!h-10 !rounded-lg placeholder:font-sans"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    setDebouncedQ(searchTerm.trim());
+                    setPage(1);
+                  }
+                }}
               />
             </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                setDebouncedQ(searchTerm.trim());
+                setPage(1);
+              }}
+            >
+              Tra cứu
+            </Button>
+            <Button
+              variant="ghost"
+              className="!h-10 shrink-0 !text-slate-500 px-2 sm:px-3"
+              icon={<RotateCcw className="w-4 h-4" />}
+              aria-label="Đặt lại bộ lọc"
+              onClick={() => {
+                setSearchTerm('');
+                setDebouncedQ('');
+                setRoleFilter('ALL');
+                setPage(1);
+              }}
+            >
+              <span className="hidden sm:inline">Đặt lại</span>
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[180px]"
+              className="h-10 w-full sm:w-auto sm:min-w-[180px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
@@ -491,22 +527,6 @@ export default function UserManagement() {
               <option value="LECTURER">Giảng viên</option>
               <option value="ADMIN">Admin</option>
             </select>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<RotateCcw className="w-4 h-4" />}
-              onClick={() => {
-                setSearchTerm('');
-                setDebouncedQ('');
-                setRoleFilter('ALL');
-                setPage(1);
-
-              }}
-            >
-              Đặt lại bộ lọc
-            </Button>
           </div>
         </div>
 

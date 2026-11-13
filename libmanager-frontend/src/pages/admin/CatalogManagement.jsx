@@ -19,6 +19,8 @@ import {
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../services/errorHandler';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 const formatVND = (val) => {
   if (val === undefined || val === null || val === '') return null;
@@ -31,7 +33,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
     header: 'Bìa',
     align: 'center',
     render: (value, row) => {
-      const coverSrc = value || row.cover || row.cover_image_path;
+      const coverSrc = resolveMediaUrl(value || row.cover || row.cover_image_path);
       if (!coverSrc) {
         return (
           <div className="w-10 h-14 bg-indigo-50 rounded flex items-center justify-center border border-indigo-100 mx-auto text-indigo-400 shrink-0">
@@ -75,45 +77,46 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
       const realBarcode = row.copy_barcode || (row.barcode && !String(row.barcode).startsWith('BC-') ? row.barcode : null);
 
       return (
-        <div className="min-w-[200px]">
-          <div className="flex items-center gap-1.5 flex-wrap mb-1">
-            <button 
-              onClick={() => navigate(`/admin/books/${row.id}`)} 
-              className="font-bold text-slate-800 text-left leading-snug line-clamp-2 hover:text-indigo-600 transition-colors cursor-pointer"
-              title="Xem chi tiết tồn kho và bản sao"
+        <div className="min-w-0 max-w-sm">
+          <div className="flex items-center gap-1.5 min-w-0 mb-1">
+            <button
+              type="button"
+              onClick={() => navigate(`/admin/books/${row.id}`)}
+              className="font-bold text-slate-800 text-left truncate min-w-0 hover:text-indigo-600 transition-colors cursor-pointer"
+              title={row.title || 'Xem chi tiết tồn kho và bản sao'}
             >
               {row.title}
             </button>
             {isBoth ? (
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200 whitespace-nowrap">
                 Cả hai
               </span>
             ) : isEbook ? (
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
                 eBook
               </span>
             ) : (
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
                 Vật lý
               </span>
             )}
             {(row.book_attribute || row.bookAttribute) && (
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                 {row.book_attribute || row.bookAttribute}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono flex-wrap">
-            <span>
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono min-w-0">
+            <span className="truncate">
               {isbnText || 'Chưa có ISBN'}
               {realBarcode ? ` • ${realBarcode}` : ''}
             </span>
             {priceText ? (
-              <span className="text-emerald-700 font-sans font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+              <span className="shrink-0 text-emerald-700 font-sans font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 whitespace-nowrap">
                 {priceText}
               </span>
             ) : (
-              <span className="text-slate-500 font-sans font-medium bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200">
+              <span className="shrink-0 text-slate-500 font-sans font-medium bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
                 Chưa có giá bìa
               </span>
             )}
@@ -139,7 +142,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
       const cat = categories.find(c => c.id === row.category_id);
       const catName = cat ? cat.category_name : (row.category || 'Chưa phân loại');
       return (
-        <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold text-center leading-tight bg-blue-50 text-blue-600`}>
+        <span className="inline-flex items-center max-w-[140px] px-2 py-1 rounded text-[10px] font-bold leading-tight bg-blue-50 text-blue-600 truncate" title={catName}>
           {catName}
         </span>
       );
@@ -209,25 +212,28 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
     header: 'Thao Tác',
     align: 'right',
     render: (value, row) => (
-      <div className="flex items-center justify-end gap-2 transition-opacity">
-        <button 
+      <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+        <AdminIconButton
+          title="Xem chi tiết tồn kho"
           onClick={() => navigate(`/admin/books/${row.id}`)}
-          title="Tồn kho"
-          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors">
+          className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
+        >
           <BookCopy className="w-4 h-4" />
-        </button>
-        <button 
+        </AdminIconButton>
+        <AdminIconButton
+          title="Chỉnh sửa"
           onClick={() => onEdit(row)}
-          title="Sửa"
-          className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 flex items-center justify-center transition-colors">
+          className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+        >
           <Edit2 className="w-4 h-4" />
-        </button>
-        <button 
+        </AdminIconButton>
+        <AdminIconButton
+          title="Xóa sách"
           onClick={() => onDelete(row)}
-          title="Xóa"
-          className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center justify-center transition-colors">
+          className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+        >
           <Trash2 className="w-4 h-4" />
-        </button>
+        </AdminIconButton>
       </div>
     )
   }
@@ -886,16 +892,37 @@ export default function CatalogManagement() {
         {/* Filters Bar */}
         <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between bg-slate-50/50 rounded-t-2xl">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 w-full xl:w-auto flex-1">
-            {/* Search */}
-            <div className="w-full">
-              <Input
-                type="text"
-                placeholder="Tìm tên sách, tác giả, ISBN… (tự tìm sau 0,35 giây)"
-                leftIcon={<Search className="w-4 h-4" />}
-                className="!h-10 !rounded-lg"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            {/* Search + Tra cứu ngay (không chờ debounce) */}
+            <div className="w-full flex items-stretch gap-2 min-w-0 md:col-span-2 lg:col-span-1">
+              <div className="min-w-0 flex-1">
+                <Input
+                  type="text"
+                  placeholder="Tìm tên sách, tác giả, ISBN…"
+                  leftIcon={<Search className="w-4 h-4" />}
+                  className="!h-10 !rounded-lg"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      setDebouncedSearch(searchTerm);
+                      setPage(1);
+                    }
+                  }}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                className="!h-10 shrink-0 px-3"
+                icon={<Search className="w-4 h-4" />}
+                onClick={() => {
+                  setDebouncedSearch(searchTerm);
+                  setPage(1);
+                }}
+              >
+                Tra cứu
+              </Button>
             </div>
             
             {/* Category Dropdown */}
@@ -1004,14 +1031,30 @@ export default function CatalogManagement() {
           />
         ) : (
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 bg-slate-50">
-            {filteredData.map(row => (
+            {filteredData.map(row => {
+              const coverSrc = resolveMediaUrl(row.cover || row.cover_image_path);
+              return (
               <div key={row.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow group flex flex-col">
-                {/* Image Placeholder & Status Badge */}
-                <div className="relative aspect-[3/4] bg-indigo-50/50 border-b border-slate-100 flex flex-col items-center justify-center text-indigo-300">
-                  <BookType className="w-16 h-16 mb-4 opacity-50" />
-                  <span className="font-mono text-sm font-medium text-indigo-400/70">{row.barcode}</span>
-                  
-                  <div className="absolute top-3 left-3">
+                {/* Cover & Status Badge */}
+                <div className="relative aspect-[3/4] bg-indigo-50/50 border-b border-slate-100 flex flex-col items-center justify-center text-indigo-300 overflow-hidden">
+                  {coverSrc ? (
+                    <img
+                      src={coverSrc}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.nextElementSibling;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`relative z-[1] flex flex-col items-center justify-center ${coverSrc ? 'hidden' : ''}`}>
+                    <BookType className="w-16 h-16 mb-4 opacity-50" />
+                    <span className="font-mono text-sm font-medium text-indigo-400/70">{row.barcode}</span>
+                  </div>
+
+                  <div className="absolute top-3 left-3 z-10">
                     {row.status === 'Hết bản hiện' || row.status === 'Hết bản in' ? (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-sm">
                         {row.status}
@@ -1027,19 +1070,21 @@ export default function CatalogManagement() {
                       </span>
                     )}
                   </div>
-                  <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
+                  <div className="absolute top-3 right-3 z-10 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <AdminIconButton
                         className="bg-white/90 backdrop-blur-sm text-slate-500 hover:text-indigo-600 p-2 rounded-full shadow-md hover:bg-indigo-50 transition-colors"
+                        title="Chỉnh sửa"
                         onClick={() => setEditingBook(row)}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button 
+                      </AdminIconButton>
+                      <AdminIconButton
                         className="bg-white/90 backdrop-blur-sm text-slate-500 hover:text-rose-600 p-2 rounded-full shadow-md hover:bg-rose-50 transition-colors"
+                        title="Xóa sách"
                         onClick={() => setDeletingBook(row)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </AdminIconButton>
                   </div>
                 </div>
                 
@@ -1071,7 +1116,8 @@ export default function CatalogManagement() {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {filteredData.length === 0 && (
               <p className="col-span-full text-center text-sm text-slate-400 py-10">
                 {isLoadingBooks ? 'Đang tải…' : 'Không tìm thấy đầu sách nào'}
@@ -1116,25 +1162,23 @@ export default function CatalogManagement() {
               <div key={cat.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span className="font-medium text-slate-700 truncate">{cat.category_name}</span>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50"
-                    title="Sửa"
+                  <AdminIconButton
+                    className="p-1.5 rounded-full text-indigo-600 hover:bg-indigo-50"
+                    title="Chỉnh sửa thể loại"
                     onClick={() => {
                       setEditingCategory(cat);
                       setCategoryFormName(cat.category_name || '');
                     }}
                   >
                     <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50"
-                    title="Xóa"
+                  </AdminIconButton>
+                  <AdminIconButton
+                    className="p-1.5 rounded-full text-rose-600 hover:bg-rose-50"
+                    title="Xóa thể loại"
                     onClick={() => setDeletingCategory(cat)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  </AdminIconButton>
                 </div>
               </div>
             ))}

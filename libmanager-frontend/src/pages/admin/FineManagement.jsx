@@ -13,6 +13,7 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 export default function FineManagement() {
   const navigate = useNavigate();
@@ -33,8 +34,9 @@ export default function FineManagement() {
   const displayDebt = lookupTotal != null ? Number(lookupTotal) : unpaidSum;
 
   const handleCollect = async (row) => {
-    if (!row) {
-      showToast('Không có phiếu phạt để thu.', 'error');
+    if (!row || row.statusColor === 'emerald') {
+      showToast(row?.statusColor === 'emerald' ? 'Phiếu này đã thu, không thu lại.' : 'Không có phiếu phạt để thu.', 'error');
+      setCollectingRow(null);
       return;
     }
     const userCode = row.mssv;
@@ -70,7 +72,7 @@ export default function FineManagement() {
   const handleSearchSubmit = async () => {
     const q = searchTerm.trim();
     if (!q) {
-      showToast('Nhập MSSV rồi nhấn phím Enter để tra cứu công nợ.', 'warning');
+      showToast('Nhập MSSV rồi bấm Tra cứu (hoặc Enter).', 'warning');
       return;
     }
     try {
@@ -92,7 +94,7 @@ export default function FineManagement() {
         return;
       }
       const mapped = fines.map((f) => ({
-        id: `FINE-${f.fine_id}`,
+        id: String(f.fine_id),
         date: f.created_at ? new Date(f.created_at).toLocaleDateString('vi-VN') : '—',
         user: data.full_name || q,
         mssv: data.user_code || q,
@@ -124,7 +126,9 @@ export default function FineManagement() {
       header: 'Mã Phiếu & Ngày',
       render: (value, row) => (
         <div className="min-w-[120px]">
-          <span className="font-mono font-bold text-slate-700 block">{row.id}</span>
+          <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
+            {row.id}
+          </span>
           <span className="text-[11px] text-slate-400 font-medium block mt-1">{row.date}</span>
         </div>
       )
@@ -133,9 +137,9 @@ export default function FineManagement() {
       key: 'user',
       header: 'Độc Giả (MSSV)',
       render: (value, row) => (
-        <div className="min-w-[160px]">
-          <span className="font-bold text-slate-800 block">{row.user}</span>
-          <span className="text-[11px] text-slate-500 font-mono block mt-1">{row.mssv}</span>
+        <div className="min-w-0 max-w-[180px]">
+          <span className="font-bold text-slate-800 block truncate" title={row.user}>{row.user}</span>
+          <span className="text-[11px] text-slate-500 font-mono block mt-1 truncate">{row.mssv}</span>
         </div>
       )
     },
@@ -143,11 +147,11 @@ export default function FineManagement() {
       key: 'reason',
       header: 'Lý do vi phạm',
       render: (value, row) => (
-        <div className="flex items-start gap-2 min-w-[200px]">
-          <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${
+        <div className="flex items-center gap-2 min-w-0 max-w-xs">
+          <AlertCircle className={`w-4 h-4 shrink-0 ${
             row.reason.includes('Trễ hạn') ? 'text-amber-500' : 'text-rose-500'
           }`} />
-          <span className="font-medium text-slate-700 leading-snug">{row.reason}</span>
+          <span className="font-medium text-slate-700 truncate" title={row.reason}>{row.reason}</span>
         </div>
       )
     },
@@ -182,10 +186,11 @@ export default function FineManagement() {
       header: 'Thao Tác',
       align: 'right',
       render: (value, row) => (
-        <div className="min-w-[150px] flex items-center justify-end gap-2">
+        <div className="min-w-[150px] inline-flex items-center justify-end gap-2 whitespace-nowrap">
           {row.statusColor !== 'emerald' ? (
             <>
               <button
+                type="button"
                 className="flex items-center justify-center gap-1.5 text-white font-semibold text-xs bg-indigo-600 hover:bg-indigo-700 px-3 py-2 rounded-lg transition-colors shadow-sm shadow-indigo-200 whitespace-nowrap"
                 onClick={() => setCollectingRow(row)}
               >
@@ -193,6 +198,7 @@ export default function FineManagement() {
                 Thu tiền
               </button>
               <button
+                type="button"
                 className="flex items-center gap-1.5 text-slate-600 font-semibold text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
                 onClick={() => setDetailRow(row)}
               >
@@ -202,6 +208,7 @@ export default function FineManagement() {
             </>
           ) : (
             <button
+              type="button"
               className="flex items-center gap-1.5 text-slate-600 font-semibold text-xs bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
               onClick={() => setDetailRow(row)}
             >
@@ -209,29 +216,26 @@ export default function FineManagement() {
               Chi tiết
             </button>
           )}
-          <button
-            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+          <AdminIconButton
+            className="w-8 h-8 rounded-full text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
             onClick={() => navigate('/admin/loans')}
             title="Xem phiếu mượn liên quan"
           >
             <Receipt className="w-4 h-4" />
-          </button>
+          </AdminIconButton>
         </div>
       )
     }
   ];
 
-  const filteredData = finesData.filter(item => {
-    const matchSearch = !searchTerm ||
-      item.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.mssv.includes(searchTerm) ||
-      item.id.toLowerCase().includes(searchTerm.toLowerCase());
+  // Ô MSSV là khóa tra cứu API, không lọc lại bảng (dễ loại mất đúng dòng vừa tìm).
+  const filteredData = finesData.filter((item) => {
     const matchType = typeFilter === 'Loại vi phạm (Tất cả)' ||
       (typeFilter === 'Trễ hạn trả sách' && item.reason.includes('Trễ hạn')) ||
       (typeFilter === 'Làm rách / Hư hỏng' && (item.reason.includes('rách') || item.reason.includes('ướt'))) ||
       (typeFilter === 'Làm mất sách' && item.reason.includes('mất'));
     const matchStatus = statusFilter === 'Trạng thái (Tất cả)' || item.status === statusFilter;
-    return matchSearch && matchType && matchStatus;
+    return matchType && matchStatus;
   });
 
   return (
@@ -246,7 +250,7 @@ export default function FineManagement() {
             Tra cứu công nợ theo MSSV và xác nhận thu phạt tại quầy cho bạn đọc.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
             variant="outline"
             icon={<AlertOctagon className="w-4 h-4" />}
@@ -264,69 +268,64 @@ export default function FineManagement() {
         </div>
       </div>
 
-      {/* 3 Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {/* Card 1 */}
-        <div className="bg-white p-6 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/50 group">
-          <div className="absolute top-4 right-4">
-            <div className="w-12 h-12 bg-rose-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-              <ShieldAlert className="w-6 h-6 text-rose-600" />
+      {/* Stats: xếp 1 cột đến lg — khung Admin hẹp (sidebar) không ép 3 cột */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-sm bg-gradient-to-br from-white to-rose-50/50 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-sm font-bold text-slate-500 truncate">Tổng dư nợ</p>
+            <div className="w-9 h-9 shrink-0 bg-rose-100 rounded-full flex items-center justify-center">
+              <ShieldAlert className="w-4 h-4 text-rose-600" aria-hidden />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Tổng dư nợ</p>
-          <h3 className="text-3xl font-extrabold text-rose-600">
-            {displayDebt > 0 ? displayDebt.toLocaleString('vi-VN') : '—'}{' '}
-            <span className="text-lg font-bold text-rose-400">₫</span>
-          </h3>
-          <div className="mt-3 text-sm font-medium text-slate-500">
+          <p className="text-2xl sm:text-3xl font-extrabold text-rose-600 tabular-nums leading-none">
+            {displayDebt > 0 ? displayDebt.toLocaleString('vi-VN') : '0'}
+            <span className="ml-1 text-base font-bold text-rose-400">₫</span>
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-500 line-clamp-2" title={lookedUpName || undefined}>
             {lookedUpName
               ? <>Độc giả <span className="text-slate-700 font-bold">{lookedUpName}</span></>
-              : 'Nhập MSSV + Enter để tra cứu'}
-          </div>
+              : 'Nhập MSSV rồi bấm Tra cứu'}
+          </p>
         </div>
 
-        {/* Card 2 */}
-        <div className="bg-white p-6 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/50 group">
-          <div className="absolute top-4 right-4">
-            <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Wallet className="w-6 h-6 text-emerald-600" />
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/50 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-sm font-bold text-slate-500 truncate">Khoản chưa thu</p>
+            <div className="w-9 h-9 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-emerald-600" aria-hidden />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Khoản chưa thu</p>
-          <h3 className="text-3xl font-extrabold text-emerald-600">
-            {unpaidRows.length} <span className="text-lg font-bold text-emerald-400">dòng</span>
-          </h3>
-          <div className="mt-3 text-sm font-medium text-slate-500">
-            Thu đủ toàn bộ số nợ một lần
-          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums leading-none">
+            {unpaidRows.length}
+            <span className="ml-1 text-base font-bold text-emerald-400">phiếu</span>
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-500">Thu đủ toàn bộ số nợ một lần</p>
         </div>
 
-        {/* Card 3 */}
-        <div className="bg-white p-6 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/50 group">
-          <div className="absolute top-4 right-4">
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Receipt className="w-6 h-6 text-amber-600" />
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-amber-100 shadow-sm bg-gradient-to-br from-white to-amber-50/50 min-w-0 md:col-span-2 lg:col-span-1">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <p className="text-sm font-bold text-slate-500 truncate">Phiếu trên bảng</p>
+            <div className="w-9 h-9 shrink-0 bg-amber-100 rounded-full flex items-center justify-center">
+              <Receipt className="w-4 h-4 text-amber-600" aria-hidden />
             </div>
           </div>
-          <p className="text-sm font-bold text-slate-500 mb-2">Phiếu trên bảng</p>
-          <h3 className="text-3xl font-extrabold text-amber-600">
-            {finesData.length} <span className="text-lg font-bold text-amber-400">phiếu</span>
-          </h3>
-          <div className="mt-3 text-sm font-medium text-slate-500">
-            Kết quả tra cứu hiện tại
-          </div>
+          <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums leading-none">
+            {finesData.length}
+            <span className="ml-1 text-base font-bold text-amber-400">phiếu</span>
+          </p>
+          <p className="mt-2 text-sm font-medium text-slate-500">Kết quả tra cứu hiện tại</p>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-w-0 overflow-hidden">
         {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-wrap items-center gap-3 flex-1">
-            <div className="w-full sm:w-80">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          <div className="flex items-stretch gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
-                placeholder="Tìm MSSV, tên độc giả hoặc mã phiếu… (nhấn phím Enter)"
+                placeholder="Nhập MSSV…"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}
@@ -334,8 +333,20 @@ export default function FineManagement() {
                 onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
               />
             </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 px-3 sm:px-4"
+              icon={<Search className="w-4 h-4" />}
+              aria-label="Tra cứu công nợ theo MSSV"
+              onClick={handleSearchSubmit}
+            >
+              Tra cứu
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[180px]"
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
             >
@@ -345,7 +356,7 @@ export default function FineManagement() {
               <option>Làm mất sách</option>
             </select>
             <select
-              className="h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer min-w-[180px]"
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -361,7 +372,7 @@ export default function FineManagement() {
         <Table
           columns={fineColumns}
           data={filteredData}
-          emptyMessage="Nhập MSSV rồi nhấn Enter để tra cứu công nợ chưa thu."
+          emptyMessage="Nhập MSSV rồi bấm Tra cứu để xem công nợ chưa thu."
           className="border-0 shadow-none rounded-none rounded-b-2xl"
         />
       </div>
@@ -408,12 +419,12 @@ export default function FineManagement() {
                 </span>
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Phương thức thanh toán</label>
-              <select className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer">
-                <option>Tiền mặt</option>
-              </select>
-              <p className="text-[11px] text-slate-400 mt-1">Thu tại quầy bằng tiền mặt; cần thu đủ toàn bộ số nợ.</p>
+            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Phương thức thanh toán</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">Tiền mặt</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Quầy chỉ thu tiền mặt. Trả bằng ví do bạn đọc tự thao tác trên cổng độc giả.
+              </p>
             </div>
           </div>
         )}
@@ -435,13 +446,23 @@ export default function FineManagement() {
       >
         {detailRow && (
           <div className="space-y-3">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-              <div>
-                <p className="font-bold text-emerald-800 text-sm">Đã hoàn tất thanh toán</p>
-                <p className="text-xs text-emerald-600 mt-0.5">Phiếu phạt này đã được xử lý xong.</p>
+            {detailRow.statusColor === 'emerald' ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="font-bold text-emerald-800 text-sm">Đã hoàn tất thanh toán</p>
+                  <p className="text-xs text-emerald-600 mt-0.5">Phiếu phạt này đã được thu tại quầy.</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex items-center gap-3">
+                <AlertCircle className="w-6 h-6 text-rose-600 shrink-0" />
+                <div>
+                  <p className="font-bold text-rose-800 text-sm">Chưa thu</p>
+                  <p className="text-xs text-rose-600 mt-0.5">Phiếu vẫn còn nợ. Dùng nút Thu tiền để xác nhận thu tiền mặt.</p>
+                </div>
+              </div>
+            )}
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-2.5">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Mã phiếu</span>

@@ -1,10 +1,8 @@
 import { useState } from 'react';
 import { 
-  ArrowDownToLine, ArrowUpFromLine, AlertCircle,
-  Book, User, CheckCircle2, X, Circle
+  Book, User, CheckCircle2, X, Search
 } from 'lucide-react';
 import { Button } from '../../components/Button';
-import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
 import { FastBarcodeScanner } from '../../components/FastBarcodeScanner';
@@ -12,13 +10,13 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
+import { AdminIconButton } from '../../components/AdminIconButton';
 
 export default function LoanManagement() {
   const { toast, showToast, hideToast } = useToast();
   const [returnBarcode, setReturnBarcode] = useState('');
   const [borrowUserId, setBorrowUserId] = useState('');
-  const [borrowBarcode, setBorrowBarcode] = useState('');
-  
+
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
 
@@ -35,8 +33,6 @@ export default function LoanManagement() {
 
   const [returnBookScanned, setReturnBookScanned] = useState(false);
   const [borrowBooks, setBorrowBooks] = useState([]);
-  const [historyFilter, setHistoryFilter] = useState('Tất cả');
-  const [historyData, setHistoryData] = useState([]);
 
   const formatLoanDate = (value) => {
     if (!value) return '—';
@@ -57,103 +53,6 @@ export default function LoanManagement() {
     };
     return map[status] || status || '—';
   };
-
-  const historyColumns = [
-    {
-      key: 'id',
-      header: 'Mã Giao Dịch',
-      render: (value, row) => (
-        <span className="font-mono font-bold text-slate-700">{row.id}</span>
-      )
-    },
-    {
-      key: 'type',
-      header: 'Hành Động',
-      render: (value, row) => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border ${
-          row.type === 'Mượn' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-blue-50 text-blue-600 border-blue-100'
-        }`}>
-          {row.type} sách
-        </span>
-      )
-    },
-    {
-      key: 'book',
-      header: 'Tên Sách / Barcode',
-      render: (value, row) => {
-        const parts = row.book.split(' (');
-        return (
-          <div className="min-w-[200px]">
-            <span className="font-bold text-slate-800 block truncate max-w-[250px]">{parts[0]}</span>
-            <span className="text-xs text-slate-400 font-mono block mt-0.5">{parts[1] ? parts[1].replace(')', '') : ''}</span>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'user',
-      header: 'Độc giả',
-      render: (value, row) => {
-        const parts = row.user.split(' (');
-        return (
-          <div className="min-w-[150px]">
-            <span className="font-semibold text-slate-700 block">{parts[0]}</span>
-            <span className="text-xs text-slate-400 font-mono block mt-0.5">{parts[1] ? parts[1].replace(')', '') : ''}</span>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'staff',
-      header: 'Nhân viên ca',
-      render: (value, row) => {
-        const parts = row.time.split(' - ');
-        return (
-          <div className="min-w-[120px]">
-            <span className="font-medium text-slate-600 block">{row.staff}</span>
-            <span className="text-xs text-slate-400 block mt-0.5">{parts[0]}</span>
-          </div>
-        );
-      }
-    },
-    {
-      key: 'status',
-      header: 'Trạng Thái',
-      render: (value, row) => {
-        if (row.status === 'Đang mượn') {
-          return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white border border-amber-400 text-amber-600 shadow-sm whitespace-nowrap">
-              <Circle className="w-2 h-2 fill-current" />
-              {row.status}
-            </span>
-          );
-        }
-        if (row.status === 'Đã trả') {
-          return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white border border-emerald-400 text-emerald-600 shadow-sm whitespace-nowrap">
-              <Circle className="w-2 h-2 fill-current" />
-              {row.status}
-            </span>
-          );
-        }
-        if (row.status === 'Quá hạn') {
-          return (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-white border border-rose-400 text-rose-600 shadow-sm whitespace-nowrap">
-              <Circle className="w-2 h-2 fill-current" />
-              {row.status}
-            </span>
-          );
-        }
-        return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-100 whitespace-nowrap">
-            {row.status}
-          </span>
-        );
-      }
-    }
-  ];
-
-  const pushHistory = (row) => setHistoryData((prev) => [row, ...prev]);
 
   const handleReturnScan = (code) => {
     const targetCode = (typeof code === 'string' ? code : returnBarcode).trim();
@@ -197,7 +96,7 @@ export default function LoanManagement() {
   };
 
   const handleBorrowScan = (code) => {
-    const targetCode = (typeof code === 'string' ? code : borrowBarcode).trim();
+    const targetCode = String(code || '').trim();
     if (!targetCode) {
       showToast('Vui lòng quét mã vạch sách mượn rồi nhấn phím Enter.', 'warning');
       return;
@@ -217,7 +116,6 @@ export default function LoanManagement() {
         loanId: match?.id,
       },
     ]);
-    setBorrowBarcode('');
     setIsBorrowLoading(false);
     showToast(`Đã thêm ${targetCode} vào phiếu mượn.`, 'success');
   };
@@ -241,15 +139,6 @@ export default function LoanManagement() {
         is_damaged: damaged && !lost,
       });
       const data = res.data || {};
-      pushHistory({
-        id: `IN-${data.loan_id || barcode}`,
-        type: 'Trả',
-        book: `${barcode}`,
-        user: '—',
-        time: new Date().toLocaleString('vi-VN'),
-        staff: 'Quầy thủ thư',
-        status: 'Đã trả',
-      });
       setShowReturnModal(false);
       setReturnBookScanned(false);
       setReturnBarcode('');
@@ -280,22 +169,13 @@ export default function LoanManagement() {
           condition_notes: checkoutConditionNotes.trim() || null,
         };
         if (book.loanId) payload.loan_id = book.loanId;
-        const res = await axiosInstance.post('/api/admin/loans/checkout', payload);
-        const d = res.data?.data || {};
+        await axiosInstance.post('/api/admin/loans/checkout', payload);
         ok += 1;
-        pushHistory({
-          id: `OUT-${d.loan_id || book.barcode}`,
-          type: 'Mượn',
-          book: `${d.book_id ? `Sách #${d.book_id}` : book.title} (${book.barcode})`,
-          user: `${mssv}`,
-          time: new Date().toLocaleString('vi-VN'),
-          staff: 'Quầy thủ thư',
-          status: 'Đang mượn',
-        });
       } catch (error) {
         errors.push(`${book.barcode}: ${getApiErrorMessage(error, 'lỗi')}`);
       }
     }
+    const totalTried = borrowBooks.length;
     setIsConfirming(false);
     if (ok > 0) {
       setShowBorrowModal(false);
@@ -304,86 +184,50 @@ export default function LoanManagement() {
       setUserValidated(false);
       setPendingLoans([]);
       setCheckoutConditionNotes('');
-      showToast(`Check-out thành công ${ok}/${borrowBooks.length} cuốn.`, 'success');
+      showToast(`Check-out thành công ${ok}/${totalTried} cuốn.`, 'success');
     }
     if (errors.length) {
       showToast(errors.slice(0, 2).join(' | '), 'error');
     }
   };
 
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-8">
-      <Toast toast={toast} onClose={hideToast} />
-      {/* Page Header */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Quản lý Mượn / Trả Sách</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Quầy xuất mượn và nhận trả sách: quét mã vạch rồi xác nhận giao / nhận sách cho bạn đọc.
-          </p>
-        </div>
-        
-        {/* Thống kê phiên làm việc (không có API báo cáo ngày) */}
-        <div className="flex items-center gap-3 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full lg:w-auto hide-scrollbar">
-          <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 rounded-lg border border-emerald-100">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-              <ArrowUpFromLine className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Mượn (phiên này)</p>
-              <p className="text-lg font-extrabold text-emerald-800 leading-none mt-0.5">
-                {historyData.filter((h) => h.type === 'Mượn').length}{' '}
-                <span className="text-xs font-semibold text-emerald-600">phiếu</span>
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-              <ArrowDownToLine className="w-4 h-4 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Trả (phiên này)</p>
-              <p className="text-lg font-extrabold text-blue-800 leading-none mt-0.5">
-                {historyData.filter((h) => h.type === 'Trả').length}{' '}
-                <span className="text-xs font-semibold text-blue-600">phiếu</span>
-              </p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 px-4 py-2 bg-rose-50 rounded-lg border border-rose-100">
-            <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center">
-              <AlertCircle className="w-4 h-4 text-rose-600" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Chờ xuất trên quầy</p>
-              <p className="text-lg font-extrabold text-rose-800 leading-none mt-0.5">
-                {borrowBooks.length}{' '}
-                <span className="text-xs font-semibold text-rose-600">cuốn</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+  const panelShell =
+    'bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-0 md:min-h-[32rem] lg:min-h-[36rem]';
 
-      {/* Main 2-Column Grid for Counters */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Left Column: Return Counter */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
-          <div className="p-5 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">1</div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Quầy Nhận Trả Sách Nhanh</h2>
-              <p className="text-xs text-slate-500">Xử lý sách trả lại và cập nhật tình trạng tài sản</p>
+  return (
+    <div className="w-full max-w-7xl mx-auto space-y-4 sm:space-y-6 pb-8 sm:pb-10 px-0">
+      <Toast toast={toast} onClose={hideToast} />
+
+      <header className="space-y-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">
+          Quản lý Mượn / Trả Sách
+        </h1>
+        <p className="text-sm text-slate-500 max-w-2xl">
+          Hai quầy độc lập: nhận trả bên trái, xuất mượn bên phải. Trên điện thoại xếp chồng theo thứ tự đó.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 lg:gap-6 items-stretch">
+        {/* 1 — Check-in */}
+        <section className={panelShell} aria-labelledby="loan-checkin-title">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+              1
+            </div>
+            <div className="min-w-0">
+              <h2 id="loan-checkin-title" className="text-base sm:text-lg font-bold text-slate-800">
+                Quầy Nhận Trả Sách
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Quét barcode bản đang mượn / quá hạn → xác nhận tình trạng
+              </p>
             </div>
           </div>
-          
-          <div className="p-6 flex-1 flex flex-col gap-5">
-            {/* Fast Barcode Scanner Component cho sách trả */}
+
+          <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 sm:gap-5">
             <FastBarcodeScanner
-              label="Quét Barcode sách trả"
-              placeholder="Quét Barcode sách trả (VD: BC-2024-0891)..."
+              label="Quét barcode sách trả"
+              placeholder="VD: DEMO-BC-100-02 — Enter để nhận mã"
               value={returnBarcode}
               onChange={(e) => setReturnBarcode(e.target.value)}
               onScan={(scannedCode) => {
@@ -395,226 +239,310 @@ export default function LoanManagement() {
               autoFocus
               autoClear={false}
               autoRefocus
-              helperText="Tự focus ô nhập — tít mã hoặc nhấn phím Enter để nhận diện sách trả."
+              helperText="Ô tự focus. Tít mã hoặc Enter."
             />
 
-            {/* Scanned Book Info Card */}
-            {returnBookScanned && (
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-16 bg-white rounded shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
-                  <Book className="w-6 h-6 text-indigo-300" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <h3 className="font-bold text-slate-800 text-base leading-tight">Bản sao đã quét</h3>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 shrink-0">Chờ check-in</span>
+            {returnBookScanned ? (
+              <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 border border-slate-200">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="w-11 h-14 sm:w-12 sm:h-16 bg-white rounded-lg shadow-sm border border-slate-200 flex items-center justify-center shrink-0">
+                    <Book className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 font-mono">Barcode: {returnBarcode}</p>
-                  <p className="text-xs text-slate-500 mt-2">Xác nhận sẽ nhận trả sách đang mượn hoặc quá hạn theo mã vạch này.</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 justify-between">
+                      <h3 className="font-bold text-slate-800 text-sm sm:text-base">Bản sao đã quét</h3>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                        Chờ check-in
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 font-mono break-all">
+                      Barcode: {returnBarcode}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                      Xác nhận sẽ nhận trả phiếu đang mượn hoặc quá hạn theo mã này.
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center">
+                <p className="text-sm font-medium text-slate-600">Chưa có mã trả</p>
+                <p className="text-xs text-slate-400 mt-1">Quét barcode để hiện thẻ xác nhận.</p>
+              </div>
             )}
 
-            {/* Condition Check */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Tình trạng tài liệu khi trả lại</label>
-              <div className="space-y-2">
-                <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer ${returnCondition === 'Nguyên vẹn' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 hover:bg-slate-50'}`}>
+              <p className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2.5">
+                Tình trạng khi trả
+              </p>
+              <div className="grid grid-cols-1 gap-2">
+                <label
+                  className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-xl border-2 cursor-pointer touch-manipulation ${
+                    returnCondition === 'Nguyên vẹn'
+                      ? 'border-indigo-500 bg-indigo-50/50'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="condition"
                     checked={returnCondition === 'Nguyên vẹn'}
                     onChange={() => setReturnCondition('Nguyên vẹn')}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                    className="mt-0.5 w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300"
                   />
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Nguyên vẹn</p>
-                    <p className="text-xs text-slate-500">Sách hoàn chỉnh, không rách nát và hư hỏng</p>
-                  </div>
+                  <span>
+                    <span className="block text-sm font-bold text-slate-800">Nguyên vẹn</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Không rách / hỏng — trả về kho sẵn sàng
+                    </span>
+                  </span>
                 </label>
-                <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer ${returnCondition === 'Hư hỏng / Mất sách' ? 'border-indigo-500 bg-indigo-50/50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                <label
+                  className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-xl border-2 cursor-pointer touch-manipulation ${
+                    returnCondition === 'Hư hỏng / Mất sách'
+                      ? 'border-indigo-500 bg-indigo-50/50'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
                   <input
                     type="radio"
                     name="condition"
                     checked={returnCondition === 'Hư hỏng / Mất sách'}
                     onChange={() => setReturnCondition('Hư hỏng / Mất sách')}
-                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                    className="mt-0.5 w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300"
                   />
-                  <div>
-                    <p className="text-sm font-bold text-rose-600">Hư hỏng / Mất sách</p>
-                    <p className="text-xs text-slate-500">Chuyển hồ sơ bồi thường, gửi thu phí</p>
-                  </div>
+                  <span>
+                    <span className="block text-sm font-bold text-rose-600">Hư hỏng / Mất sách</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">
+                      Lập bồi thường (có thể sang Báo mất / Hỏng)
+                    </span>
+                  </span>
                 </label>
               </div>
             </div>
 
-            {/* Action Button */}
-            {returnBookScanned && (
-              <div className="mt-auto pt-4">
-                <Button 
-                  variant="primary" 
-                  size="lg" 
-                  fullWidth 
-                  icon={<CheckCircle2 className="w-6 h-6" />}
-                  onClick={() => setShowReturnModal(true)}
-                >
-                  Xác nhận trả sách
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Borrow Counter */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-full">
-          <div className="p-5 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold">2</div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Quầy Xuất Phiếu Mượn</h2>
-              <p className="text-xs text-slate-500">Tạo phiếu lưu thông mượn sách cho độc giả</p>
+            <div className="mt-auto pt-2 sm:pt-3 sticky bottom-0 bg-white/95 backdrop-blur-sm pb-0.5 -mx-1 px-1 sm:static sm:bg-transparent sm:backdrop-blur-none">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                disabled={!returnBookScanned}
+                icon={<CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />}
+                onClick={() => setShowReturnModal(true)}
+              >
+                Xác nhận trả sách
+              </Button>
             </div>
           </div>
-          
-          <div className="p-6 flex-1 flex flex-col gap-5">
-            {/* User ID Input */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Nhập MSSV / Thẻ độc giả</label>
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Nhập và nhấn phím Enter…"
-                  leftIcon={<User className="w-5 h-5" />}
-                  className="!h-11 font-mono"
-                  value={borrowUserId}
-                  onChange={(e) => setBorrowUserId(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleUserScan()}
-                  disabled={isUserLoading}
-                />
-                {isUserLoading && (
-                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin"></div>
+        </section>
+
+        {/* 2 — Check-out */}
+        <section className={panelShell} aria-labelledby="loan-checkout-title">
+          <div className="p-4 sm:p-5 border-b border-slate-100 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-sm shrink-0">
+              2
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="loan-checkout-title" className="text-base sm:text-lg font-bold text-slate-800">
+                  Quầy Xuất Phiếu Mượn
+                </h2>
+                {borrowBooks.length > 0 && (
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    {borrowBooks.length} cuốn trên phiếu
+                  </span>
                 )}
               </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tra MSSV → quét barcode sẵn sàng → xuất mượn
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 sm:gap-5">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                MSSV / mã bạn đọc
+              </label>
+              <div className="flex items-stretch gap-2 min-w-0">
+                <div className="relative min-w-0 flex-1">
+                  <Input
+                    type="text"
+                    placeholder="VD: SV-DEMO-001"
+                    leftIcon={<User className="w-5 h-5" />}
+                    className="!h-11 font-mono text-sm"
+                    value={borrowUserId}
+                    onChange={(e) => {
+                      setBorrowUserId(e.target.value);
+                      if (userValidated) {
+                        setUserValidated(false);
+                        setPendingLoans([]);
+                        setBorrowBooks([]);
+                      }
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUserScan()}
+                    disabled={isUserLoading}
+                  />
+                  {isUserLoading && (
+                    <div className="absolute right-3 top-3 w-5 h-5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="!h-11 shrink-0 px-3 sm:px-4"
+                  icon={<Search className="w-4 h-4" />}
+                  disabled={isUserLoading}
+                  onClick={handleUserScan}
+                  aria-label="Tra cứu bạn đọc"
+                >
+                  Tra cứu
+                </Button>
+              </div>
             </div>
 
-            {/* User Validated Info */}
-            {userValidated && (
+            {!userValidated ? (
+              <div className="flex-1 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-10 text-center min-h-[12rem]">
+                <div className="w-12 h-12 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-3">
+                  <User className="w-6 h-6 text-slate-300" />
+                </div>
+                <p className="text-sm font-semibold text-slate-700">Chưa tra cứu bạn đọc</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-[16rem] leading-relaxed">
+                  Nhập mã rồi bấm Tra cứu (hoặc Enter). Sau đó mới quét sách vào phiếu.
+                </p>
+              </div>
+            ) : (
               <>
-                <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 space-y-3 animate-in fade-in">
+                <div className="bg-indigo-50 rounded-xl p-3.5 sm:p-4 border border-indigo-100 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-700 font-bold shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-700 font-bold shrink-0 text-sm">
                       {(borrowUserId || 'U').slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-slate-800 text-sm flex flex-wrap items-center gap-2">
                         Người mượn
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700">Đã tra cứu</span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700">
+                          Đã tra cứu
+                        </span>
                       </p>
-                      <p className="text-xs text-slate-600 font-mono mt-0.5">MSSV / mã: {borrowUserId}</p>
+                      <p className="text-xs text-slate-600 font-mono mt-0.5 truncate">{borrowUserId}</p>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        {pendingLoans.length} phiếu từ kết quả tra cứu
-                        {' · '}
-                        {pendingLoans.filter((l) => ['REQUESTED', 'PENDING_PICKUP'].includes(l.loan_status)).length} chờ xuất
+                        {pendingLoans.length} phiếu ·{' '}
+                        {
+                          pendingLoans.filter((l) =>
+                            ['REQUESTED', 'PENDING_PICKUP'].includes(l.loan_status)
+                          ).length
+                        }{' '}
+                        chờ xuất
                       </p>
                     </div>
                   </div>
 
                   {pendingLoans.length > 0 ? (
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-36 sm:max-h-40 overflow-y-auto overscroll-contain pr-0.5">
                       {pendingLoans.slice(0, 8).map((loan) => (
                         <div
                           key={loan.id}
                           className="bg-white/90 rounded-lg border border-indigo-100 px-3 py-2 text-xs"
                         >
                           <div className="flex justify-between gap-2 items-start">
-                            <p className="font-semibold text-slate-800 leading-snug">
+                            <p className="font-semibold text-slate-800 leading-snug break-words min-w-0">
                               {loan.book_title || `Book #${loan.book_id || '—'}`}
                             </p>
                             <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                               {loanStatusLabel(loan.loan_status)}
                             </span>
                           </div>
-                          <p className="text-slate-500 font-mono mt-1">
+                          <p className="text-slate-500 font-mono mt-1 break-all">
                             Phiếu #{loan.id}
                             {loan.copy_barcode ? ` · BC: ${loan.copy_barcode}` : ''}
                           </p>
                           <p className="text-slate-400 mt-0.5">
-                            Mượn: {formatLoanDate(loan.borrow_date)} · Hạn: {formatLoanDate(loan.due_date)}
+                            Mượn: {formatLoanDate(loan.borrow_date)} · Hạn:{' '}
+                            {formatLoanDate(loan.due_date)}
                           </p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                      Không có phiếu trong kết quả tra cứu. Vẫn có thể thử xuất mượn nếu có phiếu chờ nhận khớp mã vạch.
+                    <p className="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 leading-relaxed">
+                      Không có phiếu chờ trong kết quả. Vẫn có thể thử xuất nếu barcode khớp phiếu chờ
+                      nhận.
                     </p>
                   )}
                 </div>
 
                 <FastBarcodeScanner
-                  label="Quét Barcode sách mượn"
-                  placeholder="Quét Barcode cuốn sách muốn mượn (tít liên tục)..."
+                  label="Quét barcode sách mượn"
+                  placeholder="Quét liên tục — Enter để thêm vào phiếu"
                   onScan={(scannedCode) => handleBorrowScan(scannedCode)}
                   loading={isBorrowLoading}
                   autoFocus
                   autoClear
                   autoRefocus
                   buttonText="Thêm"
-                  helperText="Tự focus sau khi tra MSSV — quét liên tục không cần chuột."
+                  helperText="Tự focus sau khi tra MSSV."
                 />
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Ghi chú tình trạng khi giao
+                    Ghi chú khi giao (tuỳ chọn)
                   </label>
                   <Input
                     type="text"
-                    placeholder="VD: Bìa hơi cong, có dấu ghi chú trang 12…"
+                    placeholder="VD: Bìa hơi cong…"
                     className="!h-10"
                     value={checkoutConditionNotes}
                     onChange={(e) => setCheckoutConditionNotes(e.target.value)}
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">Ghi kèm khi xuất mượn. Để trống nếu sách nguyên vẹn.</p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto overscroll-contain">
                   {borrowBooks.map((book, index) => (
-                    <div key={book.id} className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white group hover:border-indigo-300 transition-colors animate-in fade-in">
-                      <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5 text-indigo-600 text-xs font-bold">{index + 1}</div>
+                    <div
+                      key={book.id}
+                      className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 bg-white"
+                    >
+                      <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 mt-0.5 text-indigo-600 text-xs font-bold">
+                        {index + 1}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-800 truncate">{book.title}</p>
-                        <p className="text-xs text-slate-500 font-mono">
-                          Barcode: {book.barcode}
-                          {book.loanId ? ` · gắn phiếu #${book.loanId}` : ''}
+                        <p className="text-xs text-slate-500 font-mono break-all">
+                          {book.barcode}
+                          {book.loanId ? ` · phiếu #${book.loanId}` : ''}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className="w-6 h-6 rounded-full bg-slate-100 hover:bg-rose-100 hover:text-rose-600 flex items-center justify-center text-slate-400 transition-colors shrink-0"
-                        onClick={() => setBorrowBooks((prev) => prev.filter((b) => b.id !== book.id))}
+                      <AdminIconButton
+                        className="w-8 h-8 rounded-full bg-slate-100 hover:bg-rose-100 hover:text-rose-600 text-slate-400 transition-colors shrink-0 touch-manipulation"
+                        title="Xóa khỏi phiếu"
+                        onClick={() =>
+                          setBorrowBooks((prev) => prev.filter((b) => b.id !== book.id))
+                        }
                       >
-                        <X className="w-3 h-3" />
-                      </button>
+                        <X className="w-3.5 h-3.5" />
+                      </AdminIconButton>
                     </div>
                   ))}
                   {borrowBooks.length === 0 && (
-                    <p className="text-sm text-slate-500 text-center py-4">Chưa có sách nào được quét.</p>
+                    <p className="text-sm text-slate-500 text-center py-5 border border-dashed border-slate-200 rounded-xl">
+                      Chưa có sách trên phiếu
+                    </p>
                   )}
                 </div>
 
-                <div className="mt-auto pt-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-center px-2">
+                <div className="mt-auto pt-2 sm:pt-3 sticky bottom-0 bg-white/95 backdrop-blur-sm pb-0.5 -mx-1 px-1 sm:static sm:bg-transparent sm:backdrop-blur-none space-y-2">
+                  <div className="flex flex-wrap justify-between items-center gap-1 px-0.5">
                     <span className="text-sm font-bold text-slate-700">
-                      Tổng cộng: <span className="text-indigo-600">{borrowBooks.length} cuốn</span>
+                      Tổng: <span className="text-indigo-600">{borrowBooks.length} cuốn</span>
                     </span>
-                    <span className="text-xs font-medium text-slate-500">Hạn mặc định BE: +14 ngày</span>
+                    <span className="text-[11px] text-slate-500">Hạn mặc định BE: +14 ngày</span>
                   </div>
                   <Button
                     variant="primary"
                     size="lg"
                     fullWidth
-                    icon={<CheckCircle2 className="w-6 h-6" />}
+                    icon={<CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />}
                     onClick={() => setShowBorrowModal(true)}
                     disabled={borrowBooks.length === 0}
                   >
@@ -624,46 +552,8 @@ export default function LoanManagement() {
               </>
             )}
           </div>
-        </div>
+        </section>
       </div>
-
-      {/* Transaction History Table */}
-      <Table 
-        title="Lịch sử giao dịch trong ca trực hôm nay"
-        subtitle="Danh sách cập nhật các giao dịch mượn và trả theo thời gian thực"
-        data={historyFilter === 'Tất cả' ? historyData : historyData.filter(h => h.type + ' sách' === historyFilter)}
-        columns={historyColumns}
-        actions={
-          <>
-            <div className="flex bg-slate-100 p-1 rounded-lg gap-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`!h-7 !px-3 !text-xs !rounded-md shadow-sm ${historyFilter === 'Tất cả' ? '!bg-white !text-slate-800' : '!bg-transparent !text-slate-500 hover:!text-slate-800 hover:!bg-white/50'}`}
-                onClick={() => setHistoryFilter('Tất cả')}
-              >
-                Tất cả
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`!h-7 !px-3 !text-xs !rounded-md shadow-sm ${historyFilter === 'Mượn sách' ? '!bg-white !text-slate-800' : '!bg-transparent !text-slate-500 hover:!text-slate-800 hover:!bg-white/50'}`}
-                onClick={() => setHistoryFilter('Mượn sách')}
-              >
-                Mượn sách
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className={`!h-7 !px-3 !text-xs !rounded-md shadow-sm ${historyFilter === 'Trả sách' ? '!bg-white !text-slate-800' : '!bg-transparent !text-slate-500 hover:!text-slate-800 hover:!bg-white/50'}`}
-                onClick={() => setHistoryFilter('Trả sách')}
-              >
-                Trả sách
-              </Button>
-            </div>
-          </>
-        }
-      />
 
       <Modal
         isOpen={showReturnModal}
@@ -690,23 +580,23 @@ export default function LoanManagement() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Tình trạng sách khi trả</label>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="returnCondition" 
-                  value="Nguyên vẹn" 
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4">
+              <label className="flex items-center gap-2 cursor-pointer touch-manipulation min-h-10">
+                <input
+                  type="radio"
+                  name="returnCondition"
+                  value="Nguyên vẹn"
                   checked={returnCondition === 'Nguyên vẹn'}
                   onChange={(e) => setReturnCondition(e.target.value)}
                   className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"
                 />
                 <span className="text-sm font-medium text-slate-700">Nguyên vẹn</span>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="returnCondition" 
-                  value="Hư hỏng / Mất sách" 
+              <label className="flex items-center gap-2 cursor-pointer touch-manipulation min-h-10">
+                <input
+                  type="radio"
+                  name="returnCondition"
+                  value="Hư hỏng / Mất sách"
                   checked={returnCondition === 'Hư hỏng / Mất sách'}
                   onChange={(e) => setReturnCondition(e.target.value)}
                   className="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500"

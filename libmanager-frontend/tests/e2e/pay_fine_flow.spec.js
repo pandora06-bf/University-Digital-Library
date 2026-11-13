@@ -84,7 +84,7 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
     await searchInput.press('Enter');
 
     // 2. Kiểm tra bảng hiển thị danh sách khoản phạt và bấm "Thu tiền"
-    await expect(page.getByText(/FINE-/i).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Chưa thu/).first()).toBeVisible({ timeout: 10000 });
     const collectBtn = page.getByRole('button', { name: /Thu tiền/i }).first();
     await expect(collectBtn).toBeVisible();
     await collectBtn.click();
