@@ -12,6 +12,7 @@ import { Modal } from '../../components/Modal';
 import {
   ADMIN_MOCK_BOOKS,
   ADMIN_MOCK_CATEGORIES,
+  SEED_PUBLISHERS,
   getLocalBookPrice,
   setLocalBookPrice,
   resolveBookPrice,
@@ -273,6 +274,7 @@ export default function CatalogManagement() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [publisherFilter, setPublisherFilter] = useState('Tất cả nhà xuất bản');
+  const [publisherOptions, setPublisherOptions] = useState(SEED_PUBLISHERS);
   const [statusFilter, setStatusFilter] = useState('Tất cả tình trạng');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -403,9 +405,32 @@ export default function CatalogManagement() {
         setCategories(res.data);
       }
     }).catch(error => {
-      console.warn('Backend API chưa sẵn sàng, tiếp tục sử dụng mock categories:', error?.message);
+      console.warn('Backend API chưa sẵn sàng, tiếp tục sử dụng mock categories (seed):', error?.message);
+      setCategories(ADMIN_MOCK_CATEGORIES);
     });
   };
+
+  /** Nạp NXB từ DB (2 trang × 50) rồi gộp với seed — dropdown khớp books_seed.csv. */
+  const fetchPublisherOptions = useCallback(async () => {
+    const pubs = new Set(SEED_PUBLISHERS);
+    try {
+      for (let p = 1; p <= 3; p += 1) {
+        const res = await axiosInstance.get('/api/books/search', {
+          params: { page: p, page_size: 50 },
+        });
+        (res.data?.items || []).forEach((b) => {
+          if (b?.publisher) pubs.add(String(b.publisher).trim());
+        });
+        const pages = res.data?.total_pages ?? 1;
+        if (p >= pages) break;
+      }
+    } catch {
+      ADMIN_MOCK_BOOKS.forEach((b) => {
+        if (b?.publisher) pubs.add(String(b.publisher).trim());
+      });
+    }
+    setPublisherOptions([...pubs].filter(Boolean).sort((a, b) => a.localeCompare(b, 'vi')));
+  }, []);
 
   // Debounce ô tìm kiếm → chỉ khi ổn định mới gọi API
   useEffect(() => {
@@ -417,8 +442,13 @@ export default function CatalogManagement() {
   }, [searchTerm]);
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      fetchCategories();
+      fetchPublisherOptions();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchPublisherOptions]);
 
   useEffect(() => {
     // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
@@ -949,27 +979,21 @@ export default function CatalogManagement() {
                 setPage(1);
               }}
             >
-              <option>Tất cả nhà xuất bản</option>
-              <option>NXB Trẻ</option>
-              <option>NXB Giáo Dục</option>
-              <option>O'Reilly Media</option>
-              <option>NXB Prentice Hall</option>
-              <option>NXB ĐHQG Hà Nội</option>
-              <option>NXB Thế Giới</option>
-              <option>NXB Lao Động Xã Hội</option>
+              <option value="Tất cả nhà xuất bản">Tất cả nhà xuất bản</option>
+              {publisherOptions.map((pub) => (
+                <option key={pub} value={pub}>{pub}</option>
+              ))}
             </select>
 
-            {/* Status Dropdown */}
+            {/* Status: chỉ khớp mapBookRow (Sẵn sàng | Hết bản in) */}
             <select 
               className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option>Tất cả tình trạng</option>
-              <option>Sẵn sàng</option>
-              <option>Đang lưu hành</option>
-              <option>Mượn nhiều</option>
-              <option>Hết bản in</option>
+              <option value="Tất cả tình trạng">Tất cả tình trạng</option>
+              <option value="Sẵn sàng">Sẵn sàng</option>
+              <option value="Hết bản in">Hết bản in</option>
             </select>
           </div>
           

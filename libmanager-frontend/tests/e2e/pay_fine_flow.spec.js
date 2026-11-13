@@ -78,7 +78,7 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
     await expect(page.getByRole('heading', { name: /Quản lý Thu phạt & Công nợ/i })).toBeVisible({ timeout: 10000 });
 
     // 1. Tra cứu MSSV có nợ phạt
-    const searchInput = page.getByPlaceholder(/Tìm MSSV/i);
+    const searchInput = page.getByPlaceholder(/Nhập MSSV/i);
     await expect(searchInput).toBeVisible();
     await searchInput.fill('SV-DEMO-001');
     await searchInput.press('Enter');

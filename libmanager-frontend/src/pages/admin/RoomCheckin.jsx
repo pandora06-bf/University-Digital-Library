@@ -105,7 +105,11 @@ export default function RoomCheckin() {
   );
 
   useEffect(() => {
-    loadBookings({ silent: true });
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    const timer = window.setTimeout(() => {
+      loadBookings({ silent: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadBookings]);
 
   const waiting = useMemo(
