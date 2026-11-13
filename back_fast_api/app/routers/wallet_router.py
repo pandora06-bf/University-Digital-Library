@@ -1,13 +1,16 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_roles
 from app.models.user import User
 from app.services import wallet_service as ws
 
 router = APIRouter(prefix="/api/wallet", tags=["Wallet"])
+admin_router = APIRouter(prefix="/api/admin/wallet", tags=["Admin - Wallet"])
 
 
 class TopUpCreate(BaseModel):
@@ -45,3 +48,22 @@ def get_topup(pay_code: str, user: User = Depends(get_current_user), db: Session
         topup.status = ws.EXPIRED
         db.commit()
     return ws.serialize_topup(topup)
+
+
+# ---------------------------------------------------------------- admin (E4 / BR-32)
+class AssignUnmatched(BaseModel):
+    user_code: str = Field(min_length=1, max_length=50)
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+@admin_router.get("/unmatched")
+def list_unmatched(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=50),
+                   _=Depends(require_roles("ADMIN")), db: Session = Depends(get_db)):
+    return ws.list_unmatched(db, page, size)
+
+
+@admin_router.post("/unmatched/{unmatched_id}/assign")
+def assign_unmatched(unmatched_id: int, data: AssignUnmatched,
+                     admin=Depends(require_roles("ADMIN")), db: Session = Depends(get_db)):
+    admin_code = admin.user.user_code if getattr(admin, "user", None) else None
+    return ws.assign_unmatched(db, unmatched_id, data.user_code.strip(), admin_code, data.notes)

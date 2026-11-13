@@ -78,6 +78,9 @@ class UnmatchedTx(Base):
     resolved_by: Mapped[Optional[str]] = mapped_column(
         String(50), ForeignKey("users.user_code", ondelete="SET NULL"), nullable=True
     )
+    assigned_user_code: Mapped[Optional[str]] = mapped_column(
+        String(50), ForeignKey("users.user_code", ondelete="RESTRICT"), nullable=True, index=True
+    )
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=False), server_default=func.now(), nullable=False

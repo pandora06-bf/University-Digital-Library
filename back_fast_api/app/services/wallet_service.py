@@ -139,9 +139,30 @@ def verify_webhook_key(provided: Optional[str]) -> None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Khóa webhook không hợp lệ")
 
 
-def extract_pay_code(content: str) -> Optional[str]:
-    match = PAY_CODE_RE.search((content or "").upper())
-    return match.group(0) if match else None
+def extract_webhook_key(authorization: Optional[str], x_api_key: Optional[str]) -> Optional[str]:
+    """Hỗ trợ `x-api-key: <KEY>` và `Authorization: Apikey <KEY>` (mặc định SePay)."""
+    if x_api_key and x_api_key.strip():
+        return x_api_key.strip()
+    if authorization:
+        parts = authorization.strip().split(None, 1)
+        if len(parts) == 2 and parts[0].lower() in ("apikey", "bearer"):
+            return parts[1].strip()
+    return None
+
+
+def is_own_account(account_number: Optional[str], sub_account: Optional[str]) -> bool:
+    """Giao dịch thuộc VA cấu hình nếu subAccount hoặc accountNumber khớp BANK_ACCOUNT_NO."""
+    expected = (settings.BANK_ACCOUNT_NO or "").strip().upper()
+    return bool(expected) and expected in {(v or "").strip().upper() for v in (sub_account, account_number)}
+
+
+def extract_pay_code(*texts: Optional[str]) -> Optional[str]:
+    """Lấy pay_code từ nguồn đầu tiên khớp (thứ tự ưu tiên: code, content, description)."""
+    for text in texts:
+        match = PAY_CODE_RE.search((text or "").upper())
+        if match:
+            return match.group(0)
+    return None
 
 
 def _already_processed(db: Session, bank_tx_id: str) -> bool:
@@ -151,13 +172,16 @@ def _already_processed(db: Session, bank_tx_id: str) -> bool:
 
 def process_bank_event(db: Session, bank_tx_id: str, amount: int, content: str,
                        account_number: Optional[str] = None,
-                       received_at: Optional[datetime] = None) -> Dict[str, Any]:
-    """Xử lý một giao dịch chuyển khoản đến. Idempotent theo bank_tx_id. Không commit."""
+                       received_at: Optional[datetime] = None,
+                       code: Optional[str] = None,
+                       description: Optional[str] = None) -> Dict[str, Any]:
+    """Xử lý một giao dịch chuyển khoản đến. Idempotent theo bank_tx_id. Không commit.
+    Số tiền chênh lệch / QR đã hết hạn (E2, E3): vẫn cộng đúng số tiền thực nhận."""
     bank_tx_id = str(bank_tx_id)
     if _already_processed(db, bank_tx_id):
         return {"result": "DUPLICATE", "bank_tx_id": bank_tx_id}
 
-    pay_code = extract_pay_code(content)
+    pay_code = extract_pay_code(code, content, description)
     topup = None
     if pay_code and amount > 0:
         topup = db.scalar(select(TopUp).where(TopUp.pay_code == pay_code).with_for_update())
@@ -190,6 +214,53 @@ def handle_bank_event_committed(db: Session, **kwargs) -> Dict[str, Any]:
     except IntegrityError:
         db.rollback()
         return {"result": "DUPLICATE", "bank_tx_id": str(kwargs.get("bank_tx_id"))}
+    except Exception:
+        db.rollback()
+        raise
+
+
+# ---------------------------------------------------------------- admin: giao dịch chưa khớp (E4)
+UNRESOLVED, ASSIGNED = "UNRESOLVED", "ASSIGNED"
+
+
+def serialize_unmatched(u: UnmatchedTx) -> Dict[str, Any]:
+    return {"id": u.id, "bank_tx_id": u.bank_tx_id, "amount": u.amount,
+            "bank_account_number": u.bank_account_number, "transfer_content": u.transfer_content,
+            "received_at": u.received_at, "status": u.status,
+            "assigned_user_code": u.assigned_user_code, "resolved_by": u.resolved_by,
+            "resolution_notes": u.resolution_notes, "created_at": u.created_at}
+
+
+def list_unmatched(db: Session, page: int = 1, size: int = 20) -> Dict[str, Any]:
+    base = select(UnmatchedTx).where(UnmatchedTx.assigned_user_code.is_(None))
+    total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    items = db.scalars(base.order_by(UnmatchedTx.received_at.desc(), UnmatchedTx.id.desc())
+                       .offset((page - 1) * size).limit(size)).all()
+    return {"data": [serialize_unmatched(u) for u in items], "total": total, "page": page, "size": size}
+
+
+def assign_unmatched(db: Session, unmatched_id: int, user_code: str, admin_code: Optional[str] = None,
+                     notes: Optional[str] = None) -> Dict[str, Any]:
+    """Gán giao dịch chưa khớp cho người dùng và cộng số dư trong một transaction."""
+    try:
+        tx = db.scalar(select(UnmatchedTx).where(UnmatchedTx.id == unmatched_id).with_for_update())
+        if not tx:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy giao dịch chưa khớp")
+        if tx.assigned_user_code is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Giao dịch đã được gán")
+        # Cập nhật có điều kiện: chống hai admin gán song song.
+        updated = db.execute(update(UnmatchedTx)
+                             .where(UnmatchedTx.id == tx.id, UnmatchedTx.assigned_user_code.is_(None))
+                             .values(assigned_user_code=user_code, status=ASSIGNED,
+                                     resolved_by=admin_code, resolution_notes=notes)
+                             .execution_options(synchronize_session="fetch")).rowcount
+        if updated != 1:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Giao dịch đã được gán")
+        txn = credit(db, user_code, tx.amount, TXN_TOPUP, reference_id=tx.bank_tx_id,
+                     description=f"Admin gán giao dịch chưa khớp ({tx.bank_tx_id})")
+        db.commit()
+        db.refresh(tx)
+        return {"unmatched": serialize_unmatched(tx), "transaction": serialize_txn(txn)}
     except Exception:
         db.rollback()
         raise
