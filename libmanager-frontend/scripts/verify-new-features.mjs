@@ -194,13 +194,47 @@ try {
   });
   await check('4-14.a: lỗi Axios → Toast đỏ; nợ phạt và thiếu số dư kèm nút sang trang nạp tiền', () => {
     const fine = borrowErr.errorToast(borrowErr.apiError(403, 'Tài khoản đang bị khóa mượn hoặc còn nợ phạt chưa thanh toán'));
-    assert.equal(fine.type, 'error'); assert.equal(fine.action.to, '/wallet/top-up');
+    assert.equal(fine.type, 'error'); assert.equal(fine.action.to, '/account?topup=1'); // 4-13: trả phạt bằng ví
     const limit = borrowErr.errorToast(borrowErr.apiError(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)'));
     assert.match(limit.message, /tối đa/); assert.equal(limit.action, undefined);
     const room = borrowErr.errorToast(Object.assign(new Error('Số dư không đủ. Bạn còn thiếu 20.000 ₫ để đặt phòng.'), { code: 'INSUFFICIENT_BALANCE' }));
     assert.match(room.message, /thiếu 20\.000/); assert.equal(room.action.label, 'Sang Nạp tiền');
     const offline = borrowErr.errorToast(Object.assign(new Error('Network Error'), { isAxiosError: true }));
     assert.match(offline.message, /Không kết nối/);
+  });
+  const wallet = await import('../src/utils/wallet.js');
+  await check('4-13: số tiền nạp 10.000–500.000đ, đọc "50.000", đếm ngược 15 phút', () => {
+    assert.equal(wallet.parseAmount('50.000'), 50000); assert.equal(wallet.parseAmount('1,000,000'), 1000000); assert.equal(wallet.parseAmount('abc'), null);
+    assert.equal(wallet.validateTopUpAmount(10000), null); assert.equal(wallet.validateTopUpAmount(500000), null);
+    assert.match(wallet.validateTopUpAmount(9999), /10\.000/); assert.match(wallet.validateTopUpAmount(500001), /500\.000/);
+    assert.match(wallet.validateTopUpAmount(null), /nhập số tiền/);
+    const t = wallet.toTopUp({ pay_code: 'TVABCD1234', amount: 50000, status: 'pending', created_at: '2026-10-13T01:00:00', expired_at: '2026-10-13T01:15:00', qr_url: 'https://img.vietqr.io/x.png', bank: { account_no: '123', content: 'TVABCD1234' } });
+    assert.equal(t.status, 'PENDING'); assert.equal(t.content, 'TVABCD1234'); assert.equal(t.expiresAt, '2026-10-13T01:15:00Z');
+    assert.equal(wallet.secondsLeft(t.expiresAt, Date.parse('2026-10-13T01:00:00Z')), 15 * 60);
+    assert.equal(wallet.formatCountdown(wallet.secondsLeft(t.expiresAt, Date.parse('2026-10-13T01:14:01Z'))), '00:59');
+    assert.equal(wallet.secondsLeft(t.expiresAt, Date.parse('2026-10-13T02:00:00Z')), 0);
+    assert.equal(wallet.TOPUP_POLL_MS, 3000);
+  });
+  await check('4-13: lịch sử giao dịch đổi nhãn/dấu; trả phạt thiếu tiền hiện đúng số tiền thiếu', () => {
+    const credit = wallet.toTxn({ id: 1, txn_type: 'TOPUP', amount: 50000, balance_after: 70000, created_at: '2026-10-13T01:00:00' });
+    const debit = wallet.toTxn({ id: 2, txn_type: 'FINE_PAYMENT', amount: -25000 });
+    assert.equal(credit.label, 'Nạp tiền'); assert.equal(credit.credit, true); assert.equal(debit.label, 'Trả phí phạt'); assert.equal(debit.credit, false);
+    assert.deepEqual(wallet.finePaymentPlan(150000, 25000), { status: 'OK', due: 25000, balance: 150000, missing: 0 });
+    assert.deepEqual(wallet.finePaymentPlan(5000, 25000), { status: 'INSUFFICIENT', due: 25000, balance: 5000, missing: 20000 });
+    assert.equal(wallet.finePaymentPlan(0, '0.00').status, 'NO_DEBT');
+    assert.equal(wallet.suggestedTopUp(20000), 20000); assert.equal(wallet.suggestedTopUp(1500), 10000); assert.equal(wallet.suggestedTopUp(21000), 30000);
+  });
+  const wl = await import('../src/utils/waitlist.js');
+  await check('3-13: tab Đặt trước hiện vị trí x/y, giữ chỗ còn hạn, mục giữ chỗ lên đầu', () => {
+    const waiting = wl.toWaitlistEntry({ id: 1, book_id: 7, queue_position: 2, queue_size: 5, status: 'WAITING' });
+    assert.equal(wl.positionLabel(waiting), '2/5'); assert.equal(waiting.held, false);
+    assert.equal(wl.positionLabel(wl.toWaitlistEntry({ id: 2, book_id: 8, queue_position: 3, status: 'WAITING' })), '3'); // API chưa trả tổng
+    const held = wl.toWaitlistEntry({ id: 3, book_id: 9, queue_position: 1, status: 'held', hold_expires_at: '2026-10-13T10:00:00' });
+    assert.equal(held.held, true); assert.equal(held.holdExpiresAt, '2026-10-13T10:00:00Z');
+    assert.equal(wl.holdRemaining(held.holdExpiresAt, Date.parse('2026-10-13T04:48:00Z')), '5 giờ 12 phút');
+    assert.equal(wl.holdRemaining(held.holdExpiresAt, Date.parse('2026-10-13T09:50:00Z')), '10 phút');
+    assert.equal(wl.holdRemaining(held.holdExpiresAt, Date.parse('2026-10-13T11:00:00Z')), 'Đã hết hạn giữ');
+    assert.deepEqual(wl.sortWaitlist([waiting, held]).map((e) => e.id), [3, 1]);
   });
   await check('3-12.a mock: chốt chặn nợ phạt -> hạn mức -> tồn; thành công tạo phiếu Chờ nhận hạn 24 giờ', () => {
     clock = RealDate.parse('2026-10-26T09:00:00+07:00');

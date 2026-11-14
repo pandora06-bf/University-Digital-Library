@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays } from 'lucide-react';
+import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
 import { getCurrentUser } from '../mocks/auth';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
@@ -34,10 +34,11 @@ export default function UserLayout() {
     { to: '/catalog', label: 'Danh mục', icon: Layers },
     { to: '/my-books', label: 'Sách của tôi', icon: BookmarkCheck },
     { to: '/rooms', label: 'Đặt phòng', icon: CalendarDays },
+    { to: '/account', label: 'Tài khoản', icon: UserRound }, // 4-13
   ];
 
   // Kiểm tra trang có cần bottom navigation trên mobile không
-  const showMobileBottomNav = ['/catalog', '/my-books', '/rooms', '/wallet/top-up'].includes(location.pathname);
+  const showMobileBottomNav = ['/catalog', '/my-books', '/rooms', '/wallet/top-up', '/account'].includes(location.pathname);
 
   return (
     <div className="user-portal min-h-screen flex flex-col bg-[#F6F8FC] text-[#172033]">
@@ -112,10 +113,11 @@ export default function UserLayout() {
 
             {user ? (
               <div className="flex items-center gap-3 pl-2 sm:border-l border-slate-200">
-                <div className="hidden sm:flex flex-col text-right">
+                <NavLink to={user.role === 'admin' ? '/admin' : '/account'} title="Thông tin người dùng"
+                  className="hidden sm:flex flex-col text-right rounded-lg px-1 hover:bg-slate-50">
                   <span className="text-sm font-semibold text-slate-900 line-clamp-1">{user.name}</span>
                   <span className="text-xs text-slate-500">{user.role === 'admin' ? 'Thủ thư / Quản trị viên' : 'Độc giả'}</span>
-                </div>
+                </NavLink>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -214,13 +216,13 @@ export default function UserLayout() {
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  `flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
+                  `flex-1 min-w-0 flex flex-col items-center gap-1 py-1 px-1 rounded-lg transition-colors ${
                     isActive ? 'text-indigo-600 font-bold' : 'text-slate-500 font-medium'
                   }`
                 }
               >
                 <Icon className="w-5 h-5" />
-                <span className="text-[11px]">{link.label}</span>
+                <span className="text-[11px] whitespace-nowrap">{link.label}</span>
               </NavLink>
             );
           })}

@@ -40,9 +40,10 @@ export function apiError(status, detail) {
 }
 
 // Lỗi liên quan tới tiền: kèm lối tắt sang trang nạp tiền / thanh toán (4-14.a).
+// Nợ phạt → trang Tài khoản (4-13) có nút trả phạt bằng ví và mở sẵn hộp nạp tiền.
 const PAYMENT_ACTIONS = {
-  DEBT: { to: '/wallet/top-up', label: 'Nạp tiền & thanh toán phí phạt' },
-  BLOCKED: { to: '/wallet/top-up', label: 'Nạp tiền & thanh toán phí phạt' },
+  DEBT: { to: '/account?topup=1', label: 'Nạp tiền & trả phí phạt' },
+  BLOCKED: { to: '/account?topup=1', label: 'Nạp tiền & trả phí phạt' },
   INSUFFICIENT_BALANCE: { to: '/wallet/top-up', label: 'Sang Nạp tiền' },
 };
 

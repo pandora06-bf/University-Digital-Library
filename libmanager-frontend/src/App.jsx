@@ -8,6 +8,7 @@ import MyBooksPage from './pages/user/MyBooksPage';
 const PdfReaderPage = lazy(() => import('./pages/user/PdfReaderPage'));
 import RoomBookingPage from './pages/user/RoomBookingPage';
 import WalletTopUpPage from './pages/user/WalletTopUpPage';
+import AccountPage from './pages/user/AccountPage';
 import LoginPage from './pages/auth/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotFoundPage from './pages/NotFoundPage';
@@ -45,6 +46,8 @@ export default function App() {
             <Route path="my-books" element={<MyBooksPage />} />
             <Route path="rooms" element={<RoomBookingPage />} />
             <Route path="wallet/top-up" element={<WalletTopUpPage />} />
+            {/* 4-13: Thông tin người dùng + Tài khoản dịch vụ */}
+            <Route path="account" element={<AccountPage />} />
           </Route>
         </Route>
 
