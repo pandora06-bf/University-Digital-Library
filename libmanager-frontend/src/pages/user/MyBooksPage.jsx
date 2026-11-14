@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { BookOpen, BookMarked, FileText, CheckCircle2, AlertTriangle, Clock, MapPin } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BookOpen, BookMarked, FileText, CheckCircle2, AlertTriangle, Clock, MapPin, BellRing } from 'lucide-react';
 import { Table, StatusBadge } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { loanService, ACTIVE_LOAN_STATES, WAITING_PICKUP_STATES } from '../../services/loanService';
+import WaitlistTab from '../../components/user/WaitlistTab';
 
 /**
  * Trang Sách của tôi (My Books Page) — nối API ở 3-12.b
@@ -12,6 +13,7 @@ import { loanService, ACTIVE_LOAN_STATES, WAITING_PICKUP_STATES } from '../../se
  * Dữ liệu: GET /api/loans/me qua loanService (phiếu vật lý và eBook, mới nhất trước).
  * - Desktop: Table với cột riêng của độc giả, không có nút Sửa/Xóa của Admin.
  * - Mobile: danh sách thẻ.
+ * - Tab "Đặt trước" (3-13, ?tab=waitlist): vị trí hàng chờ, giữ chỗ, hủy (WaitlistTab).
  * - Sách in nhận và trả tại quầy (thủ thư quét mã, UC10/UC11) nên trang chỉ hướng dẫn;
  *   phiếu eBook còn hiệu lực có nút Đọc online (/reader/:loanId), trả eBook trong trình đọc.
  */
@@ -141,7 +143,16 @@ function StatCard({ icon, label, value, tone }) {
   );
 }
 
+const TABS = [
+  { id: 'loans', label: 'Phiếu mượn', icon: BookMarked },
+  { id: 'waitlist', label: 'Đặt trước', icon: BellRing },
+];
+
 export default function MyBooksPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'waitlist' ? 'waitlist' : 'loans';
+  const selectTab = (id) => setSearchParams(id === 'loans' ? {} : { tab: id }, { replace: true });
+  const [waitlistCount, setWaitlistCount] = useState(null);
   const [revision, setRevision] = useState(0);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
   const [result, setResult] = useState({ key: -1, loans: null, error: null });
@@ -173,7 +184,7 @@ export default function MyBooksPage() {
             Sách của tôi
           </h1>
           <p className="text-body-md text-[#5B6B82] mt-1">
-            Theo dõi phiếu mượn, hạn nhận sách tại quầy và đọc sách điện tử
+            Theo dõi phiếu mượn, hàng chờ đặt trước và đọc sách điện tử
           </p>
         </div>
 
@@ -186,6 +197,28 @@ export default function MyBooksPage() {
         )}
       </div>
 
+      <div role="tablist" aria-label="Sách của tôi" className="flex gap-2 overflow-x-auto scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const count = id === 'loans' ? (result.loans ? loans.length : null) : waitlistCount;
+          const selected = tab === id;
+          return (
+            <button key={id} type="button" role="tab" id={`tab-${id}`} aria-selected={selected} aria-controls={`panel-${id}`}
+              onClick={() => selectTab(id)}
+              className={`inline-flex items-center gap-2 min-h-10 px-4 rounded-xl text-sm font-semibold border whitespace-nowrap transition-colors ${selected ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300'}`}>
+              <Icon className="w-4 h-4" />{label}
+              {count != null && <span className={`rounded-full px-1.5 text-xs ${selected ? 'bg-white/20' : 'bg-slate-100'}`}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === 'waitlist' && (
+        <div role="tabpanel" id="panel-waitlist" aria-labelledby="tab-waitlist">
+          <WaitlistTab onCountChange={setWaitlistCount} />
+        </div>
+      )}
+
+      {tab === 'loans' && <div role="tabpanel" id="panel-loans" aria-labelledby="tab-loans" className="space-y-8">
       {/* Nhắc phiếu đang chờ nhận: quá 24 giờ chưa tới quầy thì phiếu tự hủy */}
       {pickups.length > 0 && (
         <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 flex items-start gap-3 text-sm text-indigo-900">
@@ -285,6 +318,7 @@ export default function MyBooksPage() {
           </div>
         </>
       )}
+      </div>}
     </div>
   );
 }
