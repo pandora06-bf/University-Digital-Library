@@ -86,3 +86,6 @@ app.include_router(admin_incident_router)
 
 from app.routers.admin_user_router import router as admin_user_router
 app.include_router(admin_user_router)
+
+from app.routers.room_router import router as room_router
+app.include_router(room_router)

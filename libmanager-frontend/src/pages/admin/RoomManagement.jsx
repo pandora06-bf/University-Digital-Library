@@ -279,7 +279,7 @@ export default function RoomManagement() {
             <Input
               label="Sức chứa"
               type="number"
-              min={1}
+              min={0}
               value={form.capacity}
               error={errors.capacity}
               onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
@@ -287,7 +287,7 @@ export default function RoomManagement() {
             <Input
               label="Giá / khung 2 giờ (₫)"
               type="number"
-              min={0}
+              min={1}
               value={form.slot_price}
               error={errors.slot_price}
               onChange={(e) => setForm((f) => ({ ...f, slot_price: e.target.value }))}
