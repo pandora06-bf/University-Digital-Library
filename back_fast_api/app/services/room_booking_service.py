@@ -108,11 +108,11 @@ def checkin(db: Session, booking_id: int):
     if not booking:
         raise HTTPException(404, 'Không tìm thấy lượt đặt')
     if booking.status != 'CONFIRMED':
-        raise HTTPException(409, 'Chỉ check-in lượt đã xác nhận')
+        raise HTTPException(409, 'Chỉ xác nhận vào phòng với lượt đặt đã được xác nhận')
     now = local_now()
     start = datetime.combine(booking.booking_date, booking.slot_start)
     if not start <= now <= start + timedelta(minutes=15):
-        raise HTTPException(409, 'Chỉ check-in trong 15 phút đầu khung giờ')
+        raise HTTPException(409, 'Chỉ xác nhận vào phòng trong 15 phút đầu khung giờ')
     booking.status, booking.checkin_time = 'CHECKED_IN', now
     db.flush()
     return booking

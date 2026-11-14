@@ -21,6 +21,26 @@ from app.models.user import User
 ACTIVE_LOAN_STATUSES = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
 PICKUP_HOLD_PERIOD = timedelta(hours=24)
 
+_STATUS_VI = {
+    "AVAILABLE": "sẵn sàng",
+    "BORROWED": "đang mượn",
+    "OVERDUE": "quá hạn",
+    "RETURNED": "đã trả",
+    "REQUESTED": "đã đăng ký",
+    "PENDING_PICKUP": "chờ nhận tại quầy",
+    "CANCELLED": "đã hủy",
+    "LOST": "báo mất",
+    "EXPIRED": "hết hạn",
+    "DAMAGED": "hư hỏng",
+    "RETIRED": "thanh lý",
+}
+
+
+def _status_vi(code: Optional[str]) -> str:
+    key = (code or "").strip().upper()
+    return _STATUS_VI.get(key, (code or "không xác định").lower())
+
+
 def get_user_max_borrow_limit(user: User) -> int:
     """
     Xác định hạn mức mượn sách tối đa cùng lúc theo đối tượng bạn đọc (BR-01 / UC05):
@@ -326,7 +346,7 @@ def checkout_at_counter_service(
     if not loan_id and not loan_code and not user_code:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cần cung cấp mã phiếu mượn (id / loan_code) hoặc MSSV (user_code)"
+            detail="Cần mã phiếu mượn hoặc MSSV bạn đọc để xuất mượn"
         )
 
     # 1. Kiểm tra bản sao sách vật lý (BookCopy) và đầu sách (Book)
@@ -336,25 +356,25 @@ def checkout_at_counter_service(
     if not copy:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy bản sao sách có mã vạch {copy_barcode} (E1)"
+            detail=f"Không tìm thấy bản sao sách có mã vạch {copy_barcode}"
         )
     if copy.status != "AVAILABLE":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Bản sao sách đang ở trạng thái {copy.status}, không khả dụng (E1)"
+            detail=f"Bản sao sách đang {_status_vi(copy.status)}, không thể xuất mượn"
         )
 
     if book_id and book_id != copy.book_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="book_id không khớp với đầu sách của bản sao đã quét"
+            detail="Mã đầu sách không khớp với bản sao vừa quét"
         )
 
     book = db.scalar(select(Book).where(Book.id == copy.book_id).with_for_update())
     if not book:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy thông tin đầu sách của bản sao này (E1)"
+            detail="Không tìm thấy thông tin đầu sách của bản sao này"
         )
 
     # 2. Xác định phiếu mượn (nếu có đặt trước) hoặc chuẩn bị tạo mới (mượn trực tiếp tại quầy)
@@ -368,17 +388,17 @@ def checkout_at_counter_service(
         if not loan:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Không tìm thấy phiếu mượn hợp lệ để check-out (E1)"
+                detail="Không tìm thấy phiếu mượn hợp lệ để xuất sách"
             )
         if loan.loan_status not in ["REQUESTED", "PENDING_PICKUP"]:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Phiếu mượn đang ở trạng thái {loan.loan_status}, không thể xuất mượn (E1)"
+                detail=f"Phiếu mượn đang {_status_vi(loan.loan_status)}, không thể xuất sách"
             )
         if user_code and loan.user_code != user_code:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Mã bạn đọc (user_code) không khớp với phiếu mượn đã đăng ký"
+                detail="MSSV không khớp với phiếu mượn đã đăng ký"
             )
         if copy.book_id != loan.book_id:
             raise HTTPException(
@@ -406,13 +426,13 @@ def checkout_at_counter_service(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy hồ sơ bạn đọc với mã {target_user_code} (E1)"
+            detail=f"Không tìm thấy hồ sơ bạn đọc với mã {target_user_code}"
         )
 
     if user.is_borrowing_blocked or user.total_fines > 0 or (user.account and not user.account.is_active):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Người mượn đang bị khóa tài khoản hoặc có dư nợ phạt (E2)"
+            detail="Bạn đọc đang bị khóa tài khoản hoặc còn nợ phạt chưa thanh toán"
         )
 
     # Hạn mức mượn tối đa cùng lúc: Sinh viên = 3 cuốn, Giảng viên/Viên chức = 5 cuốn (BR-01)
@@ -436,7 +456,7 @@ def checkout_at_counter_service(
     if own_hold is None and book.available_stock <= len(active_holds):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Sách đang được giữ cho người đặt trước khác (Waitlist HELD)",
+            detail="Sách đang được giữ cho người đặt trước khác",
         )
 
     # 4. Xử lý theo từng trường hợp
@@ -454,7 +474,7 @@ def checkout_at_counter_service(
         if active_borrowed_count >= max_limit:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Người mượn đã đạt hạn mức mượn tối đa cùng lúc ({max_limit} cuốn) (E2)"
+                detail=f"Bạn đọc đã đạt hạn mức mượn tối đa ({max_limit} cuốn)"
             )
 
         # PENDING_PICKUP đã trừ tồn kho lúc đặt trên Web -> không trừ lại.
@@ -463,7 +483,7 @@ def checkout_at_counter_service(
             if book.available_stock <= 0:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Đầu sách này hiện không còn tồn kho khả dụng để xuất mượn (E1)"
+                    detail="Đầu sách này hiện không còn bản khả dụng để xuất mượn"
                 )
             book.available_stock -= 1
 
@@ -487,7 +507,7 @@ def checkout_at_counter_service(
         if active_loans_count >= max_limit:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Người mượn đã đạt hạn mức mượn tối đa cùng lúc ({max_limit} cuốn) (E2)"
+                detail=f"Bạn đọc đã đạt hạn mức mượn tối đa ({max_limit} cuốn)"
             )
 
         # Kiểm tra xem bạn đọc có đang mượn một cuốn khác của cùng đầu sách này không
@@ -501,14 +521,14 @@ def checkout_at_counter_service(
         if duplicate_loan:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Bạn đọc đang mượn một bản sao của đầu sách này và chưa trả"
+                detail="Bạn đọc đang mượn một bản của đầu sách này và chưa trả"
             )
 
         # Kiểm tra tồn kho khả dụng của đầu sách
         if book.available_stock <= 0:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Đầu sách này hiện không còn tồn kho khả dụng để xuất mượn (E1)"
+                detail="Đầu sách này hiện không còn bản khả dụng để xuất mượn"
             )
 
         # Nếu bạn đọc có trong hàng đợi (Waitlist) của đầu sách này thì xóa khỏi hàng đợi
@@ -589,7 +609,7 @@ def checkin_at_counter_service(
     if not loan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Mã vạch không có phiếu mượn ở trạng thái BORROWED để check-in (E3)"
+            detail="Không tìm thấy phiếu đang mượn hoặc quá hạn cho mã vạch này. Kiểm tra lại mã, hoặc phiếu đã được trả."
         )
 
     copy = db.scalar(select(BookCopy).where(BookCopy.copy_barcode == copy_barcode).with_for_update())
@@ -661,7 +681,7 @@ def checkin_at_counter_service(
         "return_date": loan.return_date,
         "available_stock": book.available_stock if book else None,
         "overdue_fine": fine_amount,
-        "message": "Check-in thành công"
+        "message": "Trả sách thành công"
     }
 
 
@@ -673,7 +693,7 @@ def lookup_fines_service(db: Session, user_code: str) -> Dict[str, Any]:
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy bạn đọc với MSSV {user_code} (E1)"
+            detail=f"Không tìm thấy bạn đọc với MSSV {user_code}"
         )
 
     unpaid_fines = db.scalars(
@@ -722,14 +742,17 @@ def collect_counter_fines_service(
     if user.total_fines <= Decimal(0):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Công nợ đã được thanh toán (hoặc người dùng vừa trả trực tuyến bằng ví) (E6)"
+            detail="Công nợ đã được thanh toán (hoặc người dùng vừa trả trực tuyến bằng ví)"
         )
 
     # 3. Xử lý ngoại lệ E4: Số tiền thu khác tổng nợ (Chỉ thu đủ toàn bộ, không thu một phần)
     if amount != user.total_fines:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Số tiền thu ({amount:,.0f} VNĐ) khác tổng nợ ({user.total_fines:,.0f} VNĐ). Chỉ hỗ trợ thu đủ toàn bộ (E4)."
+            detail=(
+                f"Số tiền thu ({amount:,.0f} ₫) khác tổng nợ ({user.total_fines:,.0f} ₫). "
+                "Chỉ hỗ trợ thu đủ toàn bộ."
+            ),
         )
 
     # 4. Đánh dấu các bản ghi nợ phạt là đã thanh toán
@@ -771,7 +794,10 @@ def collect_counter_fines_service(
 
     warning_message = None
     if has_unreturned_overdue:
-        warning_message = "Cảnh báo: Bạn đọc vẫn còn sách quá hạn chưa trả. Tiến trình đêm 00:00 sẽ tiếp tục tính phạt và khóa lại tài khoản (E5)."
+        warning_message = (
+            "Bạn đọc vẫn còn sách quá hạn chưa trả. "
+            "Hệ thống vẫn có thể tính phạt và khóa tài khoản vào cuối ngày."
+        )
 
     return {
         "payment": payment,

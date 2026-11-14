@@ -158,7 +158,7 @@ def delete_inventory_copy(
     if has_loan_history is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Không thể xóa bản sao đã có lịch sử mượn; hãy cập nhật trạng thái LOST hoặc DAMAGED",
+            detail="Không thể xóa bản sao đã có lịch sử mượn; hãy đánh dấu mất hoặc hư hỏng thay vì xóa",
         )
 
     if _is_available(copy):

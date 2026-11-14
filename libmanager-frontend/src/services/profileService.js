@@ -1,6 +1,11 @@
 import axiosInstance from './axios_instance';
 
-const ROLE_LABELS = { STUDENT: 'Sinh viên', LECTURER: 'Giảng viên', ADMIN: 'Quản trị viên' };
+const ROLE_LABELS = {
+  STUDENT: 'Sinh viên',
+  LECTURER: 'Giảng viên',
+  ADMIN: 'Thủ thư',
+  LIBRARIAN: 'Thủ thư',
+};
 
 // Thông tin người dùng (GET /api/users/me, user_service.get_user_profile).
 export const profileService = {

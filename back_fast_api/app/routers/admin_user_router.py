@@ -68,6 +68,8 @@ def _present(u: User):
 @router.get("")
 def list_users(
     q: str | None = None, role: str | None = None,
+    locked: bool | None = Query(None, description="true=đang khóa mượn/vô hiệu; false=đang hoạt động"),
+    has_debt: bool | None = Query(None, description="true=còn công nợ (total_fines>0); false=không nợ"),
     page: int = Query(1, ge=1), page_size: int = Query(8, ge=1, le=100),
     db: Session = Depends(get_db), _admin: Account = Depends(require_roles("ADMIN")),
 ):
@@ -78,6 +80,15 @@ def list_users(
                               User.email.ilike(pattern), Account.username.ilike(pattern)))
     if role and role.upper() != "ALL":
         stmt = stmt.where(Account.role == _role(role))
+    # Khớp _present.is_locked: không active hoặc bị chặn mượn
+    if locked is True:
+        stmt = stmt.where(or_(Account.is_active.is_(False), User.is_borrowing_blocked.is_(True)))
+    elif locked is False:
+        stmt = stmt.where(Account.is_active.is_(True), User.is_borrowing_blocked.is_(False))
+    if has_debt is True:
+        stmt = stmt.where(User.total_fines > 0)
+    elif has_debt is False:
+        stmt = stmt.where(User.total_fines <= 0)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows = db.scalars(stmt.order_by(User.user_code).offset((page-1)*page_size).limit(page_size)).all()
     return {"items": [_present(u) for u in rows], "total": total, "page": page,

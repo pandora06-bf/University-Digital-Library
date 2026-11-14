@@ -72,7 +72,7 @@ export default function FineManagement() {
   const handleSearchSubmit = async () => {
     const q = searchTerm.trim();
     if (!q) {
-      showToast('Nhập MSSV rồi bấm Tra cứu (hoặc Enter).', 'warning');
+      showToast('Nhập MSSV rồi bấm Tra cứu (không để trống).', 'warning');
       return;
     }
     try {
@@ -230,10 +230,9 @@ export default function FineManagement() {
 
   // Ô MSSV là khóa tra cứu API, không lọc lại bảng (dễ loại mất đúng dòng vừa tìm).
   const filteredData = finesData.filter((item) => {
-    const matchType = typeFilter === 'Loại vi phạm (Tất cả)' ||
-      (typeFilter === 'Trễ hạn trả sách' && item.reason.includes('Trễ hạn')) ||
-      (typeFilter === 'Làm rách / Hư hỏng' && (item.reason.includes('rách') || item.reason.includes('ướt'))) ||
-      (typeFilter === 'Làm mất sách' && item.reason.includes('mất'));
+    const matchType = typeFilter === 'Loại vi phạm (Tất cả)'
+      || (typeFilter === 'Trễ hạn trả sách' && item.reason.includes('Trễ hạn'))
+      || (typeFilter === 'Phạt phiếu mượn' && item.reason.includes('Phạt phiếu'));
     const matchStatus = statusFilter === 'Trạng thái (Tất cả)' || item.status === statusFilter;
     return matchType && matchStatus;
   });
@@ -268,53 +267,59 @@ export default function FineManagement() {
         </div>
       </div>
 
-      {/* Stats: xếp 1 cột đến lg — khung Admin hẹp (sidebar) không ép 3 cột */}
+      {/* Stats — icon outline mờ giống Users */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-rose-100 shadow-sm bg-gradient-to-br from-white to-rose-50/50 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <p className="text-sm font-bold text-slate-500 truncate">Tổng dư nợ</p>
-            <div className="w-9 h-9 shrink-0 bg-rose-100 rounded-full flex items-center justify-center">
-              <ShieldAlert className="w-4 h-4 text-rose-600" aria-hidden />
-            </div>
+        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm bg-gradient-to-br from-white to-rose-50/50 min-w-0 relative overflow-hidden">
+          <div className="absolute top-4 right-4">
+            <ShieldAlert className="w-6 h-6 text-rose-500 opacity-20" aria-hidden />
           </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 truncate">Tổng dư nợ</p>
           <p className="text-2xl sm:text-3xl font-extrabold text-rose-600 tabular-nums leading-none">
             {displayDebt > 0 ? displayDebt.toLocaleString('vi-VN') : '0'}
             <span className="ml-1 text-base font-bold text-rose-400">₫</span>
           </p>
-          <p className="mt-2 text-sm font-medium text-slate-500 line-clamp-2" title={lookedUpName || undefined}>
+          <p className="mt-3 text-[11px] font-medium text-slate-500 line-clamp-2" title={lookedUpName || undefined}>
             {lookedUpName
               ? <>Độc giả <span className="text-slate-700 font-bold">{lookedUpName}</span></>
               : 'Nhập MSSV rồi bấm Tra cứu'}
           </p>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/50 min-w-0">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <p className="text-sm font-bold text-slate-500 truncate">Khoản chưa thu</p>
-            <div className="w-9 h-9 shrink-0 bg-emerald-100 rounded-full flex items-center justify-center">
-              <Wallet className="w-4 h-4 text-emerald-600" aria-hidden />
-            </div>
+        <button
+          type="button"
+          onClick={() => setStatusFilter('Chưa thu')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm bg-gradient-to-br from-white to-emerald-50/50 min-w-0 relative overflow-hidden transition-colors ${
+            statusFilter === 'Chưa thu' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <Wallet className="w-6 h-6 text-emerald-500 opacity-20" aria-hidden />
           </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 truncate">Khoản chưa thu</p>
           <p className="text-2xl sm:text-3xl font-extrabold text-emerald-600 tabular-nums leading-none">
             {unpaidRows.length}
             <span className="ml-1 text-base font-bold text-emerald-400">phiếu</span>
           </p>
-          <p className="mt-2 text-sm font-medium text-slate-500">Thu đủ toàn bộ số nợ một lần</p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-emerald-700">Bấm để lọc chưa thu</p>
+        </button>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-amber-100 shadow-sm bg-gradient-to-br from-white to-amber-50/50 min-w-0 md:col-span-2 lg:col-span-1">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <p className="text-sm font-bold text-slate-500 truncate">Phiếu trên bảng</p>
-            <div className="w-9 h-9 shrink-0 bg-amber-100 rounded-full flex items-center justify-center">
-              <Receipt className="w-4 h-4 text-amber-600" aria-hidden />
-            </div>
+        <button
+          type="button"
+          onClick={() => setStatusFilter('Trạng thái (Tất cả)')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm bg-gradient-to-br from-white to-amber-50/50 min-w-0 md:col-span-2 lg:col-span-1 relative overflow-hidden transition-colors ${
+            statusFilter === 'Trạng thái (Tất cả)' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <Receipt className="w-6 h-6 text-amber-500 opacity-20" aria-hidden />
           </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 truncate">Phiếu trên bảng</p>
           <p className="text-2xl sm:text-3xl font-extrabold text-amber-600 tabular-nums leading-none">
             {finesData.length}
             <span className="ml-1 text-base font-bold text-amber-400">phiếu</span>
           </p>
-          <p className="mt-2 text-sm font-medium text-slate-500">Kết quả tra cứu hiện tại</p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-amber-700">Bấm để xem tất cả phiếu tra cứu</p>
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -351,8 +356,7 @@ export default function FineManagement() {
             >
               <option>Loại vi phạm (Tất cả)</option>
               <option>Trễ hạn trả sách</option>
-              <option>Làm rách / Hư hỏng</option>
-              <option>Làm mất sách</option>
+              <option>Phạt phiếu mượn</option>
             </select>
             <select
               className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
@@ -361,7 +365,6 @@ export default function FineManagement() {
             >
               <option>Trạng thái (Tất cả)</option>
               <option>Chưa thu</option>
-              <option>Thu một phần</option>
               <option>Đã hoàn tất</option>
             </select>
           </div>
@@ -371,7 +374,7 @@ export default function FineManagement() {
         <Table
           columns={fineColumns}
           data={filteredData}
-          emptyMessage="Nhập MSSV rồi bấm Tra cứu để xem công nợ chưa thu."
+          emptyMessage="Nhập MSSV rồi bấm Tra cứu (không để trống)."
           className="border-0 shadow-none rounded-none rounded-b-2xl"
         />
       </div>
@@ -437,7 +440,11 @@ export default function FineManagement() {
         footer={
           <>
             <Button variant="outline" onClick={() => setDetailRow(null)}>Đóng</Button>
-            <Button variant="primary" onClick={() => { setDetailRow(null); navigate('/admin/loans'); }}>
+            <Button
+              variant="primary"
+              icon={<ArrowLeftRight className="w-4 h-4" />}
+              onClick={() => { setDetailRow(null); navigate('/admin/loans'); }}
+            >
               Xem phiếu mượn
             </Button>
           </>

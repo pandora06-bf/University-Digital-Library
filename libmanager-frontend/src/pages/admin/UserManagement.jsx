@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Search, Plus, RotateCcw, Lock, Unlock, KeyRound, Pencil, Eye,
-  UserX, ShieldAlert, GraduationCap, Upload,
+  Users, Search, Plus, Lock, Unlock, KeyRound, Pencil, Eye,
+  UserX, ShieldAlert, GraduationCap, Upload, Receipt,
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
@@ -13,7 +13,20 @@ import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
+
 const PAGE_SIZE = 8;
+
+/** Chỉ 3 vai trò nghiệp vụ trên UI; ADMIN/LIBRARIAN cùng hiện «Thủ thư». */
+const ROLE_LABEL_VI = {
+  STUDENT: 'Sinh viên',
+  LECTURER: 'Giảng viên',
+  ADMIN: 'Thủ thư',
+  LIBRARIAN: 'Thủ thư',
+};
+
+const roleLabelVi = (role) =>
+  ROLE_LABEL_VI[String(role || '').toUpperCase()] || role || '—';
+
 const EMPTY_FORM = {
   user_code: '',
   full_name: '',
@@ -48,6 +61,8 @@ export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [lockFilter, setLockFilter] = useState('ALL'); // ALL | LOCKED | ACTIVE
+  const [debtFilter, setDebtFilter] = useState('ALL'); // ALL | DEBT | CLEAR
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -61,6 +76,9 @@ export default function UserManagement() {
   const [tempPassword, setTempPassword] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
   const [importing, setImporting] = useState(false);
+  /** UC13 AC4/E5: báo cáo import — số thành công + danh sách dòng lỗi */
+  const [importReport, setImportReport] = useState(null);
+  const [stats, setStats] = useState({ students: 0, locked: 0, debt: 0 });
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -70,23 +88,59 @@ export default function UserManagement() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
+  /** Tổng SV / khóa / công nợ trên toàn DB — không đếm theo trang (trang 1 toàn GV nên trước đây = 0). */
+  const fetchStats = useCallback(async () => {
+    try {
+      const [{ data: studentPage }, { data: first }] = await Promise.all([
+        axiosInstance.get('/api/admin/users', { params: { role: 'STUDENT', page: 1, page_size: 1 } }),
+        axiosInstance.get('/api/admin/users', { params: { page: 1, page_size: 100 } }),
+      ]);
+      const total = Number(first?.total || 0);
+      const pages = Math.max(1, Math.ceil(total / 100));
+      let items = [...(first?.items || [])];
+      if (pages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: pages - 1 }, (_, i) =>
+            axiosInstance.get('/api/admin/users', { params: { page: i + 2, page_size: 100 } })
+          )
+        );
+        for (const res of rest) items = items.concat(res.data?.items || []);
+      }
+      const mapped = items.map(mapApiUser);
+      setStats({
+        students: Number(studentPage?.total || 0),
+        locked: mapped.filter((u) => u.is_locked).length,
+        debt: mapped.filter((u) => Number(u.total_fines) > 0).length,
+      });
+    } catch {
+      /* giữ stats cũ nếu lỗi */
+    }
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await axiosInstance.get('/api/admin/users', {
-        params: { q: debouncedQ || undefined, role: roleFilter === 'ALL' ? undefined : roleFilter, page, page_size: PAGE_SIZE },
+        params: {
+          q: debouncedQ || undefined,
+          role: roleFilter === 'ALL' ? undefined : roleFilter,
+          locked: lockFilter === 'LOCKED' ? true : lockFilter === 'ACTIVE' ? false : undefined,
+          has_debt: debtFilter === 'DEBT' ? true : debtFilter === 'CLEAR' ? false : undefined,
+          page,
+          page_size: PAGE_SIZE,
+        },
       });
       setAllUsers((data?.items || []).map(mapApiUser));
       setTotalCount(data?.total || 0);
       setApiError('');
     } catch (error) {
-      setApiError(getApiErrorMessage(error, 'Không tải được danh sách người dùng từ API.'));
+      setApiError(getApiErrorMessage(error, 'Không tải được danh sách người dùng.'));
       setAllUsers([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [debouncedQ, roleFilter, page]);
+  }, [debouncedQ, roleFilter, lockFilter, debtFilter, page]);
 
   useEffect(() => {
     // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
@@ -96,13 +150,20 @@ export default function UserManagement() {
     return () => window.clearTimeout(timer);
   }, [fetchUsers]);
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchStats();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchStats]);
+
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const safePage = page;
   const pageRows = allUsers;
   const totalUsers = totalCount;
-  const lockedCount = allUsers.filter((u) => u.is_locked).length;
-  const debtCount = allUsers.filter((u) => Number(u.total_fines) > 0).length;
-  const studentCount = allUsers.filter((u) => u.role === 'STUDENT').length;
+  const lockedCount = stats.locked;
+  const debtCount = stats.debt;
+  const studentCount = stats.students;
 
   const openCreate = () => {
     setEditing(null);
@@ -196,6 +257,7 @@ export default function UserManagement() {
       showToast(editing ? 'Đã cập nhật người dùng.' : 'Đã tạo người dùng.', 'success');
       setFormOpen(false);
       await fetchUsers();
+      await fetchStats();
     } catch (error) {
       const status = error?.response?.status;
       const msg = getApiErrorMessage(error, 'Không lưu được người dùng.');
@@ -217,7 +279,7 @@ export default function UserManagement() {
       return;
     }
     if (lockTarget.role === 'ADMIN' && nextLocked) {
-      showToast('Không thể khóa tài khoản ADMIN.', 'error');
+      showToast('Không thể khóa tài khoản thủ thư.', 'error');
       setLockTarget(null);
       return;
     }
@@ -229,6 +291,7 @@ export default function UserManagement() {
       showToast(nextLocked ? 'Đã khóa tài khoản.' : 'Đã mở khóa.', 'success');
       setLockTarget(null);
       await fetchUsers();
+      await fetchStats();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đổi trạng thái khóa.'), 'error');
       setLockTarget(null);
@@ -263,17 +326,28 @@ export default function UserManagement() {
       const form = new FormData();
       form.append('file', file);
       const { data } = await axiosInstance.post('/api/admin/users/import', form);
-      const created = data?.created_accounts?.length ?? data?.created ?? 0;
-      const skipped = data?.skipped ?? data?.errors?.length ?? 0;
+      const created =
+        Number(data?.success_count ?? data?.created_accounts?.length ?? data?.created ?? 0);
+      const errors = Array.isArray(data?.errors) ? data.errors : [];
+      const errorCount = Number(data?.error_count ?? errors.length ?? data?.skipped ?? 0);
+      setImportReport({
+        fileName: file.name,
+        created,
+        errorCount,
+        errors,
+      });
       showToast(
-        `Import xong: ${created} tài khoản mới` + (skipped ? `, ${skipped} bỏ qua/lỗi` : ''),
-        'success'
+        `Import xong: ${created} tài khoản mới` + (errorCount ? `, ${errorCount} dòng lỗi` : ''),
+        errorCount ? 'warning' : 'success'
       );
       await fetchUsers();
+      await fetchStats();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Import thất bại.'), 'error');
     } finally {
       setImporting(false);
+      const input = document.getElementById('admin-user-import-input');
+      if (input) input.value = '';
     }
   };
 
@@ -303,12 +377,21 @@ export default function UserManagement() {
     {
       key: 'role',
       header: 'Vai trò',
-      render: (val) => (
-        <StatusBadge
-          status={val === 'ADMIN' ? 'Admin' : val === 'LECTURER' ? 'Giảng viên' : 'Sinh viên'}
-          type={val === 'ADMIN' ? 'warning' : val === 'LECTURER' ? 'neutral' : 'success'}
-        />
-      ),
+      render: (val) => {
+        const role = String(val || '').toUpperCase();
+        return (
+          <StatusBadge
+            status={roleLabelVi(role)}
+            type={
+              role === 'ADMIN' || role === 'LIBRARIAN'
+                ? 'warning'
+                : role === 'LECTURER'
+                  ? 'neutral'
+                  : 'success'
+            }
+          />
+        );
+      },
     },
     {
       key: 'department',
@@ -385,11 +468,15 @@ export default function UserManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quản lý tài khoản qua API thật: danh sách, thêm, sửa, khóa và đặt lại mật khẩu.
+            Danh sách, thêm, sửa, khóa và đặt lại mật khẩu tài khoản bạn đọc / thủ thư.
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <Button variant="outline" onClick={() => navigate('/admin/fines')}>
+          <Button
+            variant="outline"
+            icon={<Receipt className="w-4 h-4" />}
+            onClick={() => navigate('/admin/fines')}
+          >
             Thu phạt &amp; Công nợ
           </Button>
           <label className={`inline-flex ${importing ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -423,7 +510,20 @@ export default function UserManagement() {
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setRoleFilter('ALL');
+            setLockFilter('ALL');
+            setDebtFilter('ALL');
+            setPage(1);
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            roleFilter === 'ALL' && lockFilter === 'ALL' && debtFilter === 'ALL'
+              ? 'border-indigo-400 ring-2 ring-indigo-200'
+              : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <Users className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
@@ -431,9 +531,20 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-slate-800 leading-none">
             {totalUsers} <span className="text-sm font-medium text-slate-500">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">Tổng tài khoản theo bộ lọc</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/30">
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setRoleFilter('STUDENT');
+            setLockFilter('ALL');
+            setDebtFilter('ALL');
+            setPage(1);
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/30 transition-colors ${
+            roleFilter === 'STUDENT' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-indigo-100 hover:border-indigo-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <GraduationCap className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
@@ -441,9 +552,19 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-indigo-600 leading-none">
             {studentCount} <span className="text-sm font-medium text-indigo-400">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-indigo-600">Số sinh viên trên trang hiện tại</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30">
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Bấm để lọc sinh viên</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setLockFilter('LOCKED');
+            setDebtFilter('ALL');
+            setPage(1);
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30 transition-colors ${
+            lockFilter === 'LOCKED' ? 'border-rose-400 ring-2 ring-rose-200' : 'border-rose-100 hover:border-rose-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <UserX className="w-6 h-6 text-rose-500 opacity-20" />
           </div>
@@ -451,9 +572,19 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
             {lockedCount} <span className="text-sm font-medium text-rose-400">tài khoản</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-rose-600">Số đang khóa trên trang hiện tại</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30">
+          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc đang khóa</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDebtFilter('DEBT');
+            setLockFilter('ALL');
+            setPage(1);
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30 transition-colors ${
+            debtFilter === 'DEBT' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <ShieldAlert className="w-6 h-6 text-amber-500 opacity-20" />
           </div>
@@ -461,8 +592,8 @@ export default function UserManagement() {
           <h3 className="text-3xl font-extrabold text-amber-600 leading-none">
             {debtCount} <span className="text-sm font-medium text-amber-400">người</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-amber-600">Số có nợ trên trang hiện tại</p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Bấm để lọc còn nợ</p>
+        </button>
       </div>
 
       {/* Bảng + filter trong một card */}
@@ -480,8 +611,15 @@ export default function UserManagement() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    setDebouncedQ(searchTerm.trim());
+                    const q = searchTerm.trim();
+                    setDebouncedQ(q);
                     setPage(1);
+                    showToast(
+                      q
+                        ? `Đang tra cứu «${q}».`
+                        : 'Nhập MSSV/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                      q ? 'success' : 'warning'
+                    );
                   }
                 }}
               />
@@ -492,30 +630,23 @@ export default function UserManagement() {
               className="!h-10 shrink-0 px-3 sm:px-4"
               icon={<Search className="w-4 h-4" />}
               onClick={() => {
-                setDebouncedQ(searchTerm.trim());
+                const q = searchTerm.trim();
+                setDebouncedQ(q);
                 setPage(1);
+                showToast(
+                  q
+                    ? `Đang tra cứu «${q}».`
+                    : 'Nhập MSSV/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                  q ? 'success' : 'warning'
+                );
               }}
             >
               Tra cứu
             </Button>
-            <Button
-              variant="ghost"
-              className="!h-10 shrink-0 !text-slate-500 px-2 sm:px-3"
-              icon={<RotateCcw className="w-4 h-4" />}
-              aria-label="Đặt lại bộ lọc"
-              onClick={() => {
-                setSearchTerm('');
-                setDebouncedQ('');
-                setRoleFilter('ALL');
-                setPage(1);
-              }}
-            >
-              <span className="hidden sm:inline">Đặt lại</span>
-            </Button>
           </div>
           <div className="flex flex-wrap gap-2">
             <select
-              className="h-10 w-full sm:w-auto sm:min-w-[180px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
@@ -525,7 +656,31 @@ export default function UserManagement() {
               <option value="ALL">Vai trò (Tất cả)</option>
               <option value="STUDENT">Sinh viên</option>
               <option value="LECTURER">Giảng viên</option>
-              <option value="ADMIN">Admin</option>
+              <option value="ADMIN">Thủ thư</option>
+            </select>
+            <select
+              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              value={lockFilter}
+              onChange={(e) => {
+                setLockFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="ALL">Khóa (Tất cả)</option>
+              <option value="LOCKED">Đang khóa</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+            </select>
+            <select
+              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              value={debtFilter}
+              onChange={(e) => {
+                setDebtFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="ALL">Công nợ (Tất cả)</option>
+              <option value="DEBT">Có công nợ</option>
+              <option value="CLEAR">Không nợ</option>
             </select>
           </div>
         </div>
@@ -593,7 +748,7 @@ export default function UserManagement() {
             >
               <option value="STUDENT">Sinh viên</option>
               <option value="LECTURER">Giảng viên</option>
-              <option value="ADMIN">Admin</option>
+              <option value="ADMIN">Thủ thư</option>
             </select>
           </label>
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -624,6 +779,68 @@ export default function UserManagement() {
           <Button variant="outline" onClick={() => setLockTarget(null)}>Hủy</Button>
           <Button variant="primary" onClick={confirmLockToggle}>Xác nhận</Button>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(importReport)}
+        onClose={() => setImportReport(null)}
+        title="Báo cáo import tài khoản"
+        maxWidth="max-w-lg"
+      >
+        {importReport && (
+          <>
+            <p className="text-sm text-slate-600 mb-3">
+              Tệp <span className="font-mono text-indigo-600">{importReport.fileName}</span>
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase text-emerald-600">Thành công</p>
+                <p className="text-2xl font-extrabold text-emerald-700 tabular-nums">
+                  {importReport.created}
+                </p>
+              </div>
+              <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3">
+                <p className="text-[11px] font-bold uppercase text-rose-600">Dòng lỗi</p>
+                <p className="text-2xl font-extrabold text-rose-700 tabular-nums">
+                  {importReport.errorCount}
+                </p>
+              </div>
+            </div>
+            {importReport.errors.length > 0 ? (
+              <div className="max-h-64 overflow-auto rounded-xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 sticky top-0">
+                    <tr className="text-left text-[11px] uppercase tracking-wide text-slate-500">
+                      <th className="px-3 py-2 font-bold w-20">Dòng</th>
+                      <th className="px-3 py-2 font-bold">Lý do</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importReport.errors.map((err, idx) => (
+                      <tr key={`${err.row}-${idx}`} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-mono font-semibold text-slate-800">
+                          {err.row ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {err.reason || err.message || 'Không rõ lý do'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                Không có dòng lỗi — toàn bộ dòng hợp lệ đã được tạo.
+              </p>
+            )}
+            <div className="flex justify-end mt-4 pt-3 border-t border-slate-100">
+              <Button variant="primary" onClick={() => setImportReport(null)}>
+                Đóng
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
 
       <Modal
@@ -667,7 +884,7 @@ export default function UserManagement() {
                 ['Email', detailRow.email],
                 ['SĐT', detailRow.phone_number || '—'],
                 ['Khoa', detailRow.department || '—'],
-                ['Vai trò', detailRow.role],
+                ['Vai trò', roleLabelVi(detailRow.role)],
                 ['Hạn mức mượn', detailRow.max_borrow_limit],
                 ['Công nợ', `${Number(detailRow.total_fines).toLocaleString('vi-VN')} ₫`],
                 ['Khóa mượn', detailRow.is_locked ? 'Có' : 'Không'],
@@ -682,6 +899,7 @@ export default function UserManagement() {
               <Button variant="outline" onClick={() => setDetailRow(null)}>Đóng</Button>
               <Button
                 variant="primary"
+                icon={<Pencil className="w-4 h-4" />}
                 onClick={() => {
                   openEdit(detailRow);
                   setDetailRow(null);

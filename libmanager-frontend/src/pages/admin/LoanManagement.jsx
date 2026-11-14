@@ -54,12 +54,58 @@ export default function LoanManagement() {
     return map[status] || status || '—';
   };
 
-  const handleReturnScan = (code) => {
+  const looksLikeReaderCode = (code) =>
+    /^(SV|GV|ADMIN|LIBRARIAN)[-_]/i.test(String(code || '').trim());
+
+  const handleReturnScan = async (code) => {
     const targetCode = (typeof code === 'string' ? code : returnBarcode).trim();
     if (!targetCode) {
       showToast('Vui lòng quét hoặc nhập mã vạch sách trả rồi nhấn phím Enter.', 'warning');
       return;
     }
+
+    // SV-DEMO-001 là mã bạn đọc — check-in API chỉ nhận mã vạch bản sao (DEMO-BC-…).
+    if (looksLikeReaderCode(targetCode)) {
+      try {
+        const res = await axiosInstance.get('/api/admin/loans/lookup', {
+          params: { q: targetCode },
+        });
+        const loans = res.data?.data || [];
+        const active = loans.filter(
+          (l) =>
+            ['BORROWED', 'OVERDUE'].includes(String(l.loan_status || '').toUpperCase())
+            && l.copy_barcode
+        );
+        if (!active.length) {
+          setReturnBookScanned(false);
+          setReturnBarcode('');
+          showToast(
+            `${targetCode} là mã bạn đọc, không phải mã vạch. Không tìm thấy phiếu đang mượn/quá hạn có mã vạch.`,
+            'warning'
+          );
+          return;
+        }
+        const barcode = active[0].copy_barcode;
+        setReturnBarcode(barcode);
+        setReturnBookScanned(true);
+        showToast(
+          active.length === 1
+            ? `Đã đổi ${targetCode} → mã vạch ${barcode}. Bấm xác nhận để trả.`
+            : `${targetCode} có ${active.length} cuốn đang mượn — dùng ${barcode}. Trả lần lượt các mã còn lại.`,
+          'success'
+        );
+      } catch (error) {
+        showToast(
+          getApiErrorMessage(
+            error,
+            `${targetCode} là mã bạn đọc. Hãy quét mã vạch trên sách, không nhập MSSV.`
+          ),
+          'error'
+        );
+      }
+      return;
+    }
+
     setReturnBarcode(targetCode);
     setReturnBookScanned(true);
     showToast(`Đã nhận mã vạch trả: ${targetCode}. Bấm xác nhận để nhận sách.`, 'success');
@@ -68,7 +114,7 @@ export default function LoanManagement() {
   const handleUserScan = async () => {
     const mssv = borrowUserId.trim();
     if (!mssv) {
-      showToast('Vui lòng nhập MSSV / thẻ độc giả rồi nhấn phím Enter.', 'warning');
+      showToast('Nhập MSSV rồi bấm Tra cứu (không để trống).', 'warning');
       return;
     }
     setIsUserLoading(true);
@@ -102,7 +148,7 @@ export default function LoanManagement() {
       return;
     }
     if (borrowBooks.some((b) => b.barcode === targetCode)) {
-      showToast(`Barcode ${targetCode} đã có trong phiếu.`, 'warning');
+      showToast(`Mã vạch ${targetCode} đã có trong phiếu.`, 'warning');
       return;
     }
     setIsBorrowLoading(true);
@@ -123,7 +169,7 @@ export default function LoanManagement() {
   const confirmCheckin = async () => {
     const barcode = returnBarcode.trim();
     if (!barcode) {
-      showToast('Thiếu barcode sách trả.', 'error');
+      showToast('Thiếu mã vạch sách trả.', 'error');
       return;
     }
     const damaged = returnCondition === 'Hư hỏng / Mất sách';
@@ -144,9 +190,17 @@ export default function LoanManagement() {
       setReturnBarcode('');
       setReturnCondition('Nguyên vẹn');
       setReturnNote('');
-      showToast(data.message || 'Check-in thành công!', 'success');
+      showToast(data.message || 'Trả sách thành công.', 'success');
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Check-in thất bại.'), 'error');
+      const msg = getApiErrorMessage(error, 'Trả sách thất bại.');
+      const alreadyReturned =
+        /không tìm thấy phiếu đang mượn|đã được trả|quá hạn cho mã vạch/i.test(msg);
+      showToast(
+        alreadyReturned
+          ? `${msg} Có thể sách đã được trả — xuất mượn lại mã này hoặc lấy mã đang mượn khác ở Tồn kho.`
+          : msg,
+        'error'
+      );
     } finally {
       setIsConfirming(false);
     }
@@ -184,7 +238,7 @@ export default function LoanManagement() {
       setUserValidated(false);
       setPendingLoans([]);
       setCheckoutConditionNotes('');
-      showToast(`Check-out thành công ${ok}/${totalTried} cuốn.`, 'success');
+      showToast(`Xuất mượn thành công ${ok}/${totalTried} cuốn.`, 'success');
     }
     if (errors.length) {
       showToast(errors.slice(0, 2).join(' | '), 'error');
@@ -219,15 +273,15 @@ export default function LoanManagement() {
                 Quầy Nhận Trả Sách
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Quét barcode bản đang mượn / quá hạn → xác nhận tình trạng
+                Quét mã vạch bản đang mượn / quá hạn → xác nhận tình trạng
               </p>
             </div>
           </div>
 
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 sm:gap-5">
             <FastBarcodeScanner
-              label="Quét barcode sách trả"
-              placeholder="VD: DEMO-BC-100-02 — Enter để nhận mã"
+              label="Quét mã vạch sách trả"
+              placeholder="Quét mã vạch đang mượn — Enter để nhận mã"
               value={returnBarcode}
               onChange={(e) => setReturnBarcode(e.target.value)}
               onScan={(scannedCode) => {
@@ -239,7 +293,7 @@ export default function LoanManagement() {
               autoFocus
               autoClear={false}
               autoRefocus
-              helperText="Ô tự focus. Tít mã hoặc Enter."
+              helperText="Cần mã vạch trên sách (không phải MSSV). Nhập nhầm SV-… sẽ tự tìm mã vạch đang mượn."
             />
 
             {returnBookScanned ? (
@@ -252,11 +306,11 @@ export default function LoanManagement() {
                     <div className="flex flex-wrap items-center gap-2 justify-between">
                       <h3 className="font-bold text-slate-800 text-sm sm:text-base">Bản sao đã quét</h3>
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                        Chờ check-in
+                        Chờ xác nhận trả
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 mt-1 font-mono break-all">
-                      Barcode: {returnBarcode}
+                      Mã vạch: {returnBarcode}
                     </p>
                     <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
                       Xác nhận sẽ nhận trả phiếu đang mượn hoặc quá hạn theo mã này.
@@ -354,7 +408,7 @@ export default function LoanManagement() {
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tra MSSV → quét barcode sẵn sàng → xuất mượn
+                Tra MSSV → quét mã vạch sẵn sàng → xuất mượn
               </p>
             </div>
           </div>
@@ -368,7 +422,7 @@ export default function LoanManagement() {
                 <div className="relative min-w-0 flex-1">
                   <Input
                     type="text"
-                    placeholder="VD: SV-DEMO-001"
+                    placeholder="Nhập mã bạn đọc / MSSV"
                     leftIcon={<User className="w-5 h-5" />}
                     className="!h-11 font-mono text-sm"
                     value={borrowUserId}
@@ -408,7 +462,7 @@ export default function LoanManagement() {
                 </div>
                 <p className="text-sm font-semibold text-slate-700">Chưa tra cứu bạn đọc</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-[16rem] leading-relaxed">
-                  Nhập mã rồi bấm Tra cứu (hoặc Enter). Sau đó mới quét sách vào phiếu.
+                  Nhập MSSV rồi bấm Tra cứu (không để trống). Sau đó mới quét sách vào phiếu.
                 </p>
               </div>
             ) : (
@@ -473,15 +527,15 @@ export default function LoanManagement() {
                 </div>
 
                 <FastBarcodeScanner
-                  label="Quét barcode sách mượn"
-                  placeholder="Quét liên tục — Enter để thêm vào phiếu"
+                  label="Quét mã vạch sách mượn"
+                  placeholder="Enter để thêm vào phiếu"
                   onScan={(scannedCode) => handleBorrowScan(scannedCode)}
                   loading={isBorrowLoading}
                   autoFocus
                   autoClear
                   autoRefocus
                   buttonText="Thêm"
-                  helperText="Tự focus sau khi tra MSSV."
+                  helperText="Quét xong tự xóa ô để tít cuốn tiếp."
                 />
 
                 <div>
@@ -571,7 +625,7 @@ export default function LoanManagement() {
       >
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <h4 className="text-sm font-bold text-slate-800 mb-1">Check-in bản sao</h4>
+            <h4 className="text-sm font-bold text-slate-800 mb-1">Trả sách theo mã vạch</h4>
             <div className="text-xs text-slate-500 space-y-1 font-medium">
               <p>Mã vạch: <span className="text-slate-700 font-mono">{returnBarcode}</span></p>
               <p>Hệ thống sẽ tìm phiếu đang mượn hoặc quá hạn theo mã vạch này.</p>
@@ -631,14 +685,6 @@ export default function LoanManagement() {
                   onChange={(e) => setReturnNote(e.target.value)}
                 ></textarea>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Ảnh tình trạng</label>
-                <label className="flex items-center justify-between gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100">
-                  <span className="text-xs text-slate-600">Chọn ảnh tình trạng (tuỳ chọn)</span>
-                  <span className="text-[11px] font-semibold text-indigo-600">Chọn ảnh</span>
-                  <input type="file" accept="image/*" className="hidden" />
-                </label>
-              </div>
             </div>
           )}
         </div>
@@ -653,7 +699,7 @@ export default function LoanManagement() {
           <>
             <Button variant="outline" onClick={() => setShowBorrowModal(false)} disabled={isConfirming}>Hủy bỏ</Button>
             <Button variant="primary" onClick={confirmCheckout} disabled={isConfirming}>
-              {isConfirming ? 'Đang xử lý…' : 'Xác nhận check-out'}
+              {isConfirming ? 'Đang xử lý…' : 'Xác nhận xuất mượn'}
             </Button>
           </>
         }

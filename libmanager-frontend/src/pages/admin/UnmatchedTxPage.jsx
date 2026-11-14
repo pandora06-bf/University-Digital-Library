@@ -1,18 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WalletCards, Link2, RotateCcw, Search } from 'lucide-react';
+import { WalletCards, Link2, Search, Users } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
-import {
-  getStoredUnmatched,
-  assignUnmatched,
-  resetUnmatched,
-  DEMO_USERS_FOR_ASSIGN,
-} from '../../mocks/adminUnmatchedMock';
+import axiosInstance from '../../services/axios_instance';
+import { walletService } from '../../services/walletService';
+import { getApiErrorMessage } from '../../services/errorHandler';
 
 const formatVND = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n || 0);
@@ -21,53 +18,157 @@ const formatWhen = (iso) => {
   try {
     return new Date(iso).toLocaleString('vi-VN');
   } catch {
-    return iso;
+    return iso || '—';
   }
+};
+
+const mapRow = (u) => {
+  const assigned = u.assigned_user_code || null;
+  return {
+    id: u.id,
+    bank_tx_id: u.bank_tx_id || '',
+    amount: Number(u.amount) || 0,
+    bank_account_number: u.bank_account_number || '',
+    transfer_content: u.transfer_content || '',
+    received_at: u.received_at || u.created_at || '',
+    status: assigned || u.status === 'ASSIGNED' ? 'ASSIGNED' : 'UNRESOLVED',
+    assigned_user_code: assigned,
+    resolved_by: u.resolved_by || null,
+    resolution_notes: u.resolution_notes || null,
+  };
 };
 
 export default function UnmatchedTxPage() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
-  const [rows, setRows] = useState(() => getStoredUnmatched());
-  const [statusFilter, setStatusFilter] = useState('UNRESOLVED');
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
   const [assignTarget, setAssignTarget] = useState(null);
   const [userCode, setUserCode] = useState('');
+  const [userQuery, setUserQuery] = useState('');
+  const [manualCode, setManualCode] = useState(false);
   const [notes, setNotes] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [userOptions, setUserOptions] = useState([]);
 
+  const loadRows = useCallback(async ({ silent = false } = {}) => {
+    setLoading(true);
+    try {
+      const { items, total: t } = await walletService.listUnmatched(1, 50);
+      setRows((items || []).map(mapRow));
+      setTotal(Number(t) || (items || []).length);
+      if (!silent) {
+        showToast(`Đã tải ${t ?? items?.length ?? 0} giao dịch chưa khớp.`, 'success');
+      }
+    } catch (error) {
+      setRows([]);
+      setTotal(0);
+      if (!silent) {
+        showToast(
+          getApiErrorMessage(error, 'Không tải được danh sách giao dịch.'),
+          'error'
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  const loadUserOptions = useCallback(async () => {
+    // API order_by user_code → GV-* đứng trước SV-*; page 1 dễ chỉ toàn giảng viên.
+    // Lấy riêng STUDENT + LECTURER rồi xếp SV trước.
+    const mapUser = (u) => ({
+      user_code: u.user_code,
+      full_name: u.full_name || u.user_code,
+      role: String(u.role || '').toUpperCase(),
+    });
+    const sortReaders = (list) =>
+      [...list].sort((a, b) => {
+        const rank = (code) => (String(code).startsWith('SV') ? 0 : String(code).startsWith('GV') ? 1 : 2);
+        const d = rank(a.user_code) - rank(b.user_code);
+        return d !== 0 ? d : String(a.user_code).localeCompare(String(b.user_code));
+      });
+
+    try {
+      const [students, lecturers] = await Promise.all([
+        axiosInstance.get('/api/admin/users', { params: { role: 'STUDENT', page: 1, page_size: 50 } }),
+        axiosInstance.get('/api/admin/users', { params: { role: 'LECTURER', page: 1, page_size: 50 } }),
+      ]);
+      const items = sortReaders([
+        ...(students.data?.items || []).map(mapUser),
+        ...(lecturers.data?.items || []).map(mapUser),
+      ]);
+      setUserOptions(items);
+    } catch {
+      setUserOptions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadRows({ silent: true });
+      loadUserOptions();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadRows, loadUserOptions]);
+
+  // BE GET /unmatched chỉ trả giao dịch chưa gán (assigned_user_code IS NULL).
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
-      const okStatus = statusFilter === 'ALL' || r.status === statusFilter;
-      const okQ =
-        !term ||
-        r.bank_tx_id.toLowerCase().includes(term) ||
-        (r.transfer_content || '').toLowerCase().includes(term) ||
-        (r.assigned_user_code || '').toLowerCase().includes(term);
-      return okStatus && okQ;
+      if (!term) return true;
+      return (
+        r.bank_tx_id.toLowerCase().includes(term)
+        || (r.transfer_content || '').toLowerCase().includes(term)
+        || (r.assigned_user_code || '').toLowerCase().includes(term)
+      );
     });
-  }, [rows, statusFilter, q]);
+  }, [rows, q]);
 
-  const openCount = rows.filter((r) => r.status === 'UNRESOLVED').length;
-  const assignedCount = rows.filter((r) => r.status === 'ASSIGNED').length;
-  const openAmount = rows
-    .filter((r) => r.status === 'UNRESOLVED')
-    .reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const openCount = rows.length;
+  const openAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+
+  const filteredUserOptions = useMemo(() => {
+    const term = userQuery.trim().toLowerCase();
+    if (!term) return userOptions;
+    return userOptions.filter(
+      (u) =>
+        u.user_code.toLowerCase().includes(term)
+        || (u.full_name || '').toLowerCase().includes(term)
+    );
+  }, [userOptions, userQuery]);
+
+  const selectedUser = useMemo(
+    () => userOptions.find((u) => u.user_code === userCode) || null,
+    [userOptions, userCode]
+  );
 
   const openAssign = (row) => {
     setAssignTarget(row);
-    setUserCode(DEMO_USERS_FOR_ASSIGN[0]?.user_code || '');
+    setUserCode('');
+    setUserQuery('');
+    setManualCode(false);
     setNotes('');
   };
 
-  const confirmAssign = () => {
+  const confirmAssign = async () => {
+    const code = userCode.trim();
+    if (!assignTarget || !code) {
+      showToast('Nhập hoặc chọn mã bạn đọc (MSSV) trước khi gán.', 'warning');
+      return;
+    }
+    setAssigning(true);
     try {
-      assignUnmatched(assignTarget.id, userCode, notes);
-      setRows(getStoredUnmatched());
+      await walletService.assignUnmatched(assignTarget.id, code, notes);
       setAssignTarget(null);
-      showToast(`Đã gán ${assignTarget.bank_tx_id} → ${userCode} và cộng số dư (mẫu).`, 'success');
+      showToast(`Đã gán ${assignTarget.bank_tx_id} → ${code} và cộng số dư ví.`, 'success');
+      await loadRows({ silent: true });
     } catch (e) {
-      showToast(e.message || 'Gán thất bại.', 'error');
+      showToast(getApiErrorMessage(e, e.message || 'Gán thất bại.'), 'error');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -142,78 +243,43 @@ export default function UnmatchedTxPage() {
             Xử lý giao dịch nạp tiền chưa khớp: gán đúng bạn đọc để cộng số dư ví.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => navigate('/admin/users')}>
-            Người dùng
-          </Button>
-          <Button
-            variant="outline"
-            icon={<RotateCcw className="w-4 h-4" />}
-            onClick={() => {
-              setRows(resetUnmatched());
-              showToast('Đã nạp lại dữ liệu mẫu giao dịch chưa khớp.', 'success');
-            }}
-          >
-            Nạp lại mẫu
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          icon={<Users className="w-4 h-4" />}
+          onClick={() => navigate('/admin/users')}
+        >
+          Người dùng
+        </Button>
       </div>
 
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-        <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
-        <p className="text-amber-800/90 mt-0.5 text-[13px]">
-          BE chưa có endpoint admin list/gán unmatched — bảng <code className="bg-amber-100 px-1 rounded">unmatched_tx</code> chỉ được webhook ngân hàng ghi.
-          Gán người dùng trên trang này chỉ mô phỏng localStorage, không cộng ví thật.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm bg-gradient-to-br from-white to-amber-50/40 min-w-0 relative overflow-hidden">
           <div className="absolute top-4 right-4">
-            <WalletCards className="w-6 h-6 text-indigo-500 opacity-20" />
+            <WalletCards className="w-6 h-6 text-amber-500 opacity-20" />
           </div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng giao dịch</p>
-          <p className="text-3xl font-extrabold text-slate-800 leading-none">
-            {rows.length} <span className="text-sm font-medium text-slate-500">giao dịch</span>
-          </p>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">
-            Nạp tiền ngân hàng cần đối chiếu thủ công
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chưa khớp</p>
           <p className="text-3xl font-extrabold text-amber-600 leading-none">
             {openCount} <span className="text-sm font-medium text-amber-500">giao dịch</span>
           </p>
-          <p className="mt-3 text-[11px] font-medium text-amber-600">
-            Chưa gán cho tài khoản người dùng
+          <p className="mt-3 text-[11px] font-medium text-amber-700">
+            Danh sách giao dịch chờ gán ví{total ? ` · ${total}` : ''}
           </p>
         </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã gán</p>
-          <p className="text-3xl font-extrabold text-emerald-600 leading-none">
-            {assignedCount} <span className="text-sm font-medium text-emerald-500">giao dịch</span>
-          </p>
-          <p className="mt-3 text-[11px] font-medium text-emerald-600">
-            Đã cộng số dư ví cho người dùng tương ứng
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm min-w-0 relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40">
+          <div className="absolute top-4 right-4">
+            <WalletCards className="w-6 h-6 text-indigo-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Số tiền chưa khớp</p>
-          <p className="text-2xl font-extrabold text-slate-800 leading-none">
-            {formatVND(openAmount)}
-          </p>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">
-            Tổng giá trị các giao dịch còn chờ gán
-          </p>
+          <p className="text-2xl font-extrabold text-indigo-600 leading-none">{formatVND(openAmount)}</p>
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Tổng số tiền chờ gán ví</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4 space-y-3">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
         <div className="flex items-stretch gap-2 min-w-0">
           <div className="min-w-0 flex-1">
             <Input
-              placeholder="Tìm mã ngân hàng, nội dung CK, MSSV…"
+              placeholder="Tìm mã ngân hàng, nội dung CK…"
               leftIcon={<Search className="w-4 h-4" />}
               className="!h-10 !rounded-lg"
               value={q}
@@ -226,64 +292,143 @@ export default function UnmatchedTxPage() {
             className="!h-10 shrink-0 px-3 sm:px-4"
             icon={<Search className="w-4 h-4" />}
             onClick={() => {
-              if (!q.trim()) {
-                showToast('Nhập từ khóa rồi bấm Tra cứu (lọc bảng bên dưới).', 'warning');
-              }
+              showToast(
+                q.trim()
+                  ? `Hiển thị ${filtered.length} giao dịch khớp bộ lọc.`
+                  : 'Nhập từ khóa rồi bấm Tra cứu (lọc bảng bên dưới).',
+                q.trim() ? 'success' : 'warning'
+              );
             }}
           >
             Tra cứu
           </Button>
         </div>
-        <select
-          className="h-10 w-full sm:w-auto sm:min-w-[180px] px-3 rounded-lg border border-slate-200 text-sm bg-white"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="UNRESOLVED">Chưa khớp</option>
-          <option value="ASSIGNED">Đã gán</option>
-          <option value="ALL">Tất cả</option>
-        </select>
       </div>
 
-      <Table columns={columns} data={filtered} emptyMessage="Không có giao dịch phù hợp." />
+      <Table
+        columns={columns}
+        data={filtered}
+        loading={loading}
+        emptyMessage="Không có giao dịch chưa khớp."
+      />
 
       <Modal
         isOpen={!!assignTarget}
-        onClose={() => setAssignTarget(null)}
+        onClose={() => !assigning && setAssignTarget(null)}
         title="Gán giao dịch cho người dùng"
       >
         {assignTarget && (
           <div className="space-y-4">
-            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-sm">
-              <p className="font-mono font-semibold text-slate-800">{assignTarget.bank_tx_id}</p>
-              <p className="text-emerald-700 font-bold mt-1">{formatVND(assignTarget.amount)}</p>
-              <p className="text-slate-600 mt-2">{assignTarget.transfer_content}</p>
+            <div className="rounded-xl bg-slate-50 border border-slate-100 p-3 text-sm space-y-2">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="font-mono font-semibold text-slate-800">{assignTarget.bank_tx_id}</p>
+                <p className="text-emerald-700 font-bold">{formatVND(assignTarget.amount)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Nội dung chuyển khoản
+                </p>
+                <p className="text-slate-800 mt-0.5 break-words">{assignTarget.transfer_content || '—'}</p>
+              </div>
+              <p className="text-xs text-slate-500">
+                Hệ thống chưa khớp được người nhận. Chọn đúng bạn đọc theo nội dung CK rồi xác nhận.
+              </p>
             </div>
-            <label className="block text-sm font-medium text-slate-700">
-              Người dùng
-              <select
-                className="mt-1.5 w-full h-11 px-3 rounded-xl border border-slate-200 text-sm bg-white"
-                value={userCode}
-                onChange={(e) => setUserCode(e.target.value)}
-              >
-                {DEMO_USERS_FOR_ASSIGN.map((u) => (
-                  <option key={u.user_code} value={u.user_code}>
-                    {u.user_code} — {u.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
+
+            {!manualCode ? (
+              <div className="space-y-2">
+                <Input
+                  label="Tìm bạn đọc"
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder="Tên hoặc MSSV…"
+                  leftIcon={<Search className="w-4 h-4" />}
+                />
+                <label className="block text-sm font-medium text-slate-700">
+                  Người nhận tiền
+                  <select
+                    className="mt-1.5 w-full h-11 px-3 rounded-xl border border-slate-200 text-sm bg-white"
+                    value={selectedUser ? userCode : ''}
+                    onChange={(e) => setUserCode(e.target.value)}
+                  >
+                    <option value="">— Chưa chọn —</option>
+                    {filteredUserOptions.map((u) => (
+                      <option key={u.user_code} value={u.user_code}>
+                        {u.full_name} ({u.user_code})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {filteredUserOptions.length === 0 && (
+                  <p className="text-xs text-amber-700">Không có kết quả. Thử từ khóa khác hoặc nhập mã thủ công.</p>
+                )}
+                <button
+                  type="button"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  onClick={() => {
+                    setManualCode(true);
+                    setUserCode('');
+                  }}
+                >
+                  Không có trong danh sách? Nhập mã thủ công
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  label="Mã bạn đọc (MSSV)"
+                  value={userCode}
+                  onChange={(e) => setUserCode(e.target.value.toUpperCase())}
+                  placeholder="VD: SV20210001"
+                  className="font-mono"
+                  helperText="Nhập đúng mã đã đăng ký trong hệ thống."
+                />
+                <button
+                  type="button"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                  onClick={() => {
+                    setManualCode(false);
+                    setUserCode('');
+                    setUserQuery('');
+                  }}
+                >
+                  ← Quay lại chọn từ danh sách
+                </button>
+              </div>
+            )}
+
+            {userCode.trim() && (
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-sm">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-emerald-700">
+                  Sẽ cộng ví cho
+                </p>
+                <p className="font-semibold text-slate-900 mt-0.5">
+                  {selectedUser
+                    ? `${selectedUser.full_name} · ${selectedUser.user_code}`
+                    : userCode.trim()}
+                </p>
+                <p className="text-emerald-800 font-bold mt-0.5">{formatVND(assignTarget.amount)}</p>
+              </div>
+            )}
+
             <Input
-              label="Ghi chú (tuỳ chọn)"
+              label="Ghi chú đối chiếu (tuỳ chọn)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Đối chiếu nội dung chuyển khoản…"
+              placeholder="VD: Đúng tên trên CK, đã gọi SV xác nhận…"
             />
+
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setAssignTarget(null)}>
+              <Button variant="outline" disabled={assigning} onClick={() => setAssignTarget(null)}>
                 Hủy
               </Button>
-              <Button variant="primary" onClick={confirmAssign}>
+              <Button
+                variant="primary"
+                loading={assigning}
+                disabled={!userCode.trim()}
+                icon={<Link2 className="w-4 h-4" />}
+                onClick={confirmAssign}
+              >
                 Xác nhận gán
               </Button>
             </div>

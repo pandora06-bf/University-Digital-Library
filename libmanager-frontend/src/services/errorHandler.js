@@ -24,6 +24,32 @@ const FIELD_LABELS = {
   category_name: 'Tên thể loại'
 };
 
+/** Làm mềm detail API: bỏ mã E*, enum tiếng Anh trong toast. */
+function softenApiDetail(text) {
+  if (typeof text !== 'string' || !text.trim()) return text;
+  let out = text.replace(/\s*\(E\d+\)\.?/gi, '');
+  const statusMap = [
+    [/PENDING_PICKUP/g, 'chờ nhận tại quầy'],
+    [/BORROWED/g, 'đang mượn'],
+    [/OVERDUE/g, 'quá hạn'],
+    [/RETURNED/g, 'đã trả'],
+    [/REQUESTED/g, 'đã đăng ký'],
+    [/AVAILABLE/g, 'sẵn sàng'],
+    [/CANCELLED/g, 'đã hủy'],
+    [/EXPIRED/g, 'hết hạn'],
+    [/Waitlist\s*HELD/gi, 'giữ chỗ đặt trước'],
+    [/\bHELD\b/g, 'đang giữ chỗ'],
+    [/\bLOST\b/g, 'báo mất'],
+    [/\bDAMAGED\b/g, 'hư hỏng'],
+    [/\bcheck-?in\b/gi, 'trả sách / vào phòng'],
+    [/\bcheck-?out\b/gi, 'xuất mượn'],
+    [/\buser_code\b/g, 'MSSV'],
+    [/\bbook_id\b/g, 'mã đầu sách'],
+  ];
+  for (const [re, label] of statusMap) out = out.replace(re, label);
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
 /**
  * Trích xuất message thân thiện từ API response
  * @param {any} error - Đối tượng lỗi từ Axios hoặc Error
@@ -34,13 +60,24 @@ export function getApiErrorMessage(error, defaultMessage = '') {
   if (!error) return defaultMessage || 'Đã xảy ra lỗi không xác định.';
 
   // Trường hợp chuỗi thuần
-  if (typeof error === 'string') return error;
+  if (typeof error === 'string') return softenApiDetail(error);
 
   const response = error.response;
 
-  // Lỗi mất kết nối mạng hoặc server không phản hồi
-  if (!response || error.code === 'ERR_NETWORK') {
+  // Lỗi mất kết nối mạng hoặc server không phản hồi (chỉ khi thực sự là lỗi mạng Axios)
+  if (
+    error.code === 'ERR_NETWORK'
+    || error.code === 'ECONNABORTED'
+    || error.message === 'Network Error'
+  ) {
     return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.';
+  }
+  // Error thường (validate FE / mock) — không gắn nhầm thành mất mạng
+  if (!response) {
+    if (typeof error.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+    return defaultMessage || 'Đã xảy ra lỗi không xác định.';
   }
 
   const status = response.status;
@@ -50,7 +87,7 @@ export function getApiErrorMessage(error, defaultMessage = '') {
   // 1. Xử lý HTTP 409 - Conflict
   if (status === 409) {
     if (typeof detail === 'string' && detail.trim()) {
-      return detail;
+      return softenApiDetail(detail);
     }
     return defaultMessage || 'Dữ liệu bị xung đột. Vui lòng kiểm tra lại thông tin và thử lại.';
   }
@@ -58,7 +95,7 @@ export function getApiErrorMessage(error, defaultMessage = '') {
   // 2. Xử lý HTTP 422 - Unprocessable Entity (Pydantic Validation Error)
   if (status === 422) {
     if (typeof detail === 'string' && detail.trim()) {
-      return detail;
+      return softenApiDetail(detail);
     }
 
     if (Array.isArray(detail) && detail.length > 0) {
@@ -86,13 +123,13 @@ export function getApiErrorMessage(error, defaultMessage = '') {
 
   // 4. Xử lý HTTP 403 - Forbidden
   if (status === 403) {
-    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (typeof detail === 'string' && detail.trim()) return softenApiDetail(detail);
     return 'Bạn không có quyền thực hiện thao tác này (yêu cầu quyền Quản trị viên).';
   }
 
   // 5. Xử lý HTTP 404 - Not Found
   if (status === 404) {
-    if (typeof detail === 'string' && detail.trim()) return detail;
+    if (typeof detail === 'string' && detail.trim()) return softenApiDetail(detail);
     return defaultMessage || 'Không tìm thấy dữ liệu yêu cầu.';
   }
 
@@ -103,7 +140,7 @@ export function getApiErrorMessage(error, defaultMessage = '') {
 
   // Các trường hợp có detail string khác
   if (typeof detail === 'string' && detail.trim()) {
-    return detail;
+    return softenApiDetail(detail);
   }
 
   return defaultMessage || error.message || 'Đã xảy ra lỗi không xác định.';

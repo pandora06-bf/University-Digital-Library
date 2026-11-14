@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FileText, Search, UploadCloud, Eye, Edit2,
-  CheckCircle2, FilePlus,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
@@ -11,11 +11,6 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
-import {
-  getStoredAdminEbooks,
-  upsertAdminEbook,
-  DEMO_EBOOK_BOOK_OPTIONS,
-} from '../../mocks/adminEbooksMock';
 import { AdminIconButton } from '../../components/AdminIconButton';
 
 function formatSize(file) {
@@ -55,10 +50,10 @@ function mapApiEbook(book) {
 export default function EbookManagement() {
   const { toast, showToast, hideToast } = useToast();
   const [rows, setRows] = useState([]);
-  const [bookOptions, setBookOptions] = useState(DEMO_EBOOK_BOOK_OPTIONS);
-  const [usingMock, setUsingMock] = useState(false);
+  const [bookOptions, setBookOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [pdfFilter, setPdfFilter] = useState('ALL'); // ALL | READY | MISSING
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [selectedEbook, setSelectedEbook] = useState(null);
@@ -70,6 +65,7 @@ export default function EbookManagement() {
   const [busy, setBusy] = useState(false);
 
   const readyCount = rows.filter((r) => r.hasPdf || r.status === 'Sẵn sàng').length;
+  const missingCount = rows.length - readyCount;
 
   const loadFromApi = useCallback(async () => {
     setLoading(true);
@@ -80,23 +76,20 @@ export default function EbookManagement() {
       const items = res.data?.items || res.data?.data || [];
       const mapped = items.map(mapApiEbook);
       setRows(mapped);
-      setBookOptions(
-        mapped.length
-          ? mapped.map((r) => ({ id: r.id, title: r.title }))
-          : DEMO_EBOOK_BOOK_OPTIONS
-      );
-      setUsingMock(false);
+      setBookOptions(mapped.map((r) => ({ id: r.id, title: r.title })));
       return true;
-    } catch {
-      const mock = getStoredAdminEbooks();
-      setRows(mock);
-      setBookOptions(DEMO_EBOOK_BOOK_OPTIONS);
-      setUsingMock(true);
+    } catch (error) {
+      setRows([]);
+      setBookOptions([]);
+      showToast(
+        getApiErrorMessage(error, 'Không tải được danh sách eBook.'),
+        'error'
+      );
       return false;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
@@ -108,30 +101,23 @@ export default function EbookManagement() {
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        String(item.filename || '').toLowerCase().includes(q)
-    );
-  }, [rows, searchTerm]);
+    return rows.filter((item) => {
+      const hasPdf = !!(item.hasPdf || item.status === 'Sẵn sàng');
+      const okPdf =
+        pdfFilter === 'ALL'
+        || (pdfFilter === 'READY' && hasPdf)
+        || (pdfFilter === 'MISSING' && !hasPdf);
+      const okQ =
+        !q
+        || item.title.toLowerCase().includes(q)
+        || String(item.filename || '').toLowerCase().includes(q);
+      return okPdf && okQ;
+    });
+  }, [rows, searchTerm, pdfFilter]);
 
   const applyLocalUpload = (bookId, file, titleHint) => {
     const book = bookOptions.find((b) => String(b.id) === String(bookId));
     const pages = Math.min(10, Math.max(5, parseInt(previewPages, 10) || 10));
-    if (usingMock) {
-      const next = upsertAdminEbook({
-        id: Number(bookId),
-        title: book?.title || titleHint || `Sách #${bookId}`,
-        filename: file.name,
-        size: formatSize(file),
-        uploadDate: new Date().toLocaleDateString('vi-VN'),
-        previewPages: pages,
-        isFree,
-      });
-      setRows(next);
-      return;
-    }
     setRows((prev) => {
       const idx = prev.findIndex((r) => String(r.id) === String(bookId));
       const nextRow = {
@@ -181,32 +167,15 @@ export default function EbookManagement() {
     try {
       await tryApiUpload(uploadBookId, uploadFile);
       applyLocalUpload(uploadBookId, uploadFile);
-      setUsingMock(false);
-      showToast('Đã tải PDF lên máy chủ thành công.', 'success');
+      showToast('Đã tải PDF lên thành công.', 'success');
       setShowUploadModal(false);
       setUploadBookId('');
       setUploadFile(null);
     } catch (error) {
-      const status = error?.response?.status;
-      if (status === 404 || status === 409 || status === 422 || status === 400) {
-        showToast(
-          getApiErrorMessage(error, 'Máy chủ từ chối tải PDF. Kiểm tra đầu sách eBook và tệp PDF.'),
-          'error'
-        );
-      } else {
-        applyLocalUpload(uploadBookId, uploadFile);
-        setUsingMock(true);
-        showToast(
-          getApiErrorMessage(
-            error,
-            'Không kết nối được máy chủ. Đã lưu tạm trên giao diện (dữ liệu mẫu — không ghi máy chủ).'
-          ),
-          'warning'
-        );
-        setShowUploadModal(false);
-        setUploadBookId('');
-        setUploadFile(null);
-      }
+      showToast(
+        getApiErrorMessage(error, 'Không tải được PDF. Kiểm tra đầu sách eBook và tệp.'),
+        'error'
+      );
     } finally {
       setBusy(false);
     }
@@ -222,32 +191,15 @@ export default function EbookManagement() {
     try {
       await tryApiUpload(selectedEbook.id, replaceFile);
       applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
-      setUsingMock(false);
-      showToast('Đã cập nhật PDF trên máy chủ thành công.', 'success');
+      showToast('Đã cập nhật PDF thành công.', 'success');
       setShowReplaceModal(false);
       setReplaceFile(null);
       setSelectedEbook(null);
     } catch (error) {
-      const status = error?.response?.status;
-      if (status === 404 || status === 409 || status === 422 || status === 400) {
-        showToast(
-          getApiErrorMessage(error, 'Máy chủ từ chối cập nhật PDF. Kiểm tra đầu sách và tệp.'),
-          'error'
-        );
-      } else {
-        applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
-        setUsingMock(true);
-        showToast(
-          getApiErrorMessage(
-            error,
-            'Không kết nối được máy chủ. Đã cập nhật tạm trên giao diện (dữ liệu mẫu).'
-          ),
-          'warning'
-        );
-        setShowReplaceModal(false);
-        setReplaceFile(null);
-        setSelectedEbook(null);
-      }
+      showToast(
+        getApiErrorMessage(error, 'Không cập nhật được PDF. Kiểm tra đầu sách và tệp.'),
+        'error'
+      );
     } finally {
       setBusy(false);
     }
@@ -276,7 +228,7 @@ export default function EbookManagement() {
       // Một số BE trả JSON lỗi nhưng status 200 + blob — kiểm tra content-type
       if (data?.type && data.type.includes('json')) {
         previewTab?.close();
-        showToast('Máy chủ chưa trả được PDF xem trước cho đầu sách này.', 'error');
+        showToast('Không tải được PDF xem trước cho đầu sách này.', 'error');
         return;
       }
       const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
@@ -297,7 +249,7 @@ export default function EbookManagement() {
       const status = error?.response?.status;
       if (status === 404) {
         showToast(
-          'Không tìm thấy PDF xem trước. Kiểm tra đầu sách đã có tệp và máy chủ đã bật /api/ebooks/{id}/preview.',
+          'Không tìm thấy PDF xem trước. Kiểm tra đầu sách đã có tệp PDF.',
           'error'
         );
         return;
@@ -312,7 +264,7 @@ export default function EbookManagement() {
       showToast(
         getApiErrorMessage(
           error,
-          `Không tải được bản xem trước “${row.title}”. Kiểm tra kết nối máy chủ.`
+          `Không tải được bản xem trước “${row.title}”. Kiểm tra kết nối.`
         ),
         'warning'
       );
@@ -401,7 +353,7 @@ export default function EbookManagement() {
         </div>
         <Button
           variant="primary"
-          icon={<FilePlus className="w-4 h-4" />}
+          icon={<UploadCloud className="w-4 h-4" strokeWidth={2} />}
           onClick={() => {
             setUploadBookId('');
             setUploadFile(null);
@@ -412,34 +364,55 @@ export default function EbookManagement() {
         </Button>
       </div>
 
-      {usingMock && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Đang dùng dữ liệu mẫu / chế độ tạm</p>
-          <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            Danh sách hoặc thao tác gần nhất chưa ghi máy chủ. Upload/preview lỗi sẽ báo rõ; thành công mới đồng bộ API.
-          </p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button
+          type="button"
+          onClick={() => setPdfFilter('ALL')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            pdfFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <FileText className="w-6 h-6 text-indigo-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng tài liệu</p>
           <p className="text-3xl font-extrabold text-slate-800 leading-none">
             {rows.length} <span className="text-sm font-medium text-slate-500">cuốn</span>
           </p>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">
-            Số đầu sách điện tử đang quản lý
-          </p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/40">
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPdfFilter('READY')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40 transition-colors ${
+            pdfFilter === 'READY' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã có PDF</p>
           <p className="text-3xl font-extrabold text-emerald-600 leading-none">
             {readyCount} <span className="text-sm font-medium text-emerald-500">cuốn</span>
           </p>
-          <p className="mt-3 text-[11px] font-medium text-emerald-600">
-            Đã gắn tệp PDF, sẵn sàng xem trước
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">Bấm để lọc đã có PDF</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPdfFilter('MISSING')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40 transition-colors ${
+            pdfFilter === 'MISSING' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <UploadCloud className="w-6 h-6 text-amber-500 opacity-20" />
+          </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chưa có PDF</p>
+          <p className="text-3xl font-extrabold text-amber-600 leading-none">
+            {missingCount} <span className="text-sm font-medium text-amber-500">cuốn</span>
           </p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Bấm để lọc chưa gắn PDF</p>
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">

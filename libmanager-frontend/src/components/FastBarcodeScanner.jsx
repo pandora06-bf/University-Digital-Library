@@ -1,61 +1,122 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ScanLine, X, Loader2, Sparkles } from 'lucide-react';
 
+/** Ghi chuỗi ASCII vào DataView (header WAV). */
+function writeAscii(view, offset, text) {
+  for (let i = 0; i < text.length; i += 1) {
+    view.setUint8(offset + i, text.charCodeAt(i));
+  }
+}
+
 /**
- * Một AudioContext dùng chung + resume() khi suspended.
- * Đặc tả âm: sine 880Hz ~80ms (giữ nguyên). Chỉ sửa phần trình duyệt chặn autoplay.
+ * Fallback chắc chắn: tạo file WAV ngắn rồi phát bằng HTMLAudioElement
+ * trong cùng user gesture (click / Enter).
  */
-let sharedAudioCtx = null;
+function playWavBeepFallback() {
+  const sampleRate = 22050;
+  const durationSec = 0.14;
+  const freq = 1350;
+  const numSamples = Math.floor(sampleRate * durationSec);
+  const dataSize = numSamples * 2;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
 
-function getScannerAudioContext() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
-    sharedAudioCtx = new AudioContextClass();
-  }
-  return sharedAudioCtx;
-}
+  writeAscii(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeAscii(view, 8, 'WAVE');
+  writeAscii(view, 12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
 
-function unlockScannerAudio() {
-  try {
-    const ctx = getScannerAudioContext();
-    if (ctx?.state === 'suspended') void ctx.resume();
-  } catch {
-    /* ignore */
+  for (let i = 0; i < numSamples; i += 1) {
+    const t = i / sampleRate;
+    const envelope = Math.exp(-t * 14);
+    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * 0.65;
+    view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, sample)) * 0x7fff, true);
   }
+
+  const url = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+  const audio = new Audio(url);
+  audio.volume = 1;
+  const cleanup = () => {
+    URL.revokeObjectURL(url);
+  };
+  audio.addEventListener('ended', cleanup, { once: true });
+  audio.addEventListener('error', cleanup, { once: true });
+  return audio.play().catch(() => {
+    cleanup();
+  });
 }
 
 /**
- * Phát âm thanh beep ngắn (880Hz, 70ms) mô phỏng máy tít mã vạch chuyên dụng tại quầy thư viện
+ * Beep trong gesture click/Enter.
+ * Ưu tiên AudioContext MỚI mỗi lần (tránh context cũ bị suspended lúc auto-focus).
+ * Lỗi → fallback WAV + Audio().
  */
 function playScannerBeep() {
-  try {
-    const ctx = getScannerAudioContext();
-    if (!ctx) return;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    void playWavBeepFallback();
+    return;
+  }
 
-    const play = () => {
+  try {
+    // Tạo mới trong gesture hiện tại → thường vào thẳng "running"
+    const ctx = new AudioContextClass();
+    const startTone = () => {
+      const t0 = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // Nốt A5 chuẩn máy POS
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
+      osc.frequency.setValueAtTime(1400, t0);
+      gain.gain.setValueAtTime(0.001, t0);
+      gain.gain.linearRampToValueAtTime(0.45, t0 + 0.01);
+      gain.gain.linearRampToValueAtTime(0.001, t0 + 0.13);
       osc.connect(gain);
       gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.08);
+      osc.start(t0);
+      osc.stop(t0 + 0.14);
+      osc.onended = () => {
+        try {
+          void ctx.close();
+        } catch {
+          /* ignore */
+        }
+      };
     };
 
     if (ctx.state === 'suspended') {
-      void ctx.resume().then(play).catch(() => {});
-    } else {
-      play();
+      void ctx
+        .resume()
+        .then(() => {
+          if (ctx.state === 'running') {
+            startTone();
+          } else {
+            void playWavBeepFallback();
+            void ctx.close();
+          }
+        })
+        .catch(() => {
+          void playWavBeepFallback();
+          try {
+            void ctx.close();
+          } catch {
+            /* ignore */
+          }
+        });
+      return;
     }
+
+    startTone();
   } catch {
-    // Trình duyệt có thể chặn autoplay audio nếu chưa có tương tác người dùng, bỏ qua an toàn
+    void playWavBeepFallback();
   }
 }
 
@@ -137,7 +198,6 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
     const trimmed = (codeToScan !== undefined ? codeToScan : currentValue).trim();
     if (!trimmed || disabled || loading) return;
 
-    // Phản hồi âm thanh
     if (playSound) {
       playScannerBeep();
     }
@@ -176,14 +236,9 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
       {label && (
-        <label className="text-[12px] leading-[16px] font-medium tracking-[0.3px] text-[#5B6B82] uppercase flex items-center justify-between">
-          <span className="flex items-center gap-1.5">
-            <ScanLine className="w-3.5 h-3.5 text-indigo-600" />
-            {label}
-          </span>
-          <span className="text-[10px] text-indigo-600 lowercase font-mono">
-            [chế độ tít liên tục: {autoClear ? 'bật' : 'tắt'}]
-          </span>
+        <label className="text-[12px] leading-[16px] font-medium tracking-[0.3px] text-[#5B6B82] uppercase flex items-center gap-1.5">
+          <ScanLine className="w-3.5 h-3.5 text-indigo-600" />
+          {label}
         </label>
       )}
 
@@ -203,8 +258,6 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
             value={currentValue}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            onFocus={unlockScannerAudio}
-            onPointerDown={unlockScannerAudio}
             disabled={disabled || loading}
             placeholder={placeholder}
             className={`w-full h-11 pl-11 pr-10 bg-white rounded-xl text-sm font-mono text-slate-800 border transition-all duration-200 focus:outline-none ${
@@ -238,10 +291,7 @@ export const FastBarcodeScanner = forwardRef(function FastBarcodeScanner(
         {showButton && (
           <button
             type="button"
-            onClick={() => {
-              unlockScannerAudio();
-              triggerScan();
-            }}
+            onClick={() => triggerScan()}
             disabled={disabled || loading || !currentValue}
             className={`h-11 px-5 rounded-xl font-semibold text-sm transition-all duration-200 shrink-0 flex items-center gap-1.5 select-none ${
               currentValue && !disabled && !loading

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Search, Filter, 
-  CheckCircle2, ArrowLeftRight, AlertOctagon, BookCopy, RotateCcw, Trash2, Edit2, Archive
+  CheckCircle2, ArrowLeftRight, AlertOctagon, BookCopy, Trash2, Edit2, Archive
 } from 'lucide-react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import axiosInstance from '../../services/axios_instance';
@@ -9,7 +9,6 @@ import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
-import { ADMIN_MOCK_BOOKS, ADMIN_MOCK_COPIES } from '../../mocks/adminCatalogMock';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../services/errorHandler';
@@ -24,7 +23,6 @@ export default function InventoryManagement() {
   // State nạp danh sách đầu sách cho Combobox (NFR-PE-02: page_size ≤ 50)
   const [booksList, setBooksList] = useState([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(true);
-  const [usingMock, setUsingMock] = useState(false);
 
   const [tableData, setTableData] = useState([]);
   const [bookInfo, setBookInfo] = useState(null);
@@ -60,20 +58,19 @@ export default function InventoryManagement() {
   useEffect(() => {
     axiosInstance.get('/api/books/search?page_size=50')
       .then(res => {
-        // Mảng rỗng = DB thật không có sách — không coi là API lỗi / ép mock
-        const items = res.data?.items || [];
-        setBooksList(items);
-        setUsingMock(false);
+        setBooksList(res.data?.items || []);
       })
-      .catch(err => {
-        console.warn('API sách chưa sẵn sàng, nạp danh sách sách mock:', err?.message);
-        setBooksList(ADMIN_MOCK_BOOKS);
-        setUsingMock(true);
+      .catch((error) => {
+        setBooksList([]);
+        showToast(
+          getApiErrorMessage(error, 'Không tải được danh sách đầu sách.'),
+          'error'
+        );
       })
       .finally(() => {
         setIsLoadingBooks(false);
       });
-  }, []);
+  }, [showToast]);
 
   // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (không có RETIRED).
   // Thanh lý FE → PATCH status=DAMAGED + damage_notes; UI vẫn hiện "Đã thanh lý".
@@ -107,7 +104,6 @@ export default function InventoryManagement() {
     condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
     title: targetBook?.title || '...',
     author: targetBook?.author || '',
-    isbn: targetBook?.isbn || '',
     rawZone: c.zone,
     rawFloor: c.floor,
     rawShelf: c.shelf,
@@ -115,27 +111,20 @@ export default function InventoryManagement() {
     rawCondition: c.damage_notes,
   });
 
-  const fallbackMockCopies = (targetBookId, currentBookInfo) => {
-    const rawCopies = ADMIN_MOCK_COPIES[parseInt(targetBookId)] || [];
-    setTableData(rawCopies.map((c) => mapCopyRow(c, currentBookInfo)));
-    setUsingMock(true);
-  };
-
   const fetchInventory = async (targetBookId, currentBookInfo) => {
     const idToFetch = targetBookId || bookId;
     if (!idToFetch) return;
     const targetBook = currentBookInfo || bookInfo;
     try {
       const res = await axiosInstance.get(`/api/admin/books/${idToFetch}/copies`);
-      if (Array.isArray(res.data)) {
-        setTableData(res.data.map((c) => mapCopyRow(c, targetBook)));
-        setUsingMock(false);
-      } else {
-        fallbackMockCopies(idToFetch, targetBook);
-      }
+      const copies = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      setTableData(copies.map((c) => mapCopyRow(c, targetBook)));
     } catch (error) {
-      console.warn('API bản sao chưa sẵn sàng, nạp dữ liệu bản sao mock:', error?.message);
-      fallbackMockCopies(idToFetch, targetBook);
+      setTableData([]);
+      showToast(
+        getApiErrorMessage(error, 'Không tải được danh sách bản sao.'),
+        'error'
+      );
     }
   };
 
@@ -152,17 +141,19 @@ export default function InventoryManagement() {
           setBookInfo(found);
           fetchInventory(bookId, found);
         } else {
-          const mockBook = ADMIN_MOCK_BOOKS.find(x => x.id.toString() === bookId.toString());
-          if (mockBook) setBookInfo(mockBook);
-          fetchInventory(bookId, mockBook);
+          setBookInfo(null);
+          setTableData([]);
+          showToast('Không tìm thấy đầu sách này.', 'error');
         }
       })
-      .catch(err => {
+      .catch((error) => {
         if (!isMounted) return;
-        console.warn('API sách chưa sẵn sàng, nạp thông tin đầu sách mock:', err?.message);
-        const mockBook = ADMIN_MOCK_BOOKS.find(x => x.id.toString() === bookId.toString());
-        if (mockBook) setBookInfo(mockBook);
-        fetchInventory(bookId, mockBook);
+        setBookInfo(null);
+        setTableData([]);
+        showToast(
+          getApiErrorMessage(error, 'Không tải được thông tin đầu sách.'),
+          'error'
+        );
       });
 
     return () => {
@@ -372,7 +363,11 @@ export default function InventoryManagement() {
       item.title.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchLocation = locationFilter === 'ALL' || item.location === locationFilter;
-    const matchStatus = statusFilter === 'ALL' || item.rawStatus === statusFilter;
+    const matchStatus =
+      statusFilter === 'ALL'
+      || (statusFilter === 'ISSUE' && ['DAMAGED', 'LOST', 'RETIRED'].includes(item.rawStatus))
+      || (statusFilter === 'DAMAGED' && (item.rawStatus === 'DAMAGED' || item.rawStatus === 'RETIRED'))
+      || item.rawStatus === statusFilter;
     
     return matchSearch && matchLocation && matchStatus;
   });
@@ -401,7 +396,7 @@ export default function InventoryManagement() {
             {val}
           </button>
           <span className="text-xs text-slate-500 truncate mt-0.5">
-            {row.author} • ISBN: {row.isbn}
+            {row.author || '—'}
           </span>
         </div>
       )
@@ -505,7 +500,9 @@ export default function InventoryManagement() {
   const availableCopies = tableData.filter(c => c.rawStatus === 'AVAILABLE').length;
   const availablePercent = totalCopies > 0 ? Math.round((availableCopies / totalCopies) * 100) : 0;
   const borrowedCopies = tableData.filter(c => c.rawStatus === 'BORROWED').length;
-  const brokenCopies = tableData.filter(c => c.rawStatus === 'DAMAGED' || c.rawStatus === 'LOST').length;
+  const brokenCopies = tableData.filter((c) =>
+    ['DAMAGED', 'LOST', 'RETIRED'].includes(c.rawStatus)
+  ).length;
   const brokenPercent = totalCopies > 0 ? Math.round((brokenCopies / totalCopies) * 100) : 0;
 
   return (
@@ -545,15 +542,6 @@ export default function InventoryManagement() {
         </div>
       </div>
 
-      {usingMock && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
-          <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            Không lấy được tồn kho từ máy chủ. Danh sách bản sao hiện tại chỉ để xem giao diện.
-          </p>
-        </div>
-      )}
-
       {!bookId ? (
         /* Màn hình hướng dẫn chọn sách thân thiện (thay thế ngõ cụt cũ) */
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-12 text-center flex flex-col items-center justify-center">
@@ -565,7 +553,11 @@ export default function InventoryManagement() {
             Dữ liệu bản sao và vị trí kệ được quản lý chi tiết theo từng đầu sách. Hãy chọn một cuốn sách từ thanh chọn phía trên hoặc truy cập từ biểu tượng Tồn kho tại trang Danh mục Sách.
           </p>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => navigate('/admin/catalog')}>
+            <Button
+              variant="outline"
+              icon={<BookCopy className="w-4 h-4" />}
+              onClick={() => navigate('/admin/catalog')}
+            >
               Đến trang Danh mục Sách
             </Button>
           </div>
@@ -603,65 +595,75 @@ export default function InventoryManagement() {
             </div>
           </div>
 
-      {/* 4 Stats Cards */}
+      {/* 4 Stats Cards — màu/tint giống Users · eBook */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-5">
-            <BookCopy className="w-16 h-16 text-indigo-900" />
+        <button
+          type="button"
+          onClick={() => setStatusFilter('ALL')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            statusFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <BookCopy className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Tổng bản sao vật lý</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{totalCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
-          </div>
-          <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">Của đầu sách này</span>
-          </div>
-        </div>
+          <h3 className="text-3xl font-extrabold text-slate-800 leading-none">
+            {totalCopies} <span className="text-sm font-medium text-slate-500">cuốn</span>
+          </h3>
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả</p>
+        </button>
 
-        {/* Card 2 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('AVAILABLE')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40 transition-colors ${
+            statusFilter === 'AVAILABLE' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Sẵn sàng trên kệ</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{availableCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
-          </div>
-          <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">{availablePercent}%</span>
-            <span className="text-slate-500">tổng số lượng</span>
-          </div>
-        </div>
+          <h3 className="text-3xl font-extrabold text-emerald-600 leading-none">
+            {availableCopies} <span className="text-sm font-medium text-emerald-500">cuốn</span>
+          </h3>
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">Bấm để lọc sẵn sàng · {availablePercent}%</p>
+        </button>
 
-        {/* Card 3 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('BORROWED')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40 transition-colors ${
+            statusFilter === 'BORROWED' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
-            <ArrowLeftRight className="w-6 h-6 text-indigo-500 opacity-20" />
+            <ArrowLeftRight className="w-6 h-6 text-amber-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đang cho mượn</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-slate-800 leading-none">{borrowedCopies} <span className="text-sm font-medium text-slate-500">cuốn</span></h3>
-          </div>
-          <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded">Đang lưu thông</span>
-          </div>
-        </div>
+          <h3 className="text-3xl font-extrabold text-amber-600 leading-none">
+            {borrowedCopies} <span className="text-sm font-medium text-amber-500">cuốn</span>
+          </h3>
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Bấm để lọc đang mượn</p>
+        </button>
 
-        {/* Card 4 */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('ISSUE')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30 transition-colors ${
+            statusFilter === 'ISSUE' ? 'border-rose-400 ring-2 ring-rose-200' : 'border-rose-100 hover:border-rose-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <AlertOctagon className="w-6 h-6 text-rose-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cần xử lý & Bảo quản</p>
-          <div className="flex items-end gap-2">
-            <h3 className="text-3xl font-extrabold text-rose-700 leading-none">{brokenCopies} <span className="text-sm font-medium text-rose-500">cuốn</span></h3>
-          </div>
-          <div className="mt-3 text-[11px] font-medium flex items-center gap-1.5">
-            <span className="text-rose-600 font-bold">{brokenPercent}%</span>
-            <span className="text-slate-500">hư hỏng, sửa, thất lạc</span>
-          </div>
-        </div>
+          <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
+            {brokenCopies} <span className="text-sm font-medium text-rose-400">cuốn</span>
+          </h3>
+          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc thanh lý / mất · {brokenPercent}%</p>
+        </button>
       </div>
 
       {/* Main Content Area */}
@@ -713,25 +715,13 @@ export default function InventoryManagement() {
               <option value="ALL">Tình trạng (Tất cả)</option>
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="BORROWED">Đang cho mượn</option>
-              <option value="DAMAGED">Đã thanh lý / Hỏng</option>
+              <option value="ISSUE">Cần xử lý (thanh lý / mất)</option>
+              <option value="DAMAGED">Đã thanh lý</option>
               <option value="LOST">Báo mất</option>
             </select>
           </div>
           
           <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              icon={<RotateCcw className="w-4 h-4" />}
-              onClick={() => {
-                setSearchTerm('');
-                setLocationFilter('ALL');
-                setStatusFilter('ALL');
-              }}
-              className="!text-slate-500"
-            >
-              Đặt lại
-            </Button>
             <Button 
               variant="outline" 
               size="sm" 

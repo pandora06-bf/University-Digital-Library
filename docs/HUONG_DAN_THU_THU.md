@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **13/11/2026** (`main` @ `9ceca8d`) |
+| **Sprint / task** | Sprint 3 Admin (FE) — cập nhật **14/11/2026** (`main` @ `9ea0da9` + polish tìm nhanh local) |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **URL (Docker)** | http://localhost:5174 |
@@ -12,11 +12,13 @@
 
 Tài liệu ngắn cho ca trực trên cổng Admin. Sidebar đủ các mục quản trị (không có trang Tổng quan riêng).
 
+**Tìm nhanh:** trên hầu hết trang list, **bấm thẻ thống kê** (Tổng / trạng thái / khóa / nợ…) để lọc bảng — không cần mở dropdown filter.
+
 **Máy quét barcode:** ô quét tự focus. Tít mã hoặc gõ rồi **Enter**. Toast hiện giữa phía trên.
 
 **Barcode** là mã từng bản in (`DEMO-BC-099-01`), xem ở **Tồn kho** sau khi chọn đầu sách. File ebook không có barcode.
 
-**Banner vàng «Đang dùng dữ liệu mẫu»:** Phòng (CRUD) và Giao dịch chưa khớp; hoặc API tạm lỗi (Danh mục, Tồn kho, eBook, Check-in list).
+**Banner vàng «Đang dùng dữ liệu mẫu»:** Phòng (CRUD); hoặc API tạm lỗi (Danh mục, Tồn kho, eBook, Check-in list).
 
 Chi tiết seeder đầy đủ: `docs/demo_script.md`.
 
@@ -43,15 +45,15 @@ Chi tiết seeder đầy đủ: `docs/demo_script.md`.
 | Trang | Tài khoản / mã thử | Việc nên làm |
 |-------|-------------------|--------------|
 | Login → `/admin/*` | `admin` / `Admin@123` | Vào cổng quản trị |
-| `/admin/loans` check-out | Mã `SV-DEMO-001` hoặc `SV-DEMO-007` + barcode **Sẵn sàng** (`DEMO-BC-…-01` lấy ở Tồn kho) | Tra MSSV → quét barcode → xuất phiếu. `SV-DEMO-003` phải bị chặn vì nợ |
-| `/admin/loans` check-in | Barcode bản đang **BORROWED** (seed của `SV-DEMO-001`) | Quét → Nguyên vẹn → xác nhận. Phiếu quá hạn đã có phạt (`DEMO-BC-002-01` / `SV-DEMO-003`) có thể bị từ chối trùng dữ liệu |
+| `/admin/loans` check-out | `SV-DEMO-007` (phiếu chờ) hoặc `SV-DEMO-001` + mã **Sẵn sàng** lấy ở Tồn kho | Tra MSSV → quét → xuất. `SV-DEMO-003` bị chặn vì nợ |
+| `/admin/loans` check-in | Tài khoản **đang mượn thật** trên seed: `SV-DEMO-001` + mã vạch phiếu active (thường `DEMO-BC-001-01`); quá hạn: `SV-DEMO-003` / `DEMO-BC-002-01` | Quét mã đang mượn → Nguyên vẹn → xác nhận. Xem mục §2 bên dưới |
 | `/admin/fines` | `SV-DEMO-003` | Tra → thấy nợ 55.000₫ → Thu đủ một lần. Không tra bằng `demo_student_003` |
 | `/admin/incidents` | `SV-DEMO-005` (xem seed LOST); lập mới cần phiếu **BORROWED** khác | Tra mã bạn đọc hoặc `loan_id` → lập mất/hỏng |
 | `/admin/users` | Tìm `SV-DEMO-003`, `SV-DEMO-001`… | List / khóa–mở / reset (reset theo **Account.id**, không phải MSSV) / import |
 | `/admin/catalog` · `ebooks` · `inventory` | Chỉ cần `admin` | CRUD đầu sách, PDF, bản sao / barcode `DEMO-BC-*` |
-| `/admin/rooms` | — (UI mẫu) | Chưa API CRUD phòng |
+| `/admin/rooms` | `admin` | CRUD phòng thật (`/api/admin/rooms`) |
 | `/admin/rooms/checkin` | Booking seed `CONFIRMED` trong ngày (xem list theo ngày) | Check-in trong **15 phút đầu** slot; mã lượt / `booking_id` từ bảng |
-| `/admin/unmatched` | — (UI mẫu) | Không cộng ví thật |
+| `/admin/unmatched` | List chưa gán từ API; gán bằng `SV-DEMO-…` | Cộng ví thật sau gán |
 
 Barcode mẫu dạng `DEMO-BC-xxx-01`. Giao dịch phòng seed: `DEMO-RB-*`.
 
@@ -68,35 +70,57 @@ Barcode mẫu dạng `DEMO-BC-xxx-01`. Giao dịch phòng seed: `DEMO-RB-*`.
 | Thu phạt | `/admin/fines` | **Đã nối** tra một mã bạn đọc + thu đủ nợ. Không có danh sách mọi phiếu. BE gửi email biên lai sau thu |
 | Báo mất / Hỏng | `/admin/incidents` | **Đã nối** `GET /api/admin/incidents` + tạo `POST /api/admin/loans/incident` |
 | Người dùng | `/admin/users` | **Đã nối** list/tạo/sửa/khóa/reset/import (`/api/admin/users`) |
-| Phòng học nhóm | `/admin/rooms` | **Mẫu FE** (chưa có CRUD admin phòng — Hiền 2B-21) |
+| Phòng học nhóm | `/admin/rooms` | **Đã nối** `GET/POST/PUT /api/admin/rooms` (2B-21) |
 | Check-in phòng | `/admin/rooms/checkin` | **Đã nối** `GET …/room-bookings?booking_date=` + `POST …/checkin` |
-| GD chưa khớp | `/admin/unmatched` | **Mẫu FE** (không cộng ví thật — Hiền 4-07) |
+| GD chưa khớp | `/admin/unmatched` | **Đã nối** `GET/POST /api/admin/wallet/unmatched…` |
 
 ---
 
 ## 1. Check-out (xuất mượn) — `/admin/loans`
 
-1. Cột **Quầy Xuất Phiếu Mượn**: nhập **mã bạn đọc** (`SV-DEMO-001`) → **Enter**.
+1. Cột **Quầy Xuất Phiếu Mượn**: nhập **mã bạn đọc** → **Tra cứu** / **Enter**.
 2. Xem phiếu chờ nhận nếu có. Không có phiếu chờ vẫn xuất mượn trực tiếp tại quầy.
 3. Ghi chú tình trạng sách khi giao nếu cần.
-4. Quét barcode bản in đang **Sẵn sàng** (ô tự xóa sau mỗi lần) → thêm vào phiếu.
+4. Quét mã vạch bản **Sẵn sàng** (ô tự xóa sau mỗi lần) → thêm vào phiếu. Lấy mã ở **Tồn kho** (trạng thái Sẵn sàng).
 5. **Xác nhận xuất phiếu mượn**.
 
-Barcode không có trong kho thì toast: không tìm thấy bản sao (E1). Sách đang giữ chỗ cho bạn đọc khác thì máy chủ từ chối xuất cho người không giữ chỗ.
+### Tài khoản / mã thử (seed — không hiện trên UI)
+
+| Thử | Mã bạn đọc | Mã vạch | Kỳ vọng |
+|-----|------------|---------|---------|
+| Có phiếu chờ | `SV-DEMO-007` | Bản **Sẵn sàng** khớp đầu sách phiếu (Tồn kho) | Tra cứu thấy phiếu chờ → xuất |
+| Xuất trực tiếp | `SV-DEMO-001` | Bản **Sẵn sàng** bất kỳ (VD `DEMO-BC-004-01` nếu còn) | Xuất OK nếu chưa vượt hạn mức |
+| Bị chặn nợ | `SV-DEMO-003` | — | Toast khóa / còn nợ — không xuất |
+
+Mã không có trong kho → toast không tìm thấy bản sao. Sách đang giữ chỗ cho người khác → máy chủ từ chối.
 
 ---
 
 ## 2. Check-in (nhận trả) — `/admin/loans`
 
-1. Cột **Quầy Nhận Trả Sách Nhanh**: quét barcode bản đang **BORROWED** hoặc **OVERDUE** → **Enter** (ô giữ mã để xác nhận).
+1. Cột **Quầy Nhận Trả Sách**: quét **mã vạch trên sách** đang mượn / quá hạn → **Enter** (ô giữ mã để xác nhận).
 2. Chọn **Nguyên vẹn** hoặc **Hư hỏng / Mất sách**.
 3. **Xác nhận trả sách** một lần.
 
-Chỉ trả được phiếu còn đang mượn hoặc quá hạn. Bấm lại cùng mã sau khi đã trả sẽ báo không còn phiếu BORROWED (E3).
+**Lưu ý:** `SV-DEMO-001` là **mã bạn đọc (MSSV)**, không phải mã vạch. API trả sách tìm theo `copy_barcode` (VD `DEMO-BC-001-01`). Nếu gõ nhầm MSSV, FE sẽ tra phiếu đang mượn và đổi sang mã vạch (nếu có).
 
-Lần trả đầu đôi khi hiện **Hệ thống gặp sự cố** dù sách đã được ghi nhận trả. Tra lại mã: nếu bản sao đã **Sẵn sàng** thì không trả thêm lần nữa.
+### Tài khoản đang mượn thật trên seed (sau `database_seeder`)
 
-Phiếu quá hạn **đã có khoản phạt** (mẫu `DEMO-BC-002-01` / `SV-DEMO-003`) hiện chưa nhận trả được: máy chủ báo dữ liệu trùng.
+| Bạn đọc | Tình trạng (sau seed) | Mã vạch | Ghi chú |
+|---------|----------------------|---------|---------|
+| `SV-DEMO-001` | Đang mượn → có thể **đã trả** nếu demo trước đó | `DEMO-BC-001-01` | Nếu toast «không tìm thấy phiếu…» → phiếu đã `RETURNED`. Xuất lại ở quầy phải rồi trả, hoặc dùng mã khác bên dưới |
+| `SV-DEMO-003` | **Quá hạn** | `DEMO-BC-002-01` | Còn nợ 55.000₫; trả có thể lỗi nếu phạt trùng |
+| `SV-DEMO-011` | **Đang mượn** (fill waitlist) | `DEMO-BC-006-01` | Thường còn BORROWED sau khi `001-01` đã trả |
+
+Cách lấy mã chắc chắn: **Tồn kho** → lọc **Đang cho mượn**, hoặc tra MSSV ở quầy xuất rồi xem `copy_barcode` phiếu `BORROWED`/`OVERDUE`.
+
+| Thử | Cách làm | Kỳ vọng |
+|-----|----------|---------|
+| Trả thường | Quét mã **còn đang mượn** (`DEMO-BC-006-01` hoặc `DEMO-BC-001-01` sau khi xuất lại) | Trả thành công |
+| Quá hạn | Quét `DEMO-BC-002-01` | Có thể lỗi nếu đã có phạt trùng |
+| Trả lần 2 | Cùng mã sau khi đã trả | Toast: không còn phiếu đang mượn / quá hạn — **đúng nghiệp vụ**, không phải lỗi seed |
+
+Lần trả đầu đôi khi hiện **Hệ thống gặp sự cố** dù sách đã được ghi nhận trả. Tra lại ở Tồn kho: nếu bản sao đã **Sẵn sàng** thì không trả thêm lần nữa.
 
 Mất hoặc hỏng nặng: lập tiếp ở **Báo mất / Hỏng**. Tiền phạt quá hạn thu ở **Thu phạt**.
 
@@ -172,7 +196,10 @@ Thêm, sửa, khóa/mở, đặt lại mật khẩu, import CSV/XLSX — gọi `
 
 ### `/admin/unmatched`
 
-Gán giao dịch nạp tiền chưa khớp. Chỉ mô phỏng trên trình duyệt, không cộng ví thật.
+1. Bảng từ `GET /api/admin/wallet/unmatched` (chỉ giao dịch **chưa gán**).
+2. **Gán người dùng** → nhập/chọn MSSV (`SV-DEMO-001`…) + ghi chú → `POST …/unmatched/{id}/assign`.
+3. Thành công: cộng số dư ví thật; dòng biến mất khỏi list.
+4. API lỗi → toast cảnh báo + fallback mẫu local (không cộng ví).
 
 ---
 
@@ -188,7 +215,7 @@ Gán giao dịch nạp tiền chưa khớp. Chỉ mô phỏng trên trình duy�
 | Mất–hỏng | `/admin/incidents` |
 | Người dùng | `/admin/users` |
 | Phòng (mẫu) / check-in (API) | `/admin/rooms`, `/admin/rooms/checkin` |
-| Giao dịch chưa khớp (mẫu) | `/admin/unmatched` |
+| Giao dịch chưa khớp (API) | `/admin/unmatched` |
 
 ---
 
@@ -204,5 +231,6 @@ Gán giao dịch nạp tiền chưa khớp. Chỉ mô phỏng trên trình duy�
 - `GET /api/admin/incidents`, `POST /api/admin/loans/incident`
 - `GET/POST/PUT /api/admin/users`, `PATCH …/lock`, import + reset
 - `GET /api/admin/room-bookings?booking_date=`, `POST /api/admin/room-bookings/checkin`
+- `GET /api/admin/wallet/unmatched`, `POST /api/admin/wallet/unmatched/{id}/assign`
 
 Swagger: http://localhost:8010/docs (đăng nhập admin lấy JWT trước khi thử).

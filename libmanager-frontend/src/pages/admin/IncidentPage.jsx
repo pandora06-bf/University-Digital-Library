@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { 
-  AlertOctagon, Plus, Search, RotateCcw, Eye, 
+  AlertOctagon, Plus, Search, Eye, 
   FileText, AlertTriangle, DollarSign,
   ScanLine, BookOpen, User, Receipt
 } from 'lucide-react';
@@ -13,13 +13,6 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
-import {
-  getStoredIncidents,
-  addStoredIncident,
-  updateStoredIncidentStatus,
-  findMockActiveLoan,
-  MOCK_ACTIVE_LOANS,
-} from '../../mocks/incidents';
 import { AdminIconButton } from '../../components/AdminIconButton';
 
 const EMPTY_CREATE_FORM = {
@@ -59,7 +52,7 @@ function mapApiIncident(item) {
     book_price: Number(item.penalty_amount || item.book_price || 0),
     compensation_amount: Number(item.penalty_amount || item.compensation_amount || 0),
     created_at: created,
-    created_by: item.created_by || 'Máy chủ',
+    created_by: item.created_by || 'Thủ thư',
     status: item.status || 'RESOLVED',
     fromApi: true,
   };
@@ -70,7 +63,6 @@ export default function IncidentPage() {
   const { toast, showToast, hideToast } = useToast();
 
   const [incidents, setIncidents] = useState([]);
-  const [usingMock, setUsingMock] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -84,16 +76,18 @@ export default function IncidentPage() {
       });
       const items = data?.data || data?.items || (Array.isArray(data) ? data : []);
       setIncidents(items.map(mapApiIncident));
-      setUsingMock(false);
       return true;
-    } catch {
-      setIncidents(getStoredIncidents());
-      setUsingMock(true);
+    } catch (error) {
+      setIncidents([]);
+      showToast(
+        getApiErrorMessage(error, 'Không tải được danh sách biên bản.'),
+        'error'
+      );
       return false;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -117,7 +111,7 @@ export default function IncidentPage() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
   };
 
-  const applyLookupHit = (found, code, via) => {
+  const applyLookupHit = (found, code) => {
     setLoanLookedUp(true);
     setCreateForm((prev) => ({
       ...prev,
@@ -130,7 +124,7 @@ export default function IncidentPage() {
       borrower_code: found.borrower_code || found.user_code || '',
       borrower_class: found.borrower_class || found.department || '',
     }));
-    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id} (${via}).`, 'success');
+    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id}.`, 'success');
   };
 
   const handleLookupLoan = async () => {
@@ -148,7 +142,7 @@ export default function IncidentPage() {
       return next;
     });
 
-    // UC15 / 4-15.b: API quầy lookup (MSSV | mã phiếu | barcode) → fallback mock
+    // UC15 / 4-15.b: API quầy lookup (MSSV | mã phiếu | barcode)
     try {
       const { data } = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: code } });
       const loans = Array.isArray(data?.data)
@@ -167,23 +161,9 @@ export default function IncidentPage() {
           borrower_name: hit.full_name || hit.borrower_name,
           borrower_code: hit.user_code || hit.borrower_code,
           book_price: hit.book_price ?? hit.price ?? 0,
-        }, code, 'API');
-        setIsSearchingBook(false);
+        }, code);
         return;
       }
-      if (loans.length > 0) {
-        showToast(
-          'Tìm thấy phiếu nhưng không ở trạng thái đang mượn hoặc quá hạn.',
-          'warning'
-        );
-      }
-    } catch {
-      /* fallback mock */
-    }
-
-    const found = findMockActiveLoan(code);
-    setIsSearchingBook(false);
-    if (!found) {
       setLoanLookedUp(false);
       setCreateForm((prev) => ({
         ...prev,
@@ -196,12 +176,20 @@ export default function IncidentPage() {
         borrower_class: '',
       }));
       showToast(
-        `Không tìm thấy phiếu đang mượn cho "${code}". Thử mẫu: ${MOCK_ACTIVE_LOANS[0].barcode}.`,
+        loans.length > 0
+          ? 'Tìm thấy phiếu nhưng không ở trạng thái đang mượn hoặc quá hạn.'
+          : `Không tìm thấy phiếu đang mượn cho «${code}». Kiểm tra mã vạch hoặc mã phiếu.`,
+        loans.length > 0 ? 'warning' : 'error'
+      );
+    } catch (error) {
+      setLoanLookedUp(false);
+      showToast(
+        getApiErrorMessage(error, `Không tra cứu được phiếu «${code}».`),
         'error'
       );
-      return;
+    } finally {
+      setIsSearchingBook(false);
     }
-    applyLookupHit(found, code, 'mẫu');
   };
 
   // Lọc dữ liệu
@@ -227,7 +215,7 @@ export default function IncidentPage() {
   const damagedCount = incidents.filter(i => i.incident_type === 'DAMAGED').length;
   const totalCompensation = incidents.reduce((sum, item) => sum + (item.compensation_amount || 0), 0);
 
-  // 4-15.b: lưu local + thử check-in API (is_lost / is_damaged) khi có barcode
+  // 4-15.b: lập biên bản qua API (incident hoặc check-in mất/hỏng)
   const handleSaveIncident = async () => {
     const errors = {};
     if (!createForm.code.trim()) errors.code = 'Mã vạch hoặc mã phiếu không được để trống';
@@ -237,7 +225,7 @@ export default function IncidentPage() {
     if (!createForm.description.trim()) errors.description = 'Mô tả chi tiết sự cố không được để trống';
     const compensation = Number(createForm.book_price);
     if (!compensation || compensation <= 0) {
-      errors.book_price = 'Nhập số tiền bồi thường (> 0). Nếu thiếu giá bìa, nhập thủ công (E2).';
+      errors.book_price = 'Nhập số tiền bồi thường (> 0). Nếu thiếu giá bìa, nhập thủ công.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -248,12 +236,9 @@ export default function IncidentPage() {
     setFormErrors({});
 
     const isLost = createForm.incident_type === 'LOST';
-    let apiOk = false;
-    let apiPenalty = compensation;
-    let apiLoanId = createForm.loan_code;
-    let apiIncidentId = null;
     try {
       const loanId = Number(createForm.loan_code);
+      let apiIncidentId = null;
       if (Number.isFinite(loanId) && loanId > 0) {
         const { data } = await axiosInstance.post('/api/admin/loans/incident', {
           loan_id: loanId,
@@ -262,76 +247,33 @@ export default function IncidentPage() {
           manual_penalty: compensation,
           manual_reason: createForm.description.trim(),
         });
-        apiOk = true;
-        if (data?.penalty_amount != null) apiPenalty = Number(data.penalty_amount);
-        if (data?.loan_id != null) apiLoanId = String(data.loan_id);
         if (data?.incident_id != null) apiIncidentId = data.incident_id;
       } else if (createForm.barcode) {
-        const { data } = await axiosInstance.post('/api/admin/loans/checkin', {
+        await axiosInstance.post('/api/admin/loans/checkin', {
           copy_barcode: createForm.barcode,
           condition_notes: createForm.description.trim(),
           is_lost: isLost,
           is_damaged: !isLost,
           damage_penalty: compensation,
         });
-        apiOk = true;
-        if (data?.penalty_amount != null) apiPenalty = Number(data.penalty_amount);
-        if (data?.loan_id != null) apiLoanId = String(data.loan_id);
-      }
-    } catch (error) {
-      const status = error?.response?.status;
-      const msg = getApiErrorMessage(error, 'Không ghi được sự cố lên máy chủ — vẫn lưu biên bản trên giao diện.');
-      if (status === 409 || status === 422 || status === 400 || status === 404) {
-        showToast(msg, 'error');
+      } else {
+        showToast('Thiếu mã phiếu hoặc mã vạch để lập biên bản.', 'error');
         return;
       }
-      showToast(msg, 'warning');
-    }
-
-    if (apiOk && !usingMock) {
       setShowCreateModal(false);
       setLoanLookedUp(false);
       setCreateForm({ ...EMPTY_CREATE_FORM });
       await loadIncidents();
       showToast(
-        `Đã lập biên bản${apiIncidentId ? ` BB-${apiIncidentId}` : ''} và ghi sự cố lên máy chủ.`,
+        `Đã lập biên bản${apiIncidentId ? ` BB-${apiIncidentId}` : ''}.`,
         'success'
       );
-      return;
+    } catch (error) {
+      showToast(
+        getApiErrorMessage(error, 'Không lưu được biên bản. Vui lòng thử lại.'),
+        'error'
+      );
     }
-
-    // Fallback local khi API chưa ghi được
-    const newIncident = {
-      id: apiOk && apiLoanId ? `INC-LOAN-${apiLoanId}` : `INC-2026-${String(incidents.length + 1).padStart(3, '0')}`,
-      incident_code: apiOk && apiLoanId ? `BB-LOAN-${apiLoanId}` : `BB-2026-${String(incidents.length + 1).padStart(3, '0')}`,
-      loan_code: String(apiLoanId),
-      barcode: createForm.barcode,
-      book_title: createForm.book_title,
-      borrower_name: createForm.borrower_name,
-      borrower_code: createForm.borrower_code,
-      borrower_class: createForm.borrower_class,
-      incident_type: createForm.incident_type,
-      description: createForm.description.trim(),
-      book_price: compensation,
-      compensation_amount: apiPenalty,
-      created_at: new Date().toLocaleDateString('vi-VN'),
-      created_by: 'Thủ thư',
-      status: apiOk ? 'RESOLVED' : 'PENDING',
-      synced_api: apiOk,
-    };
-
-    const updated = addStoredIncident(newIncident);
-    setIncidents(updated);
-    setUsingMock(true);
-    setShowCreateModal(false);
-    setLoanLookedUp(false);
-    setCreateForm({ ...EMPTY_CREATE_FORM });
-    showToast(
-      apiOk
-        ? `Đã lập biên bản ${newIncident.incident_code} và ghi sự cố lên máy chủ.`
-        : `Đã lưu biên bản ${newIncident.incident_code} trên giao diện (chưa đồng bộ máy chủ).`,
-      'success'
-    );
   };
 
   // Cấu hình các cột cho bảng Table component
@@ -428,12 +370,9 @@ export default function IncidentPage() {
         if (val === 'PENDING') {
           style = 'bg-amber-50 text-amber-700 border-amber-200';
           label = 'Chờ xử lý';
-        } else if (val === 'RECORDED') {
-          style = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-          label = 'Đã ghi công nợ';
-        } else if (val === 'RESOLVED') {
+        } else if (val === 'RESOLVED' || val === 'RECORDED') {
           style = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-          label = 'Đã bồi thường';
+          label = 'Đã ghi nhận';
         }
         return (
           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${style}`}>
@@ -455,31 +394,17 @@ export default function IncidentPage() {
           >
             <Eye className="w-4 h-4" />
           </AdminIconButton>
-          {/* 4-15.c: chuyển trạng thái biên bản */}
-          {row.status === 'PENDING' && (
-            <button
-              type="button"
-              className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-              onClick={() => {
-                setIncidents(updateStoredIncidentStatus(row.id, 'RECORDED'));
-                showToast('Đã ghi công nợ bồi thường.', 'success');
-              }}
-            >
-              Ghi nợ
-            </button>
-          )}
-          {row.status === 'RECORDED' && (
-            <button
-              type="button"
-              className="px-2 h-8 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-              onClick={() => {
-                setIncidents(updateStoredIncidentStatus(row.id, 'RESOLVED'));
-                showToast('Đã đánh dấu bồi thường xong.', 'success');
-              }}
-            >
-              Đã TT
-            </button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="!h-8 !px-2 !text-[11px]"
+            icon={<Receipt className="w-3.5 h-3.5" />}
+            onClick={() => navigate('/admin/fines')}
+            title="Thu bồi thường / công nợ tại quầy (UC10)"
+          >
+            Thu phạt
+          </Button>
         </div>
       )
     }
@@ -495,7 +420,7 @@ export default function IncidentPage() {
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Báo mất / Hỏng sách</h1>
           <p className="text-sm text-slate-500 mt-1">
             {loading
-              ? 'Đang tải danh sách biên bản từ máy chủ…'
+              ? 'Đang tải danh sách biên bản…'
               : 'Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.'}
           </p>
         </div>
@@ -522,10 +447,18 @@ export default function IncidentPage() {
         </div>
       </div>
 
-      {/* 4 Stats Cards */}
+      {/* 4 Stats Cards — bấm để lọc nhanh */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Tổng biên bản */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setTypeFilter('ALL');
+            setStatusFilter('ALL');
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            typeFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <FileText className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
@@ -535,13 +468,19 @@ export default function IncidentPage() {
               {totalIncidents} <span className="text-sm font-medium text-slate-500">vụ việc</span>
             </h3>
           </div>
-          <div className="mt-3 text-[11px] font-medium text-slate-500">
-            Trên danh sách hiện tại
-          </div>
-        </div>
+          <div className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả</div>
+        </button>
 
-        {/* Card 2: Báo mất */}
-        <div className="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30">
+        <button
+          type="button"
+          onClick={() => {
+            setTypeFilter('LOST');
+            setStatusFilter('ALL');
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30 transition-colors ${
+            typeFilter === 'LOST' ? 'border-rose-400 ring-2 ring-rose-200' : 'border-rose-100 hover:border-rose-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <AlertOctagon className="w-6 h-6 text-rose-500 opacity-20" />
           </div>
@@ -551,13 +490,19 @@ export default function IncidentPage() {
               {lostCount} <span className="text-sm font-medium text-rose-400">cuốn</span>
             </h3>
           </div>
-          <div className="mt-3 text-[11px] font-medium text-rose-600 flex items-center gap-1">
-            <span>Ngừng lưu thông, bản sao chuyển sang ngừng dùng</span>
-          </div>
-        </div>
+          <div className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc báo mất</div>
+        </button>
 
-        {/* Card 3: Hỏng nặng */}
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30">
+        <button
+          type="button"
+          onClick={() => {
+            setTypeFilter('DAMAGED');
+            setStatusFilter('ALL');
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30 transition-colors ${
+            typeFilter === 'DAMAGED' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <AlertTriangle className="w-6 h-6 text-amber-500 opacity-20" />
           </div>
@@ -567,12 +512,9 @@ export default function IncidentPage() {
               {damagedCount} <span className="text-sm font-medium text-amber-400">cuốn</span>
             </h3>
           </div>
-          <div className="mt-3 text-[11px] font-medium text-amber-600">
-            Rách bìa, mất trang, hư hỏng không phục hồi
-          </div>
-        </div>
+          <div className="mt-3 text-[11px] font-medium text-amber-600">Bấm để lọc hỏng nặng</div>
+        </button>
 
-        {/* Card 4: Tổng bồi thường */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
           <div className="absolute top-4 right-4">
             <DollarSign className="w-6 h-6 text-emerald-500 opacity-20" />
@@ -583,9 +525,7 @@ export default function IncidentPage() {
               {formatVND(totalCompensation)}
             </h3>
           </div>
-          <div className="mt-3 text-[11px] font-medium text-slate-500">
-            Theo nguyên tắc giá bìa
-          </div>
+          <div className="mt-3 text-[11px] font-medium text-slate-500">Theo nguyên tắc giá bìa</div>
         </div>
       </div>
 
@@ -633,25 +573,6 @@ export default function IncidentPage() {
             >
               Tra cứu
             </Button>
-            <Button
-              variant="ghost"
-              className="!h-10 shrink-0 !text-slate-500 px-2 sm:px-3"
-              icon={<RotateCcw className="w-4 h-4" />}
-              disabled={loading}
-              aria-label="Nạp lại danh sách"
-              onClick={async () => {
-                setSearchTerm('');
-                setTypeFilter('ALL');
-                setStatusFilter('ALL');
-                const ok = await loadIncidents();
-                showToast(
-                  ok ? 'Đã đồng bộ danh sách sự cố từ máy chủ.' : 'API chưa sẵn — đang dùng dữ liệu mẫu.',
-                  ok ? 'success' : 'warning'
-                );
-              }}
-            >
-              <span className="hidden sm:inline">Nạp lại</span>
-            </Button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <select
@@ -669,9 +590,7 @@ export default function IncidentPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="ALL">Trạng thái (Tất cả)</option>
-              <option value="PENDING">Chờ xử lý</option>
-              <option value="RECORDED">Đã ghi nhận công nợ</option>
-              <option value="RESOLVED">Đã bồi thường</option>
+              <option value="RESOLVED">Đã ghi nhận</option>
             </select>
           </div>
         </div>
@@ -794,6 +713,7 @@ export default function IncidentPage() {
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>Hủy bỏ</Button>
             <Button 
               variant="primary" 
+              icon={<Plus className="w-4 h-4" />}
               onClick={handleSaveIncident}
               className="!bg-indigo-600 hover:!bg-indigo-700"
             >
@@ -815,7 +735,7 @@ export default function IncidentPage() {
             <div className="flex items-stretch gap-2 min-w-0">
               <div className="min-w-0 flex-1">
                 <Input
-                  placeholder="VD: SV-DEMO-005 hoặc mã phiếu"
+                  placeholder="VD: mã vạch hoặc mã phiếu"
                   leftIcon={<ScanLine className="w-4 h-4" />}
                   className="!h-11 font-mono text-sm"
                   value={createForm.code}
@@ -845,7 +765,7 @@ export default function IncidentPage() {
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Tra cứu phiếu đang mượn. Nếu máy chủ lỗi, có thể thử mã mẫu: {MOCK_ACTIVE_LOANS.map((l) => l.barcode).slice(0, 2).join(', ')}
+              Tra cứu phiếu đang mượn theo mã vạch hoặc mã phiếu.
             </p>
           </div>
 
@@ -942,9 +862,6 @@ export default function IncidentPage() {
               if (formErrors.book_price) setFormErrors({ ...formErrors, book_price: '' });
             }}
           />
-          <p className="text-[11px] text-slate-400 -mt-2">
-            Lưu biên bản trên giao diện; nếu có mã vạch sẽ thử ghi sự cố lên máy chủ. Máy chủ từ chối sẽ hiện thông báo lỗi.
-          </p>
         </div>
       </Modal>
     </div>

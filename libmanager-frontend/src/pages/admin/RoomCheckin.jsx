@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ScanLine, DoorOpen, CheckCircle2, RotateCcw } from 'lucide-react';
+import { ScanLine, DoorOpen, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -8,7 +8,6 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
-import { getTodayBookings } from '../../mocks/adminRoomsMock';
 
 /** YYYY-MM-DD theo lịch máy (VN thường GMT+7). */
 function todayISODate() {
@@ -63,8 +62,8 @@ export default function RoomCheckin() {
   const [inputError, setInputError] = useState('');
   const [busy, setBusy] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
-  const [useMockList, setUseMockList] = useState(false);
   const [rows, setRows] = useState([]);
+  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL | CONFIRMED | CHECKED_IN
   const [checkingId, setCheckingId] = useState(null);
 
   const loadBookings = useCallback(
@@ -76,25 +75,12 @@ export default function RoomCheckin() {
         });
         const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
         setRows(list.map(mapBookingRow));
-        setUseMockList(false);
       } catch (error) {
-        // Fallback mock chỉ khi API lỗi — giữ UI demo được
-        const mock = getTodayBookings().map((b) => ({
-          id: b.booking_code,
-          user_code: b.user_code,
-          room_id: b.room_name || b.room_id,
-          slot_start: b.slot_start,
-          slot_end: b.slot_end,
-          status: b.status,
-          attendee_count: null,
-          _mock: true,
-        }));
-        setRows(mock);
-        setUseMockList(true);
+        setRows([]);
         if (!opts.silent) {
           showToast(
-            getApiErrorMessage(error, 'Không tải được lượt đặt — đang dùng dữ liệu mẫu.'),
-            'warning'
+            getApiErrorMessage(error, 'Không tải được danh sách lượt đặt.'),
+            'error'
           );
         }
       } finally {
@@ -120,6 +106,10 @@ export default function RoomCheckin() {
     () => rows.filter((b) => b.status === 'CHECKED_IN').length,
     [rows]
   );
+  const filteredRows = useMemo(() => {
+    if (statusFilter === 'ALL') return rows;
+    return rows.filter((b) => b.status === statusFilter);
+  }, [rows, statusFilter]);
 
   const runCheckin = async (bookingId) => {
     setCheckingId(bookingId);
@@ -136,14 +126,14 @@ export default function RoomCheckin() {
       });
       setBookingIdInput('');
       showToast(
-        `Check-in OK · #${updated.id}` +
+        `Đã xác nhận vào phòng · #${updated.id}` +
           (updated.user_code && updated.user_code !== '—' ? ` · ${updated.user_code}` : ''),
         'success'
       );
       // Đồng bộ lại list theo ngày đang chọn
       await loadBookings({ silent: true });
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Check-in phòng thất bại.'), 'error');
+      showToast(getApiErrorMessage(error, 'Xác nhận vào phòng thất bại.'), 'error');
     } finally {
       setBusy(false);
       setCheckingId(null);
@@ -207,9 +197,6 @@ export default function RoomCheckin() {
       header: 'Thao tác',
       align: 'right',
       render: (_, row) => {
-        if (useMockList || row._mock) {
-          return <span className="text-xs text-slate-400">Mẫu</span>;
-        }
         if (row.status !== 'CONFIRMED') {
           return <span className="text-xs text-slate-400">—</span>;
         }
@@ -219,6 +206,7 @@ export default function RoomCheckin() {
             variant="outline"
             disabled={busy}
             isLoading={checkingId === row.id}
+            icon={<ScanLine className="w-3.5 h-3.5" />}
             onClick={() => runCheckin(row.id)}
           >
             Check-in
@@ -247,17 +235,6 @@ export default function RoomCheckin() {
           Danh mục phòng
         </Button>
       </div>
-
-      {useMockList && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-          <p className="font-semibold">Đang dùng dữ liệu mẫu</p>
-          <p className="text-amber-800/90 mt-0.5 text-[13px]">
-            Không tải được{' '}
-            <code className="bg-amber-100 px-1 rounded">GET /api/admin/room-bookings</code>. Form
-            check-in vẫn gọi API thật khi nhập mã số.
-          </p>
-        </div>
-      )}
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -302,51 +279,71 @@ export default function RoomCheckin() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setStatusFilter('ALL')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            statusFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <DoorOpen className="w-6 h-6 text-indigo-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            {useMockList ? 'Trong ngày (mẫu)' : 'Trong ngày'}
+            Trong ngày
           </p>
           <p className="text-3xl font-extrabold text-slate-800 leading-none">
             {rows.length}{' '}
             <span className="text-sm font-medium text-slate-500">lượt đặt</span>
           </p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm">
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter('CONFIRMED')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40 transition-colors ${
+            statusFilter === 'CONFIRMED' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <ScanLine className="w-6 h-6 text-amber-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            Chờ check-in
+            Chờ vào phòng
           </p>
           <p className="text-3xl font-extrabold text-amber-600 leading-none">
             {waiting} <span className="text-sm font-medium text-amber-500">lượt</span>
           </p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm">
+          <p className="mt-3 text-[11px] font-medium text-amber-600">Bấm để lọc chờ vào phòng</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter('CHECKED_IN')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40 transition-colors ${
+            statusFilter === 'CHECKED_IN' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
+          </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-            Đã check-in
+            Đã vào phòng
           </p>
           <p className="text-3xl font-extrabold text-emerald-600 leading-none">
             {checked} <span className="text-sm font-medium text-emerald-500">lượt</span>
           </p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-emerald-600">Bấm để lọc đã vào phòng</p>
+        </button>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold text-slate-800">
-          Lượt đặt {bookingDate}
-          {useMockList ? ' (mẫu)' : ''}
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          icon={<RotateCcw className="w-4 h-4" />}
-          disabled={loadingList}
-          onClick={() => loadBookings({ silent: false })}
-        >
-          {loadingList ? 'Đang tải…' : 'Tải lại'}
-        </Button>
-      </div>
+      <h2 className="text-base font-bold text-slate-800">
+        Lượt đặt {bookingDate}
+        {loadingList ? ' · Đang tải…' : ''}
+        {statusFilter !== 'ALL' ? ` · Đang lọc (${filteredRows.length})` : ''}
+      </h2>
       <Table
         columns={columns}
-        data={rows}
+        data={filteredRows}
         loading={loadingList}
         emptyMessage="Chưa có lượt đặt trong ngày này."
         rowKey={(r) => String(r.id)}

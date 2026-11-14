@@ -58,4 +58,29 @@ export const walletService = {
     const { data } = await axiosInstance.post('/api/fines/pay-by-wallet');
     return { amountPaid: Number(data.amount_paid ?? 0), balanceAfter: Number(data.balance_after ?? 0) };
   },
+
+  // 4-07 / UC16 Admin: list giao dịch chưa gán (assigned_user_code IS NULL).
+  async listUnmatched(page = 1, size = 50) {
+    const { data } = await axiosInstance.get('/api/admin/wallet/unmatched', {
+      params: { page, size },
+    });
+    return {
+      items: data?.data ?? data?.items ?? [],
+      total: Number(data?.total ?? 0),
+      page: Number(data?.page ?? page),
+      size: Number(data?.size ?? size),
+    };
+  },
+
+  // Gán unmatched → cộng ví thật; body { user_code, notes? }.
+  async assignUnmatched(unmatchedId, userCode, notes = '') {
+    const { data } = await axiosInstance.post(
+      `/api/admin/wallet/unmatched/${encodeURIComponent(unmatchedId)}/assign`,
+      {
+        user_code: String(userCode || '').trim(),
+        notes: notes?.trim() ? notes.trim() : null,
+      }
+    );
+    return data;
+  },
 };

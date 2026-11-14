@@ -89,14 +89,17 @@ export function assignUnmatched(txId, userCode, notes = '') {
   if (tx.status === 'ASSIGNED') {
     throw Object.assign(new Error('Giao dịch đã được gán rồi'), { code: '409' });
   }
-  const user = DEMO_USERS_FOR_ASSIGN.find((u) => u.user_code === userCode);
-  if (!user) throw Object.assign(new Error('Chọn người dùng hợp lệ'), { code: 'VALIDATION' });
+  const code = String(userCode || '').trim();
+  if (!code) {
+    throw Object.assign(new Error('Nhập mã bạn đọc (MSSV) trước khi gán.'), { code: 'VALIDATION' });
+  }
+  const user = DEMO_USERS_FOR_ASSIGN.find((u) => u.user_code === code);
 
   tx.status = 'ASSIGNED';
   tx.resolved_by = 'admin';
-  tx.assigned_user_code = user.user_code;
-  tx.assigned_user_name = user.full_name;
-  tx.resolution_notes = (notes || `Gán cho ${user.user_code}`).trim();
+  tx.assigned_user_code = code;
+  tx.assigned_user_name = user?.full_name || code;
+  tx.resolution_notes = (notes || `Gán cho ${code}`).trim();
   save([...list]);
   return tx;
 }
