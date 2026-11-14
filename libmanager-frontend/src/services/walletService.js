@@ -1,0 +1,61 @@
+import axiosInstance from './axios_instance';
+import { toTopUp, toTxn } from '../utils/wallet';
+
+// 4-13: Tài khoản dịch vụ của người đang đăng nhập (wallet_router.py, fine_wallet_router.py,
+// fines_router.py, webhook_router.py). Lỗi giữ nguyên dạng Axios để ToastAlertComponent đổi lời.
+export const TXN_PAGE_SIZE = 10;
+
+// Nút giả lập chuyển khoản chỉ hiện ở môi trường chạy thử (dev server, hoặc bật cờ khi demo).
+export const canSimulateTopUp = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TOPUP_SIMULATE === 'true';
+
+export const walletService = {
+  async getBalance() {
+    const { data } = await axiosInstance.get('/api/wallet');
+    // API thật trả `balance`; mock MSW cũ trả `service_balance`.
+    return Number(data.balance ?? data.service_balance ?? 0);
+  },
+
+  async getTransactions(page = 1, size = TXN_PAGE_SIZE) {
+    const { data } = await axiosInstance.get('/api/wallet/transactions', { params: { page, size } });
+    const total = Number(data.total ?? 0);
+    return { items: (data.data ?? data.items ?? []).map(toTxn), total, page, size, pages: Math.max(1, Math.ceil(total / size)) };
+  },
+
+  async createTopUp(amount) {
+    const { data } = await axiosInstance.post('/api/wallet/topups', { amount });
+    return toTopUp(data);
+  },
+
+  async getTopUp(payCode) {
+    const { data } = await axiosInstance.get(`/api/wallet/topups/${encodeURIComponent(payCode)}`);
+    return toTopUp(data);
+  },
+
+  // Chỉ chạy khi backend bật ENABLE_DEV_SIMULATE; nếu tắt, backend trả 404.
+  async simulateTopUp(payCode) {
+    const { data } = await axiosInstance.post(`/api/dev/topups/${encodeURIComponent(payCode)}/simulate`);
+    return data;
+  },
+
+  // Tổng nợ phạt chưa trả + từng khoản (3-08).
+  async getMyFines() {
+    const { data } = await axiosInstance.get('/api/fines/my-fines');
+    return {
+      total: Number(data.total_fines ?? 0),
+      blocked: Boolean(data.is_borrowing_blocked),
+      fines: (data.fines ?? []).map((fine) => ({
+        id: fine.fine_id,
+        loanId: fine.loan_id,
+        overdueDays: fine.overdue_days,
+        amount: Number(fine.total_amount ?? 0),
+        createdAt: fine.created_at,
+      })),
+    };
+  },
+
+  // 4-02: trả toàn bộ nợ phạt bằng số dư ví.
+  async payFines() {
+    const { data } = await axiosInstance.post('/api/fines/pay-by-wallet');
+    return { amountPaid: Number(data.amount_paid ?? 0), balanceAfter: Number(data.balance_after ?? 0) };
+  },
+};
