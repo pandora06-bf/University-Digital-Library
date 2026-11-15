@@ -82,7 +82,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
 
     // 2. Kiểm tra quầy mượn sách & tra cứu MSSV
     await expect(page.getByRole('heading', { name: 'Quầy Xuất Phiếu Mượn' })).toBeVisible();
-    const mssvInput = page.getByPlaceholder(/SV-DEMO-001/i);
+    const mssvInput = page.getByPlaceholder(/Nhập mã bạn đọc/i);
     await expect(mssvInput).toBeVisible();
 
     await mssvInput.fill('SV-DEMO-001');
