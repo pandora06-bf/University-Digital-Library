@@ -82,10 +82,10 @@ def send_sync(recipient, subject, template, context):
         log.exception("Email preparation failed: %s", template)
         return False
 
-def send_receipt(recipient, user_name, loan_id, book_title, author, borrow_date, due_date):
+def send_receipt(recipient, user_name, loan_id, book_title, author, borrow_date, due_date, loan_code=None):
     context = context_base(user_name)
     context.update(receipt_id=f"BL-{loan_id}", borrow_date=local_date(borrow_date), due_date=local_date(due_date),
-        books=[{"title": book_title, "author": author or "", "loan_code": f"PM-{loan_id}"}])
+        books=[{"title": book_title, "author": author or "", "loan_code": loan_code or f"PM-{loan_id}"}])
     return send_sync(recipient, "Thư viện - Biên lai mượn sách", "receipt.html", context)
 
 def send_reminder(recipient, user_name, book_title, loan_id, due_date):
