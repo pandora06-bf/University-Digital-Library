@@ -55,12 +55,43 @@ def get_user_max_borrow_limit(user: User) -> int:
     return user.max_borrow_limit if (user.max_borrow_limit and user.max_borrow_limit > 0) else 3
 
 
-def send_checkout_receipt_email(user_email: str, loan_id: int, title: str, due_date: datetime):
+def send_checkout_receipt_email(
+    user_email: Optional[str],
+    loan_id: int,
+    title: str,
+    due_date: datetime,
+    user_name: Optional[str] = None,
+    author: Optional[str] = None,
+    borrow_date: Optional[datetime] = None,
+    loan_code: Optional[str] = None,
+):
     """
-    Gửi email biên lai ở chế độ nền (BackgroundTasks - UC12 / NFR-PE-03 / AC2)
+    Gửi email biên lai ở chế độ nền (BackgroundTasks - UC12 / NFR-PE-03 / AC2).
+    Chạy sau khi transaction check-out đã commit; lỗi SMTP không ảnh hưởng phiếu mượn.
     """
-    # Tích hợp SMTP/fastapi-mail
-    pass
+    import logging
+    from app.services.email_notifier import VN, send_receipt
+
+    def _as_vn(value: Optional[datetime]) -> Optional[datetime]:
+        # Checkout lưu datetime.now() (giờ local, naive) -> gắn múi giờ VN
+        # để local_date() không hiểu nhầm là UTC và cộng thêm 7 giờ.
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=VN)
+        return value
+
+    try:
+        send_receipt(
+            user_email,
+            user_name,
+            loan_id,
+            title,
+            author,
+            _as_vn(borrow_date or datetime.now()),
+            _as_vn(due_date),
+            loan_code=loan_code,
+        )
+    except Exception:
+        logging.getLogger(__name__).exception("Gửi email biên lai thất bại loan_id=%s", loan_id)
 
 
 def promote_waitlist_stub(db: Session, book_id: int):
@@ -583,7 +614,8 @@ def checkout_at_counter_service(
         due_date=loan.due_date,
         user_name=user.full_name,
         author=book.author if book else "",
-        borrow_date=loan.borrow_date
+        borrow_date=loan.borrow_date,
+        loan_code=loan.loan_code,
     )
 
     return loan
