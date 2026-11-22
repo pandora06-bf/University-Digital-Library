@@ -150,8 +150,20 @@ export const handlers = [
     const due = new Date(now.getTime() + 14 * 86400 * 1000);
     return HttpResponse.json({ id: Date.now(), loan_code: 'PM-2026-' + Math.floor(1000 + Math.random() * 9000), book_id: book.id, book_title: book.title, loan_type: 'PHYSICAL', loan_status: 'PENDING_PICKUP', borrow_date: now.toISOString(), due_date: due.toISOString(), pickup_deadline: new Date(now.getTime() + 86400000).toISOString() }, { status: 201 });
   }),
-  http.get('*/api/loans/my-loans', () => HttpResponse.json({ items: DEMO_LOANS.filter(l => ['BORROWED','PENDING_PICKUP','OVERDUE'].includes(l.loan_status)), total: DEMO_LOANS.length, page: 1, page_size: 20, total_pages: 1 })),
-  http.get('*/api/loans/my-history', () => HttpResponse.json({ items: [], total: 0, page: 1, page_size: 20, total_pages: 1 })),
+  http.get('*/api/loans/my-loans', () => {
+    const rows = DEMO_LOANS.filter((l) => ['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
+    return HttpResponse.json({ data: rows, items: rows, total: rows.length });
+  }),
+  http.get('*/api/loans/my-history', () => {
+    const rows = DEMO_LOANS.filter((l) => !['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
+    return HttpResponse.json({ data: rows, items: rows, total: rows.length });
+  }),
+  http.post('*/api/loans/:loanId/renew', ({ params }) => {
+    const loan = DEMO_LOANS.find((item) => String(item.id) === String(params.loanId));
+    if (!loan) return HttpResponse.json({ detail: 'Không tìm thấy phiếu mượn' }, { status: 404 });
+    const due = new Date(Date.now() + 17 * 86400000).toISOString();
+    return HttpResponse.json({ ...loan, due_date: due, renewal_count: Number(loan.renewal_count || 0) + 1, loan_status: 'BORROWED' });
+  }),
   http.post('*/api/loans/:loanId/return', ({ params }) => HttpResponse.json({ message: 'Tra sach thanh cong', loan_id: Number(params.loanId) })),
   http.get('*/api/waitlists/my-waitlists', () => HttpResponse.json({ items: [], total: 0 })),
   http.post('*/api/waitlists', async ({ request }) => {

@@ -72,7 +72,7 @@ export default function InventoryManagement() {
       });
   }, [showToast]);
 
-  // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (không có RETIRED).
+  // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (chưa có RETIRED trên schema update).
   // Thanh lý FE → PATCH status=DAMAGED + damage_notes; UI vẫn hiện "Đã thanh lý".
   const mapCopyStatusLabel = (status) => {
     if (status === 'AVAILABLE') return 'Sẵn sàng';
@@ -290,7 +290,7 @@ export default function InventoryManagement() {
 
     setIsRetiring(true);
     try {
-      // BE không có RETIRED → dùng DAMAGED để loại khỏi tồn khả dụng + ghi chú thanh lý
+      // Schema inventory chưa nhận RETIRED → dùng DAMAGED để loại khỏi tồn khả dụng.
       const note = retireReason.trim()
         ? `[Thanh lý] ${retireReason.trim()}`
         : (retiringRow.rawCondition

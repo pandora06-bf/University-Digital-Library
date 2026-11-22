@@ -47,6 +47,7 @@ function mapApiUser(u) {
     department: u.department || u.major || '',
     role: u.role || u.user_type || u.account?.role || 'STUDENT',
     is_locked: Boolean(u.is_locked ?? u.is_borrowing_blocked),
+    lock_reason: u.lock_reason || '',
     total_fines: Number(u.total_fines || 0),
     max_borrow_limit: u.max_borrow_limit ?? (u.role === 'LECTURER' || u.user_type === 'LECTURER' ? 5 : 3),
   };
@@ -73,6 +74,8 @@ export default function UserManagement() {
   const [saving, setSaving] = useState(false);
 
   const [lockTarget, setLockTarget] = useState(null);
+  const [lockReason, setLockReason] = useState('');
+  const [lockReasonError, setLockReasonError] = useState('');
   const [tempPassword, setTempPassword] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -276,25 +279,39 @@ export default function UserManagement() {
     if (!nextLocked && Number(lockTarget.total_fines) > 0) {
       showToast('Còn công nợ, không mở khóa. Thu phạt trước tại quầy.', 'error');
       setLockTarget(null);
+      setLockReason('');
+      setLockReasonError('');
       return;
     }
     if (lockTarget.role === 'ADMIN' && nextLocked) {
       showToast('Không thể khóa tài khoản thủ thư.', 'error');
       setLockTarget(null);
+      setLockReason('');
+      setLockReasonError('');
+      return;
+    }
+    const reason = lockReason.trim();
+    if (nextLocked && !reason) {
+      setLockReasonError('Vui lòng nhập lý do khóa tài khoản');
       return;
     }
 
     try {
       await axiosInstance.patch(`/api/admin/users/${encodeURIComponent(lockTarget.user_code)}/lock`, {
         is_locked: nextLocked,
+        reason: nextLocked ? reason : null,
       });
       showToast(nextLocked ? 'Đã khóa tài khoản.' : 'Đã mở khóa.', 'success');
       setLockTarget(null);
+      setLockReason('');
+      setLockReasonError('');
       await fetchUsers();
       await fetchStats();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đổi trạng thái khóa.'), 'error');
       setLockTarget(null);
+      setLockReason('');
+      setLockReasonError('');
     }
   };
 
@@ -437,7 +454,11 @@ export default function UserManagement() {
             <Pencil className="w-4 h-4" />
           </AdminIconButton>
           <AdminIconButton
-            onClick={() => setLockTarget(row)}
+            onClick={() => {
+              setLockTarget(row);
+              setLockReason('');
+              setLockReasonError('');
+            }}
             className={`${iconBtn} ${
               row.is_locked
                 ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
@@ -463,15 +484,15 @@ export default function UserManagement() {
     <div className="space-y-6 max-w-[1400px] mx-auto pb-8">
       <Toast toast={toast} onClose={hideToast} />
 
-      {/* Header — cùng kiểu Incident / Fines */}
+      {/* Header — title trái, CTA phải (cùng khung Catalog / Incident / Rooms) */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
             Danh sách, thêm, sửa, khóa và đặt lại mật khẩu tài khoản bạn đọc / thủ thư.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-3 shrink-0 ml-auto">
           <Button
             variant="outline"
             icon={<Receipt className="w-4 h-4" />}
@@ -479,27 +500,26 @@ export default function UserManagement() {
           >
             Thu phạt &amp; Công nợ
           </Button>
-          <label className={`inline-flex ${importing ? 'opacity-60 pointer-events-none' : ''}`}>
-            <Button
-              variant="outline"
-              icon={<Upload className="w-4 h-4" />}
-              disabled={importing}
-              onClick={() => document.getElementById('admin-user-import-input')?.click()}
-            >
-              {importing ? 'Đang import…' : 'Import CSV/XLSX'}
-            </Button>
-            <input
-              id="admin-user-import-input"
-              type="file"
-              accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                handleImportFile(f);
-              }}
-            />
-          </label>
+          <Button
+            variant="outline"
+            icon={<Upload className="w-4 h-4" />}
+            disabled={importing}
+            className={importing ? 'opacity-60' : undefined}
+            onClick={() => document.getElementById('admin-user-import-input')?.click()}
+          >
+            {importing ? 'Đang import…' : 'Import CSV/XLSX'}
+          </Button>
+          <input
+            id="admin-user-import-input"
+            type="file"
+            accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = '';
+              handleImportFile(f);
+            }}
+          />
           <Button variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreate}>
             Thêm người dùng
           </Button>
@@ -644,9 +664,9 @@ export default function UserManagement() {
               Tra cứu
             </Button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <select
-              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={roleFilter}
               onChange={(e) => {
                 setRoleFilter(e.target.value);
@@ -659,7 +679,7 @@ export default function UserManagement() {
               <option value="ADMIN">Thủ thư</option>
             </select>
             <select
-              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={lockFilter}
               onChange={(e) => {
                 setLockFilter(e.target.value);
@@ -671,7 +691,7 @@ export default function UserManagement() {
               <option value="ACTIVE">Đang hoạt động</option>
             </select>
             <select
-              className="h-10 w-full sm:w-auto sm:min-w-[160px] px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={debtFilter}
               onChange={(e) => {
                 setDebtFilter(e.target.value);
@@ -762,7 +782,11 @@ export default function UserManagement() {
 
       <Modal
         isOpen={Boolean(lockTarget)}
-        onClose={() => setLockTarget(null)}
+        onClose={() => {
+          setLockTarget(null);
+          setLockReason('');
+          setLockReasonError('');
+        }}
         title={lockTarget?.is_locked ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?'}
       >
         <p className="text-sm text-slate-600 mb-4">
@@ -774,9 +798,48 @@ export default function UserManagement() {
               Đang nợ {Number(lockTarget.total_fines).toLocaleString('vi-VN')} ₫ — không mở khóa khi còn công nợ.
             </span>
           )}
+          {lockTarget?.is_locked && lockTarget?.lock_reason && (
+            <span className="block mt-2 text-slate-500">
+              Lý do khóa hiện tại: <span className="font-medium text-slate-700">{lockTarget.lock_reason}</span>
+            </span>
+          )}
         </p>
+        {!lockTarget?.is_locked && (
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+              Lý do khóa <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              value={lockReason}
+              onChange={(e) => {
+                setLockReason(e.target.value);
+                if (lockReasonError) setLockReasonError('');
+              }}
+              rows={3}
+              maxLength={500}
+              placeholder="VD: Vi phạm quy định mượn sách / nợ phạt kéo dài..."
+              className={`w-full px-3 py-2.5 rounded-xl border text-sm text-slate-700 focus:outline-none focus:ring-2 resize-none ${
+                lockReasonError
+                  ? 'border-rose-400 focus:ring-rose-200'
+                  : 'border-slate-200 focus:border-indigo-400 focus:ring-indigo-100'
+              }`}
+            />
+            {lockReasonError && (
+              <p className="mt-1.5 text-xs font-medium text-rose-600">{lockReasonError}</p>
+            )}
+          </div>
+        )}
         <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-          <Button variant="outline" onClick={() => setLockTarget(null)}>Hủy</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLockTarget(null);
+              setLockReason('');
+              setLockReasonError('');
+            }}
+          >
+            Hủy
+          </Button>
           <Button variant="primary" onClick={confirmLockToggle}>Xác nhận</Button>
         </div>
       </Modal>
@@ -888,6 +951,7 @@ export default function UserManagement() {
                 ['Hạn mức mượn', detailRow.max_borrow_limit],
                 ['Công nợ', `${Number(detailRow.total_fines).toLocaleString('vi-VN')} ₫`],
                 ['Khóa mượn', detailRow.is_locked ? 'Có' : 'Không'],
+                ['Lý do khóa', detailRow.lock_reason || '—'],
               ].map(([k, v]) => (
                 <div key={k} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                   <dt className="text-[11px] uppercase tracking-wide text-slate-400 font-bold">{k}</dt>

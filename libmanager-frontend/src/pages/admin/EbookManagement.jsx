@@ -61,6 +61,7 @@ export default function EbookManagement() {
   const [uploadFile, setUploadFile] = useState(null);
   const [replaceFile, setReplaceFile] = useState(null);
   const [previewPages, setPreviewPages] = useState('10');
+  const [borrowDays, setBorrowDays] = useState('14');
   const [isFree, setIsFree] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -144,9 +145,11 @@ export default function EbookManagement() {
     const form = new FormData();
     form.append('file', file);
     const pages = Math.min(10, Math.max(5, parseInt(previewPages, 10) || 10));
+    const daysRaw = parseInt(borrowDays, 10);
+    const days = Number.isFinite(daysRaw) && daysRaw >= 1 && daysRaw <= 365 ? daysRaw : 14;
     // Không gắn Content-Type tay — Axios tự thêm boundary cho FormData.
     await axiosInstance.post(`/api/admin/books/${bookId}/upload-pdf`, form, {
-      params: { preview_pages: pages, is_free: isFree, borrow_days: 14 },
+      params: { preview_pages: pages, is_free: isFree, borrow_days: days },
     });
   };
 
@@ -357,6 +360,9 @@ export default function EbookManagement() {
           onClick={() => {
             setUploadBookId('');
             setUploadFile(null);
+            setPreviewPages('10');
+            setBorrowDays('14');
+            setIsFree(false);
             setShowUploadModal(true);
           }}
         >
@@ -416,8 +422,8 @@ export default function EbookManagement() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex items-stretch gap-2 min-w-0 w-full sm:max-w-xl">
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
+          <div className="flex items-stretch gap-2 min-w-0 w-full">
             <div className="min-w-0 flex-1">
               <Input
                 type="text"
@@ -510,14 +516,26 @@ export default function EbookManagement() {
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Trang xem trước (5–10)"
+              type="number"
+              min="5"
+              max="10"
               value={previewPages}
               onChange={(e) => setPreviewPages(e.target.value)}
             />
-            <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
-              <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />
-              Miễn phí đọc toàn bộ
-            </label>
+            <Input
+              label="Số ngày mượn eBook"
+              type="number"
+              min="1"
+              max="365"
+              value={borrowDays}
+              onChange={(e) => setBorrowDays(e.target.value)}
+              helperText="Mặc định 14 (1–365)"
+            />
           </div>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />
+            Miễn phí đọc toàn bộ
+          </label>
         </div>
       </Modal>
 
@@ -555,6 +573,25 @@ export default function EbookManagement() {
                 onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
               />
             </label>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Trang xem trước (5–10)"
+              type="number"
+              min="5"
+              max="10"
+              value={previewPages}
+              onChange={(e) => setPreviewPages(e.target.value)}
+            />
+            <Input
+              label="Số ngày mượn eBook"
+              type="number"
+              min="1"
+              max="365"
+              value={borrowDays}
+              onChange={(e) => setBorrowDays(e.target.value)}
+              helperText="Mặc định 14 (1–365)"
+            />
           </div>
         </div>
       </Modal>
