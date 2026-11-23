@@ -1,7 +1,7 @@
 """Email templates for 3-06. Dispatch only after the business transaction commits."""
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import timezone
 from pathlib import Path
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
@@ -44,25 +44,25 @@ async def send_html(recipient, subject, template, context):
     if not recipient or not recipient.strip():
         log.info("Skip %s: user has no email", template)
         return False
-    sender = os.getenv("SMTP_FROM") or os.getenv("MAIL_FROM")
-    host = os.getenv("SMTP_HOST") or os.getenv("MAIL_SERVER")
+    from app.core.config import Settings
+
+    smtp_settings = Settings(_env_ignore_empty=True)
+    sender = smtp_settings.SMTP_FROM or os.getenv("MAIL_FROM")
+    host = smtp_settings.SMTP_HOST or os.getenv("MAIL_SERVER")
     if not host or not sender:
         log.warning("Email not sent: SMTP_HOST/SMTP_FROM not configured (%s)", template)
         return False
     html = render_template(template, **context)
-    port = int(os.getenv("SMTP_PORT", "587"))
-    ssl = os.getenv("SMTP_SSL", "false").lower() == "true"
-    user = os.getenv("SMTP_USER", "")
     from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
     cfg = ConnectionConfig(
-         MAIL_USERNAME=user,
-         MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
+         MAIL_USERNAME=smtp_settings.SMTP_USER,
+         MAIL_PASSWORD=smtp_settings.SMTP_PASSWORD,
          MAIL_FROM=sender,
-         MAIL_PORT=port,
+         MAIL_PORT=smtp_settings.SMTP_PORT,
          MAIL_SERVER=host,
-         MAIL_STARTTLS=os.getenv("SMTP_STARTTLS", "true").lower() == "true",
-         MAIL_SSL_TLS=os.getenv("SMTP_SSL", "false").lower() == "true",
-         USE_CREDENTIALS=bool(user),
+         MAIL_STARTTLS=smtp_settings.SMTP_STARTTLS,
+         MAIL_SSL_TLS=smtp_settings.SMTP_SSL,
+         USE_CREDENTIALS=bool(smtp_settings.SMTP_USER),
          VALIDATE_CERTS=True
     )
     message = MessageSchema(subject=subject, recipients=[recipient], body=html, subtype=MessageType.html)
@@ -110,10 +110,38 @@ def send_incident_notice(recipient, user_name, incident_id, incident_type, amoun
     context.update(incident_id=incident_id, incident_type=incident_type, amount=amount)
     return send_sync(recipient, 'Thư viện - Biên bản mất/hỏng sách', 'incident.html', context)
 
-def send_topup_confirmed(recipient, user_name, amount, balance):
+def send_topup_confirmed(
+    recipient,
+    user_name,
+    transaction_id,
+    pay_code,
+    amount,
+    paid_at,
+    balance_after,
+):
     context = context_base(user_name)
-    context.update(amount=amount, balance=balance)
-    return send_sync(recipient, 'Thư viện - Xác nhận nạp tiền', 'topup_confirmed.html', context)
+    context.update(
+        transaction_id=transaction_id,
+        pay_code=pay_code,
+        amount=f"{int(amount):,}".replace(",", ".") + " VNĐ",
+        paid_at=local_date(paid_at),
+        balance_after=f"{int(balance_after):,}".replace(",", ".") + " VNĐ",
+    )
+    sent = send_sync(recipient, 'Thư viện - Xác nhận nạp tiền', 'top_up.html', context)
+    if sent and recipient:
+        from app.core.database import SessionLocal
+        from app.models.notification import EmailNotice
+
+        db = SessionLocal()
+        try:
+            db.add(EmailNotice(event_key=f"topup:{transaction_id}", recipient=recipient))
+            db.commit()
+        except Exception:
+            db.rollback()
+            log.exception("Top-up email sent but failed to record notice transaction_id=%s", transaction_id)
+        finally:
+            db.close()
+    return sent
 
 def send_fine_paid(recipient, user_name, amount, balance):
     context = context_base(user_name)
