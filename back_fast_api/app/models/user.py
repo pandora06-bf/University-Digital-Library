@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     TIMESTAMP,
     func,
 )
@@ -65,6 +66,7 @@ class User(Base):
     max_borrow_days: Mapped[int] = mapped_column(Integer, server_default="14", nullable=False)
 
     is_borrowing_blocked: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+    lock_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     total_fines: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), server_default="0.00", nullable=False)
     service_balance: Mapped[int] = mapped_column(
         Integer, server_default="0", default=0, nullable=False

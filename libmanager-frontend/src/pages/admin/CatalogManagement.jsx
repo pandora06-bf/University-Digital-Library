@@ -220,7 +220,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
           <Edit2 className="w-4 h-4" />
         </AdminIconButton>
         <AdminIconButton
-          title="Xóa sách"
+          title="Vô hiệu hóa đầu sách"
           onClick={() => onDelete(row)}
           className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
         >
@@ -248,7 +248,7 @@ export default function CatalogManagement() {
   const [bookForm, setBookForm] = useState({ 
     title: '', author: '', publisher: '', year: '', 
     bookType: 'Vật lý', categoryId: '', courseCode: '', description: '', keywords: '',
-    price: '', numPages: '', previewPages: ''
+    price: '', numPages: '', previewPages: '', borrowDays: '14'
   });
   const [formErrors, setFormErrors] = useState({});
   const [coverFile, setCoverFile] = useState(null);
@@ -307,6 +307,9 @@ export default function CatalogManagement() {
       book_price: uiPrice,
       num_pages: b.num_pages ?? null,
       preview_pages: b.preview_pages ?? b.ebook?.preview_pages ?? null,
+      borrow_days: b.borrow_days ?? b.ebook?.borrow_days ?? null,
+      has_ebook: Boolean(b.has_pdf || b.ebook),
+      ebook: b.ebook || (b.has_pdf ? { preview_pages: b.preview_pages, borrow_days: b.borrow_days, is_free: b.is_free } : null),
       book_attribute: b.book_attribute || b.attribute || '',
       subject_code: b.subject_code || '',
     };
@@ -418,9 +421,11 @@ export default function CatalogManagement() {
     setBookForm({ 
       title: '', author: '', publisher: '', year: '', 
       bookType: 'Vật lý', categoryId: '', courseCode: '', description: '', keywords: '',
-      price: '', numPages: '', previewPages: ''
+      price: '', numPages: '', previewPages: '', borrowDays: '14'
     });
     setFormErrors({});
+    setCoverFile(null);
+    setPdfFile(null);
     setIsAddingBook(true);
   };
 
@@ -452,8 +457,14 @@ export default function CatalogManagement() {
           : (book.ebook?.preview_pages !== undefined && book.ebook?.preview_pages !== null
             ? book.ebook.preview_pages.toString()
             : '')),
+      borrowDays: (() => {
+        const d = book.ebook?.borrow_days ?? book.borrow_days ?? book.borrowDays;
+        return d !== undefined && d !== null ? String(d) : '14';
+      })(),
     });
     setFormErrors({});
+    setCoverFile(null);
+    setPdfFile(null);
     setEditingBook(book);
   };
 
@@ -561,15 +572,16 @@ export default function CatalogManagement() {
       }
     }
 
-    // 7. Số trang xem trước (previewPages): Chỉ áp dụng cho eBook (PDF) theo đặc tả UC09 (5–10 trang)
+        // 7. Số trang xem trước + số ngày mượn eBook (UC09)
     let validPreviewPages = null;
+    let validBorrowDays = 14;
     if (bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') {
       const trimmedPreview = bookForm.previewPages !== undefined && bookForm.previewPages !== null
         ? bookForm.previewPages.toString().trim()
         : '';
       if (trimmedPreview !== '') {
         if (!/^\d+$/.test(trimmedPreview)) {
-          errors.previewPages = 'Số trang xem trước phải là số nguyên dương (không chứa chữ cái, số âm hay số thập phân)';
+          errors.previewPages = 'Số trang xem trước phải là số nguyên dương (không nhập chữ cái, số âm hay số thập phân)';
         } else {
           const previewVal = parseInt(trimmedPreview, 10);
           if (previewVal < 1) {
@@ -583,9 +595,24 @@ export default function CatalogManagement() {
           }
         }
       }
-    }
 
-    // Giá bìa (BE đã có field price ≥ 0)
+      const trimmedBorrow = bookForm.borrowDays !== undefined && bookForm.borrowDays !== null
+        ? bookForm.borrowDays.toString().trim()
+        : '';
+      if (trimmedBorrow === '') {
+        validBorrowDays = 14;
+      } else if (!/^\d+$/.test(trimmedBorrow)) {
+        errors.borrowDays = 'Số ngày mượn eBook phải là số nguyên dương';
+      } else {
+        const days = parseInt(trimmedBorrow, 10);
+        if (days < 1 || days > 365) {
+          errors.borrowDays = 'Số ngày mượn eBook phải từ 1 đến 365';
+        } else {
+          validBorrowDays = days;
+        }
+      }
+    }
+// Giá bìa (BE đã có field price ≥ 0)
     const trimmedPrice = bookForm.price !== undefined && bookForm.price !== null
       ? bookForm.price.toString().trim()
       : '';
@@ -652,11 +679,16 @@ export default function CatalogManagement() {
         }
 
         // Upload PDF khi sách EBOOK hoặc BOTH (BE đã cho phép cả hai)
-        if (bookId && pdfFile && (payload.book_type === 'EBOOK' || payload.book_type === 'BOTH')) {
+        const isEbookType = payload.book_type === 'EBOOK' || payload.book_type === 'BOTH';
+        if (bookId && pdfFile && isEbookType) {
           const pdfData = new FormData();
           pdfData.append('file', pdfFile);
           await axiosInstance.post(`/api/admin/books/${bookId}/upload-pdf`, pdfData, {
-            params: { preview_pages: validPreviewPages || 10, is_free: false, borrow_days: 14 },
+            params: {
+              preview_pages: validPreviewPages || 10,
+              is_free: false,
+              borrow_days: validBorrowDays,
+            },
           });
         }
 
@@ -701,12 +733,12 @@ export default function CatalogManagement() {
     if (!deletingBook) return;
     try {
       await axiosInstance.delete(`/api/admin/books/${deletingBook.id}`);
-      showToast('Đã xóa đầu sách thành công!', 'success');
+      showToast('Đã vô hiệu hóa đầu sách.', 'success');
       setDeletingBook(null);
       fetchBooks();
     } catch (error) {
-      console.error('Lỗi xóa sách:', error);
-      const errorMsg = getApiErrorMessage(error, 'Không thể xóa sách. Vui lòng thử lại.');
+      console.error('Lỗi vô hiệu hóa sách:', error);
+      const errorMsg = getApiErrorMessage(error, 'Không thể vô hiệu hóa sách. Vui lòng thử lại.');
       showToast(errorMsg, 'error');
       setDeletingBook(null);
     }
@@ -996,7 +1028,7 @@ export default function CatalogManagement() {
                       </AdminIconButton>
                       <AdminIconButton
                         className="bg-white/90 backdrop-blur-sm text-slate-500 hover:text-rose-600 p-2 rounded-full shadow-md hover:bg-rose-50 transition-colors"
-                        title="Xóa sách"
+                        title="Vô hiệu hóa đầu sách"
                         onClick={() => setDeletingBook(row)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1247,7 +1279,7 @@ export default function CatalogManagement() {
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Định dạng tài liệu</label>
               <select 
-                className="w-full h-12 px-4 bg-white border border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 rounded-xl text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all"
+                className="w-full min-h-12 h-12 px-4 py-0 text-sm font-medium leading-[3rem] text-slate-700 bg-white border border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 rounded-xl focus:outline-none cursor-pointer transition-all"
                 value={bookForm.bookType}
                 onChange={(e) => handleFieldChange('bookType', e.target.value)}
               >
@@ -1276,12 +1308,31 @@ export default function CatalogManagement() {
               </div>
             )}
 
+            {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                  Số ngày mượn eBook
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={bookForm.borrowDays}
+                  onChange={(e) => handleFieldChange('borrowDays', e.target.value)}
+                  className="w-full"
+                  error={formErrors.borrowDays}
+                  helperText={!formErrors.borrowDays ? "Mặc định 14 ngày (1–365)" : undefined}
+                  placeholder="VD: 14"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                 Thể loại <span className="text-rose-500">*</span>
               </label>
               <select 
-                className={`w-full h-12 px-4 bg-white border ${formErrors.categoryId ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all`}
+                className={`w-full min-h-12 h-12 px-4 py-0 text-sm font-medium leading-[3rem] text-slate-700 bg-white border ${formErrors.categoryId ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl focus:outline-none cursor-pointer transition-all`}
                 value={bookForm.categoryId}
                 onChange={(e) => handleFieldChange('categoryId', e.target.value)}
               >
@@ -1394,12 +1445,12 @@ export default function CatalogManagement() {
       <Modal
         isOpen={!!deletingBook}
         onClose={() => setDeletingBook(null)}
-        title="Xác nhận xóa sách"
+        title="Vô hiệu hóa đầu sách"
         footer={
           <>
             <Button variant="outline" onClick={() => setDeletingBook(null)}>Hủy bỏ</Button>
             <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={confirmDelete}>
-              Xác nhận Xóa
+              Vô hiệu hóa đầu sách
             </Button>
           </>
         }
@@ -1410,15 +1461,11 @@ export default function CatalogManagement() {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-bold text-slate-800 leading-snug">
-              Bạn có chắc chắn muốn xóa đầu sách này không?
+              Vô hiệu hóa đầu sách này?
             </h3>
             <p className="text-sm text-slate-600 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
               <span className="font-bold block">{deletingBook?.title}</span>
               <span className="text-xs font-mono text-slate-500 mt-1 block">Barcode: {deletingBook?.barcode}</span>
-            </p>
-            <p className="text-xs font-medium text-rose-600 mt-3 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
-              Hành động này không thể hoàn tác sau khi xác nhận.
             </p>
           </div>
         </div>

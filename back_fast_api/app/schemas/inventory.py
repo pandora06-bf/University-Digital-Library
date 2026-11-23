@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-InventoryStatus = Literal["AVAILABLE", "BORROWED", "DAMAGED", "LOST"]
+InventoryStatus = Literal["AVAILABLE", "BORROWED", "DAMAGED", "LOST", "RETIRED"]
 
 
 class InventoryCreate(BaseModel):

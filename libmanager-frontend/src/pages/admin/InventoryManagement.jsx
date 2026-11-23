@@ -72,8 +72,6 @@ export default function InventoryManagement() {
       });
   }, [showToast]);
 
-  // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (không có RETIRED).
-  // Thanh lý FE → PATCH status=DAMAGED + damage_notes; UI vẫn hiện "Đã thanh lý".
   const mapCopyStatusLabel = (status) => {
     if (status === 'AVAILABLE') return 'Sẵn sàng';
     if (status === 'BORROWED') return 'Đang cho mượn';
@@ -290,14 +288,13 @@ export default function InventoryManagement() {
 
     setIsRetiring(true);
     try {
-      // BE không có RETIRED → dùng DAMAGED để loại khỏi tồn khả dụng + ghi chú thanh lý
       const note = retireReason.trim()
         ? `[Thanh lý] ${retireReason.trim()}`
         : (retiringRow.rawCondition
           ? `[Thanh lý] ${retiringRow.rawCondition}`
           : '[Thanh lý] Ngừng lưu thông');
       await axiosInstance.patch(`/api/admin/copies/${retiringRow.barcode}/condition`, {
-        status: 'DAMAGED',
+        status: 'RETIRED',
         damage_notes: note,
       });
       showToast('Thanh lý bản sao thành công!', 'success');
@@ -366,7 +363,8 @@ export default function InventoryManagement() {
     const matchStatus =
       statusFilter === 'ALL'
       || (statusFilter === 'ISSUE' && ['DAMAGED', 'LOST', 'RETIRED'].includes(item.rawStatus))
-      || (statusFilter === 'DAMAGED' && (item.rawStatus === 'DAMAGED' || item.rawStatus === 'RETIRED'))
+      || (statusFilter === 'RETIRED' && (item.rawStatus === 'RETIRED' || item.rawStatus === 'DAMAGED'))
+      || (statusFilter === 'DAMAGED' && item.rawStatus === 'DAMAGED')
       || item.rawStatus === statusFilter;
     
     return matchSearch && matchLocation && matchStatus;
@@ -565,25 +563,32 @@ export default function InventoryManagement() {
       ) : (
         <>
           {/* Subheader khi đã chọn sách */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white px-5 py-4 rounded-2xl border border-slate-200 shadow-xs">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between bg-white px-4 sm:px-5 py-4 rounded-2xl border border-slate-200 shadow-xs min-w-0">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="bg-indigo-100 text-indigo-700 px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono shrink-0">
                   Mã #{bookInfo?.id || bookId}
                 </span>
-                <h2 className="text-lg sm:text-xl font-bold text-slate-800 truncate max-w-xl">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-800 truncate min-w-0">
                   {bookInfo?.title || 'Đang tải thông tin sách...'}
                 </h2>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1 truncate">
                 Tác giả: <span className="font-semibold text-slate-700">{bookInfo?.author || 'Chưa cập nhật'}</span>
                 {bookInfo?.publisher && <> • NXB: <span className="font-semibold text-slate-700">{bookInfo.publisher}</span></>}
                 {(bookInfo?.publication_year || bookInfo?.year) && <> • Năm: <span className="font-semibold text-slate-700">{bookInfo?.publication_year || bookInfo?.year}</span></>}
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="primary" 
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
+              <Button
+                variant="outline"
+                icon={<Filter className="w-4 h-4" />}
+                onClick={() => navigate('/admin/loans')}
+              >
+                Xem Phiếu Mượn
+              </Button>
+              <Button
+                variant="primary"
                 icon={<Plus className="w-4 h-4" />}
                 onClick={() => {
                   setAddFormErrors({});
@@ -666,13 +671,11 @@ export default function InventoryManagement() {
         </button>
       </div>
 
-      {/* Main Content Area */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-        
-        {/* Filters Bar */}
+      {/* Main Content Area — filter bar đồng bộ Fines/Users */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-w-0 overflow-hidden">
         <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
           <div className="flex items-stretch gap-2 min-w-0">
-            <div className="min-w-0 flex-1 sm:max-w-md">
+            <div className="min-w-0 flex-1">
               <Input
                 type="text"
                 placeholder="Lọc theo mã vạch hoặc tên sách…"
@@ -680,6 +683,14 @@ export default function InventoryManagement() {
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!searchTerm.trim()) {
+                      showToast('Nhập mã vạch/tên sách rồi bấm Tra cứu (lọc bảng bên dưới).', 'warning');
+                    }
+                  }
+                }}
               />
             </div>
             <Button
@@ -696,9 +707,9 @@ export default function InventoryManagement() {
               Tra cứu
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <select
-              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
             >
@@ -708,7 +719,7 @@ export default function InventoryManagement() {
               ))}
             </select>
             <select
-              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
@@ -716,20 +727,10 @@ export default function InventoryManagement() {
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="BORROWED">Đang cho mượn</option>
               <option value="ISSUE">Cần xử lý (thanh lý / mất)</option>
-              <option value="DAMAGED">Đã thanh lý</option>
+              <option value="RETIRED">Đã thanh lý</option>
+              <option value="DAMAGED">Hỏng (DAMAGED)</option>
               <option value="LOST">Báo mất</option>
             </select>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              icon={<Filter className="w-4 h-4" />}
-              onClick={() => navigate('/admin/loans')}
-            >
-              Xem Phiếu Mượn
-            </Button>
           </div>
         </div>
 

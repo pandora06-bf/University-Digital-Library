@@ -132,8 +132,11 @@ def update_inventory_copy(
     for field, value in changes.items():
         setattr(copy, field, value)
     new_available = _is_available(copy)
-    if old_available != new_available:
-        book.available_stock += 1 if new_available else -1
+    if old_available and not new_available:
+        # Tránh âm available_stock (chk_book_available_stock_positive) khi dữ liệu lệch.
+        book.available_stock = max(0, int(book.available_stock or 0) - 1)
+    elif not old_available and new_available:
+        book.available_stock = int(book.available_stock or 0) + 1
 
     db.commit()
     db.refresh(copy)
