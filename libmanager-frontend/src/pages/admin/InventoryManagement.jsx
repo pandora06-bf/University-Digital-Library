@@ -72,8 +72,6 @@ export default function InventoryManagement() {
       });
   }, [showToast]);
 
-  // BE chỉ nhận AVAILABLE | BORROWED | DAMAGED | LOST (chưa có RETIRED trên schema update).
-  // Thanh lý FE → PATCH status=DAMAGED + damage_notes; UI vẫn hiện "Đã thanh lý".
   const mapCopyStatusLabel = (status) => {
     if (status === 'AVAILABLE') return 'Sẵn sàng';
     if (status === 'BORROWED') return 'Đang cho mượn';
@@ -290,14 +288,13 @@ export default function InventoryManagement() {
 
     setIsRetiring(true);
     try {
-      // Schema inventory chưa nhận RETIRED → dùng DAMAGED để loại khỏi tồn khả dụng.
       const note = retireReason.trim()
         ? `[Thanh lý] ${retireReason.trim()}`
         : (retiringRow.rawCondition
           ? `[Thanh lý] ${retiringRow.rawCondition}`
           : '[Thanh lý] Ngừng lưu thông');
       await axiosInstance.patch(`/api/admin/copies/${retiringRow.barcode}/condition`, {
-        status: 'DAMAGED',
+        status: 'RETIRED',
         damage_notes: note,
       });
       showToast('Thanh lý bản sao thành công!', 'success');
@@ -366,7 +363,8 @@ export default function InventoryManagement() {
     const matchStatus =
       statusFilter === 'ALL'
       || (statusFilter === 'ISSUE' && ['DAMAGED', 'LOST', 'RETIRED'].includes(item.rawStatus))
-      || (statusFilter === 'DAMAGED' && (item.rawStatus === 'DAMAGED' || item.rawStatus === 'RETIRED'))
+      || (statusFilter === 'RETIRED' && (item.rawStatus === 'RETIRED' || item.rawStatus === 'DAMAGED'))
+      || (statusFilter === 'DAMAGED' && item.rawStatus === 'DAMAGED')
       || item.rawStatus === statusFilter;
     
     return matchSearch && matchLocation && matchStatus;
@@ -729,7 +727,8 @@ export default function InventoryManagement() {
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="BORROWED">Đang cho mượn</option>
               <option value="ISSUE">Cần xử lý (thanh lý / mất)</option>
-              <option value="DAMAGED">Đã thanh lý</option>
+              <option value="RETIRED">Đã thanh lý</option>
+              <option value="DAMAGED">Hỏng (DAMAGED)</option>
               <option value="LOST">Báo mất</option>
             </select>
           </div>

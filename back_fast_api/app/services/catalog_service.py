@@ -22,7 +22,7 @@ def is_book_disabled(book: Book, copies) -> bool:
 def get_catalog_tree_service(db: Session) -> Dict[str, Any]:
     subjects = db.scalars(select(Subject).order_by(Subject.subject_code)).all()
     categories = db.scalars(select(Category).order_by(Category.id.asc())).all()
-    books = db.scalars(select(Book)).all()
+    books = db.scalars(select(Book).where(Book.is_active.is_(True))).all()
 
     subject_tree = []
     for subj in subjects:
@@ -57,6 +57,12 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy sách với mã {book_id}",
+        )
+
+    if not book.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sách hiện đã bị vô hiệu hóa hoặc ngừng lưu hành",
         )
 
     copies = db.scalars(

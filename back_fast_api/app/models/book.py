@@ -64,7 +64,9 @@ class Book(Base):
     num_pages: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     book_type: Mapped[str] = mapped_column(String(50), nullable=False)
     available_stock: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
-    
+    # Soft-delete UC09 E3: False = vô hiệu hóa, giữ lịch sử mượn/phạt
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default="true", default=True, nullable=False)
+
     search_vector: Mapped[Optional[str]] = mapped_column(TSVECTOR, nullable=True)
 
     category_id: Mapped[Optional[int]] = mapped_column(

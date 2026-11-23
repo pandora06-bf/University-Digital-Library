@@ -70,7 +70,7 @@ def search_books_advanced(
         raise ValueError(f"page_size phải trong khoảng 1..{MAX_PAGE_SIZE}")
     offset = (page - 1) * page_size
 
-    stmt = select(Book)
+    stmt = select(Book).where(Book.is_active.is_(True))
 
     # 1. Full-text search trên nhan đề, tác giả, NXB, mô tả, từ khóa
     search_terms = normalize_tsquery_text(query_text)

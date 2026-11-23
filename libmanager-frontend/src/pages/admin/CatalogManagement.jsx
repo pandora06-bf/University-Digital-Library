@@ -220,7 +220,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
           <Edit2 className="w-4 h-4" />
         </AdminIconButton>
         <AdminIconButton
-          title="Xóa sách"
+          title="Vô hiệu hóa đầu sách"
           onClick={() => onDelete(row)}
           className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
         >
@@ -733,12 +733,12 @@ export default function CatalogManagement() {
     if (!deletingBook) return;
     try {
       await axiosInstance.delete(`/api/admin/books/${deletingBook.id}`);
-      showToast('Đã xóa đầu sách thành công!', 'success');
+      showToast('Đã vô hiệu hóa đầu sách.', 'success');
       setDeletingBook(null);
       fetchBooks();
     } catch (error) {
-      console.error('Lỗi xóa sách:', error);
-      const errorMsg = getApiErrorMessage(error, 'Không thể xóa sách. Vui lòng thử lại.');
+      console.error('Lỗi vô hiệu hóa sách:', error);
+      const errorMsg = getApiErrorMessage(error, 'Không thể vô hiệu hóa sách. Vui lòng thử lại.');
       showToast(errorMsg, 'error');
       setDeletingBook(null);
     }
@@ -1028,7 +1028,7 @@ export default function CatalogManagement() {
                       </AdminIconButton>
                       <AdminIconButton
                         className="bg-white/90 backdrop-blur-sm text-slate-500 hover:text-rose-600 p-2 rounded-full shadow-md hover:bg-rose-50 transition-colors"
-                        title="Xóa sách"
+                        title="Vô hiệu hóa đầu sách"
                         onClick={() => setDeletingBook(row)}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1279,7 +1279,7 @@ export default function CatalogManagement() {
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Định dạng tài liệu</label>
               <select 
-                className="w-full h-12 px-4 bg-white border border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 rounded-xl text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all"
+                className="w-full min-h-12 h-12 px-4 py-0 text-sm font-medium leading-[3rem] text-slate-700 bg-white border border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 rounded-xl focus:outline-none cursor-pointer transition-all"
                 value={bookForm.bookType}
                 onChange={(e) => handleFieldChange('bookType', e.target.value)}
               >
@@ -1332,7 +1332,7 @@ export default function CatalogManagement() {
                 Thể loại <span className="text-rose-500">*</span>
               </label>
               <select 
-                className={`w-full h-12 px-4 bg-white border ${formErrors.categoryId ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all`}
+                className={`w-full min-h-12 h-12 px-4 py-0 text-sm font-medium leading-[3rem] text-slate-700 bg-white border ${formErrors.categoryId ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl focus:outline-none cursor-pointer transition-all`}
                 value={bookForm.categoryId}
                 onChange={(e) => handleFieldChange('categoryId', e.target.value)}
               >
@@ -1445,12 +1445,12 @@ export default function CatalogManagement() {
       <Modal
         isOpen={!!deletingBook}
         onClose={() => setDeletingBook(null)}
-        title="Xác nhận xóa sách"
+        title="Vô hiệu hóa đầu sách"
         footer={
           <>
             <Button variant="outline" onClick={() => setDeletingBook(null)}>Hủy bỏ</Button>
             <Button variant="primary" className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600" onClick={confirmDelete}>
-              Xác nhận Xóa
+              Vô hiệu hóa đầu sách
             </Button>
           </>
         }
@@ -1461,15 +1461,11 @@ export default function CatalogManagement() {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-bold text-slate-800 leading-snug">
-              Bạn có chắc chắn muốn xóa đầu sách này không?
+              Vô hiệu hóa đầu sách này?
             </h3>
             <p className="text-sm text-slate-600 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
               <span className="font-bold block">{deletingBook?.title}</span>
               <span className="text-xs font-mono text-slate-500 mt-1 block">Barcode: {deletingBook?.barcode}</span>
-            </p>
-            <p className="text-xs font-medium text-rose-600 mt-3 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
-              Hành động này không thể hoàn tác sau khi xác nhận.
             </p>
           </div>
         </div>

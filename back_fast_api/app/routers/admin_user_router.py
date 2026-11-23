@@ -38,6 +38,9 @@ class UserUpdate(BaseModel):
 
 class LockBody(BaseModel):
     is_locked: bool
+    # FE gửi `reason`; chấp nhận thêm `lock_reason` cho tương thích
+    reason: str | None = Field(default=None, max_length=500)
+    lock_reason: str | None = Field(default=None, max_length=500)
 
 
 def _role(value: str) -> str:
@@ -61,6 +64,7 @@ def _present(u: User):
         "full_name": u.full_name, "email": u.email, "phone_number": u.phone_number,
         "department": u.department, "role": a.role,
         "is_locked": not a.is_active or u.is_borrowing_blocked,
+        "lock_reason": u.lock_reason,
         "total_fines": str(u.total_fines), "max_borrow_limit": u.max_borrow_limit,
     }
 
@@ -173,6 +177,13 @@ def lock_user(user_code: str, body: LockBody, db: Session = Depends(get_db),
         raise HTTPException(409, "Không thể mở khóa khi còn công nợ")
     user.account.is_active = not body.is_locked
     user.is_borrowing_blocked = body.is_locked
+    if body.is_locked:
+        reason = (body.reason or body.lock_reason or "").strip()
+        if not reason:
+            raise HTTPException(422, "Vui lòng nhập lý do khóa tài khoản")
+        user.lock_reason = reason
+    else:
+        user.lock_reason = None
     db.flush()
     data = _present(user)
     db.commit()

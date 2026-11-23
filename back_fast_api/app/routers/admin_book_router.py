@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -101,7 +100,7 @@ def update_book(
 @router.delete(
     "/{book_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Xóa đầu sách",
+    summary="Vô hiệu hóa đầu sách",
 )
 def delete_book(
     book_id: int,
@@ -109,21 +108,11 @@ def delete_book(
     _: Account = Depends(require_roles("ADMIN")),
 ) -> None:
     book = _get_book_or_404(db, book_id)
-    cover_path = book.cover_image_path
-    ebook_path = book.ebook.file_path if book.ebook else None
-
-    try:
-        db.delete(book)
-        db.commit()
-    except IntegrityError as exc:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Không thể xóa sách vì đang có dữ liệu mượn/trả liên quan",
-        ) from exc
-
-    delete_static_file(cover_path)
-    delete_static_file(ebook_path)
+    if not book.is_active:
+        return
+    book.is_active = False
+    book.available_stock = 0
+    db.commit()
 
 
 @router.post(
