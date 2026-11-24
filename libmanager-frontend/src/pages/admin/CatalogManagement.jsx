@@ -876,7 +876,7 @@ export default function CatalogManagement() {
         <div className="p-4 border-b border-slate-100 flex flex-col 2xl:flex-row gap-4 items-start 2xl:items-center justify-between bg-slate-50/50 rounded-t-2xl">
           <div className="flex flex-col xl:flex-row xl:items-center gap-3 w-full 2xl:flex-1">
             {/* Search + Tra cứu ngay (không chờ debounce) */}
-            <div className="w-full xl:min-w-[22rem] xl:max-w-[26rem] xl:flex-1 flex items-stretch gap-2">
+            <div className="w-full xl:min-w-[28rem] xl:flex-[2] flex items-stretch gap-2">
               <div className="min-w-0 flex-1">
                 <Input
                   type="text"
