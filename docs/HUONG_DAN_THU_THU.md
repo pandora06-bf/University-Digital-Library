@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Cập nhật** | 24/11/2026 — theo seed live + cổng Admin hiện tại |
+| **Cập nhật** | 24/11/2026 (tối) — seed live + chỉnh quầy/tồn kho/eBook/phạt sau polish Admin |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **FE local** | http://127.0.0.1:5173 |
@@ -51,9 +51,9 @@ Script thuyết trình chi tiết: `docs/SCRIPT_THUYET_TRINH_ADMIN_FE.md`.
 | Xuất mượn | `SV-DEMO-007` hoặc `SV-DEMO-011` | Không nợ. Quét `DEMO-BC-005-01` hoặc `DEMO-BC-005-03` (sẵn sàng). **Không** nhập mã phiếu vào ô mã vạch |
 | Xuất bị chặn | `SV-DEMO-001` / `003` / `005` / `009` | Tra được hồ sơ, không xuất vì nợ / khóa |
 | Nhận trả | `SV-DEMO-009` hoặc `DEMO-BC-005-02` | Đang quá hạn *Introduction to Algorithms* |
-| Thu phạt chưa thu | `SV-DEMO-003` **250.000** · `005` **280.000** · `009` **45.000** · `001` **89.000** | Tra MSSV → lọc Chưa thu → mở Thu tiền rồi **Hủy** |
+| Thu phạt chưa thu | `SV-DEMO-003` **250.000** · `005` **280.000** · `009` **45.000** · `001` **89.000** | Tra MSSV → lọc Chưa thu / loại **Mất·hỏng** hoặc **Trễ hạn** → mở Thu tiền rồi **Hủy** |
 | Thu phạt đã thu | `SV-DEMO-011` · `SV-DEMO-007` | Lọc **Đã hoàn tất** → Chi tiết |
-| Báo mất | Xem `SV-DEMO-005`, `003` | Lập mới: phiếu **#15** · `SV-DEMO-009` · mã sách `DEMO-BC-005-02` rồi **Hủy** |
+| Báo mất | Xem `SV-DEMO-005`, `003` | Lập mới: phiếu **#15** · `SV-DEMO-009` · mã `DEMO-BC-005-02` rồi **Hủy**. Có giá bìa → bồi thường theo giá (không chỉnh tay) |
 | Người dùng | Các mã trên | Khóa+nợ: 001/003/005/009. Sạch: 007/011/`GV-DEMO-002` |
 | Phòng | `admin` | CRUD phòng; ngừng phòng còn lịch → toast nghiệp vụ |
 | Check-in phòng | Ngày đặt trên seed | Chỉ trong **15 phút đầu** slot; ngoài cửa sổ → từ chối |
@@ -65,15 +65,15 @@ Script thuyết trình chi tiết: `docs/SCRIPT_THUYET_TRINH_ADMIN_FE.md`.
 
 | Màn hình | Đường dẫn | Ghi chú |
 |----------|-----------|---------|
-| Danh mục sách | `/admin/catalog` | CRUD đầu sách, thể loại, bìa/PDF; soft-delete `is_active` |
-| eBook / PDF | `/admin/ebooks` | List + upload + xem trước; nhãn eBook / Cả hai |
-| Tồn kho | `/admin/inventory` | Bản sao, vị trí kệ, thanh lý / hư hỏng / báo mất |
+| Danh mục sách | `/admin/catalog` | CRUD đầu sách, thể loại, bìa/PDF; soft-delete `is_active`; cấu hình eBook có thể lưu không cần upload lại PDF |
+| eBook / PDF | `/admin/ebooks` | List + upload + xem trước; **Lưu cấu hình** (trang xem trước / ngày mượn / miễn phí) không bắt buộc file mới |
+| Tồn kho | `/admin/inventory` · `/admin/books/:id` | Bản sao, vị trí kệ; **Thanh lý** ≠ **Xóa cứng**; mất/hỏng khi đang mượn → quầy Sự cố / Trả |
 | Mượn / Trả | `/admin/loans` | Lookup + checkout + check-in; không có bảng list phiếu |
-| Thu phạt | `/admin/fines` | Tra từng MSSV; thu đủ một lần tiền mặt; kèm khoản đã thu |
-| Báo mất / Hỏng | `/admin/incidents` | List + lập biên bản; lọc loại mất/hỏng |
-| Người dùng | `/admin/users` | List / tạo / khóa / reset / import |
-| Phòng học nhóm | `/admin/rooms` | CRUD phòng |
-| Check-in phòng | `/admin/rooms/checkin` | Theo ngày; cửa sổ 15 phút |
+| Thu phạt | `/admin/fines` | Tra từng MSSV; thu đủ một lần; lọc loại Trễ hạn / Mất·hỏng / Phạt khác |
+| Báo mất / Hỏng | `/admin/incidents` | List + lập biên bản; bồi thường theo giá bìa nếu sách có giá |
+| Người dùng | `/admin/users` | List / tạo (MSSV 3–50, username tuỳ chọn) / khóa / reset / import |
+| Phòng học nhóm | `/admin/rooms` | CRUD phòng; nút **Check-in mã đặt** sang màn check-in |
+| Check-in phòng | `/admin/rooms/checkin` | Vào từ Phòng (hoặc search header); theo ngày; cửa sổ 15 phút |
 | GD chưa khớp | `/admin/unmatched` | Lọc Chưa khớp / Đã khớp / Tất cả |
 
 ---
@@ -116,7 +116,8 @@ Trả lần 2 cùng mã → toast không còn phiếu — đúng nghiệp vụ. 
 
 1. Nhập đúng **MSSV** → **Tra cứu**. Bảng trống đến khi tra.  
 2. Lọc **Chưa thu** / **Đã hoàn tất**.  
-3. **Thu tiền** → xác nhận tiền mặt **đủ toàn bộ** nợ một lần (không thu một phần).
+3. Lọc loại vi phạm (nếu cần): **Trễ hạn trả sách** · **Mất / hỏng sách** · **Phạt khác** (BE gắn loại theo biên bản sự cố, không đoán tay trên UI).  
+4. **Thu tiền** → xác nhận tiền mặt **đủ toàn bộ** nợ một lần (không thu một phần).
 
 | MSSV | Live |
 |------|------|
@@ -135,9 +136,14 @@ Sau thu: `total_fines = 0`, mở khóa mượn (trừ khi còn sách quá hạn 
 ## 6. Báo mất / hỏng — `/admin/incidents`
 
 1. Bảng list + lọc **Tất cả / Mất sách / Hỏng nặng**. Trạng thái ghi nhận luôn **Đã ghi nhận** (không workflow PENDING).  
-2. **Lập biên bản** → tra mã bạn đọc hoặc id phiếu đang `BORROWED`/`OVERDUE`.  
-3. Chọn mất hoặc hỏng → Lưu. Hệ thống cộng phạt (giá bìa ± quá hạn), khóa mượn; mất → copy `LOST`, hỏng → copy `RETIRED`.  
-4. Thu tiền sang `/admin/fines?mssv=…`.
+2. **Lập biên bản** → tra **MSSV / mã phiếu / barcode** phiếu đang `BORROWED`/`OVERDUE` rồi Enter hoặc **Tra cứu**.  
+3. Chọn mất hoặc hỏng → mô tả → Lưu.  
+   - Sách **có giá bìa**: khoản bồi thường theo giá (± quá hạn) — form **không** cho sửa tay số tiền.  
+   - Sách **thiếu giá**: bắt buộc nhập số bồi thường thủ công.  
+4. Hệ thống cộng phạt, khóa mượn; mất → copy `LOST`, hỏng → copy `RETIRED`.  
+5. Thu tiền sang `/admin/fines?mssv=…`.  
+
+Không dùng form **sửa tồn kho** để “báo mất” thay cho bước này.
 
 **Xem biên bản seed (đã ghi nhận):** `SV-DEMO-005` (mất `DEMO-BC-003-01`), `SV-DEMO-003` (mất `DEMO-BC-002-01`) — không lập lại trên các phiếu này.
 
@@ -155,17 +161,21 @@ Cách làm: **Lập biên bản** → nhập `SV-DEMO-009` hoặc `15` hoặc `D
 
 ### `/admin/catalog`
 
-- Tìm (debounce ~0,35s) + phân trang server 10.  
+- Tìm (ô search rộng trên desktop) + debounce ~0,35s + phân trang server 10.  
 - Lọc thể loại / NXB / định dạng (Vật lý, eBook, Cả hai — khớp đúng loại).  
 - Cột **Số bản sao (sẵn sàng)** = bản `AVAILABLE` / tổng bản in.  
-- Thêm / sửa / **Vô hiệu hóa đầu sách** (`is_active=false`, không xóa cứng).  
+- Thêm / sửa / **Vô hiệu hóa đầu sách** (`is_active=false`, không xóa cứng; bản sao barcode vẫn còn trong kho).  
+- Sửa đầu sách đã có PDF: đổi trang xem trước / ngày mượn / miễn phí rồi **Lưu** — không bắt buộc chọn PDF mới.  
 - Thẻ **Thể loại** → CRUD thể loại.
 
 ### `/admin/inventory`
 
 - Ô trên: **mã đầu sách hoặc tên** (một kết quả mở ngay; nhiều kết quả → gợi ý). Sau khi mở đầu sách, lọc barcode trong bảng.  
 - Trạng thái filter (Tiếng Việt): Sẵn sàng · Đang cho mượn · Cần xử lý · Đã thanh lý · Hư hỏng · Báo mất.  
-- Không thanh lý bản đang mượn. Sau thanh lý không đưa lại Sẵn sàng.
+- Cột **Trạng thái** = lưu thông (`AVAILABLE` / `BORROWED` / `LOST`…). Cột **Tình trạng** = vật lý (Nguyên vẹn / Hư hỏng / Báo mất / Đã thanh lý) — theo status, không bị ghi chú `[Thanh lý]…` đè thành “Hư hỏng”.  
+- **Thanh lý** (icon Archive): ngừng lưu thông, giữ barcode; không thanh lý bản đang mượn; sau thanh lý / mất / hỏng **không** đưa lại Sẵn sàng.  
+- **Xóa cứng** (icon thùng rác): chỉ bản **Sẵn sàng** chưa từng có lịch sử mượn; khác Thanh lý.  
+- Thêm bản sao mới luôn **Sẵn sàng**. Sửa bản sẵn sàng: chỉ Sẵn sàng hoặc Thanh lý kho — **không** chọn tay Báo mất / Hư hỏng (làm ở Sự cố / Trả sách).
 
 | ID | Đầu sách | Mã mẫu | Trạng thái |
 |----|----------|--------|------------|
@@ -179,7 +189,8 @@ Cách làm: **Lập biên bản** → nhập `SV-DEMO-009` hoặc `15` hoặc `D
 
 - List eBook + Cả hai; badge loại cạnh tên.  
 - Thẻ: Tất cả / Đã có PDF / Chưa có PDF.  
-- Tải / thay PDF; xem trước khi đã có file. Form: trang xem trước 5–10, ngày mượn, miễn phí đọc.
+- Tải / thay PDF; xem trước khi đã có file.  
+- Modal cập nhật: chọn PDF mới **hoặc** chỉ sửa trang xem trước (5–10) / ngày mượn / miễn phí → **Lưu cấu hình**.
 
 ---
 
@@ -187,7 +198,8 @@ Cách làm: **Lập biên bản** → nhập `SV-DEMO-009` hoặc `15` hoặc `D
 
 ### `/admin/rooms`
 
-Xem / thêm / sửa / ngừng phòng. Ngừng phòng còn lịch tương lai → toast nghiệp vụ.
+Xem / thêm / sửa / ngừng phòng. Ngừng phòng còn lịch tương lai → toast nghiệp vụ.  
+Nút **Check-in mã đặt** → `/admin/rooms/checkin` (không có mục riêng trên sidebar).
 
 ### `/admin/rooms/checkin`
 
@@ -203,7 +215,10 @@ Seed ngày **24/11/2026** (đã qua cửa sổ buổi tối): đã vào `SV-DEMO
 
 ### `/admin/users`
 
-Thêm / sửa / khóa–mở (có lý do khóa) / reset mật khẩu / import CSV·XLSX. Reset theo **Account**, không theo MSSV.
+Thêm / sửa / khóa–mở (có lý do khóa) / reset mật khẩu / import CSV·XLSX.  
+- MSSV / mã: **3–50** ký tự.  
+- **Username** đăng nhập (tuỳ chọn) khi tạo; để trống → hệ thống tạo `sv{mã}`.  
+- Reset mật khẩu theo **Account**, không theo MSSV. Mật khẩu tạm chỉ hiện **một lần**.
 
 ### `/admin/unmatched`
 
@@ -236,10 +251,10 @@ Thêm / sửa / khóa–mở (có lý do khóa) / reset mật khẩu / import CS
 - `GET /api/admin/loans/copy?barcode=` — tra bản trước xuất
 - `GET /api/admin/loans/active-return?barcode=` — thẻ đang mượn
 - `POST /api/admin/loans/checkout` · `POST /api/admin/loans/checkin`
-- `GET /api/admin/fines/lookup?include_paid=` · `POST /api/admin/fines/collect`
-- `GET /api/admin/incidents` · `POST /api/admin/loans/incident`
+- `GET /api/admin/fines/lookup?include_paid=` (kèm `fine_type` / `has_incident`) · `POST /api/admin/fines/collect`
+- `GET /api/admin/incidents` · `POST /api/admin/loans/incident` (`loan_id` số)
 - `GET /api/books/search` — `exact_format`, `exact_publisher`, `total_copies`, `available_copies`
-- Sách / thể loại / tồn kho / eBook preview
+- Sách / thể loại / tồn kho · `PATCH /api/admin/books/{id}/ebook-config` · eBook preview
 - `GET|POST|PUT /api/admin/users`, lock, import, reset
 - `GET /api/admin/room-bookings?booking_date=` · `POST …/checkin`
 - `GET /api/admin/wallet/unmatched?status=unresolved|assigned|all` · `POST …/assign`

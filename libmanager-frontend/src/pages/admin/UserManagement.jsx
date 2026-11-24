@@ -28,6 +28,7 @@ const roleLabelVi = (role) =>
 
 const EMPTY_FORM = {
   user_code: '',
+  username: '',
   full_name: '',
   email: '',
   phone_number: '',
@@ -39,7 +40,8 @@ function mapApiUser(u) {
   return {
     // BE reset-password cần Account.id (int), không phải user_code
     account_id: u.account_id ?? u.account?.id ?? (Number.isInteger(u.id) ? u.id : null),
-    user_code: u.user_code || u.student_id || u.username || u.id,
+    user_code: u.user_code || u.student_id || u.id,
+    username: u.username || u.account?.username || '',
     full_name: u.full_name || u.name || '',
     email: u.email || '',
     phone_number: u.phone_number || u.phone || '',
@@ -89,29 +91,18 @@ export default function UserManagement() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  /** Tổng SV / khóa / công nợ trên toàn DB — không đếm theo trang (trang 1 toàn GV nên trước đây = 0). */
+  /** Tổng SV / khóa / công nợ — dùng filter BE + total, không quét toàn bộ trang. */
   const fetchStats = useCallback(async () => {
     try {
-      const [{ data: studentPage }, { data: first }] = await Promise.all([
+      const [{ data: students }, { data: locked }, { data: debt }] = await Promise.all([
         axiosInstance.get('/api/admin/users', { params: { role: 'STUDENT', page: 1, page_size: 1 } }),
-        axiosInstance.get('/api/admin/users', { params: { page: 1, page_size: 100 } }),
+        axiosInstance.get('/api/admin/users', { params: { locked: true, page: 1, page_size: 1 } }),
+        axiosInstance.get('/api/admin/users', { params: { has_debt: true, page: 1, page_size: 1 } }),
       ]);
-      const total = Number(first?.total || 0);
-      const pages = Math.max(1, Math.ceil(total / 100));
-      let items = [...(first?.items || [])];
-      if (pages > 1) {
-        const rest = await Promise.all(
-          Array.from({ length: pages - 1 }, (_, i) =>
-            axiosInstance.get('/api/admin/users', { params: { page: i + 2, page_size: 100 } })
-          )
-        );
-        for (const res of rest) items = items.concat(res.data?.items || []);
-      }
-      const mapped = items.map(mapApiUser);
       setStats({
-        students: Number(studentPage?.total || 0),
-        locked: mapped.filter((u) => u.is_locked).length,
-        debt: mapped.filter((u) => Number(u.total_fines) > 0).length,
+        students: Number(students?.total || 0),
+        locked: Number(locked?.total || 0),
+        debt: Number(debt?.total || 0),
       });
     } catch {
       /* giữ stats cũ nếu lỗi */
@@ -177,6 +168,7 @@ export default function UserManagement() {
     setEditing(row);
     setForm({
       user_code: row.user_code,
+      username: row.username || '',
       full_name: row.full_name,
       email: row.email || '',
       phone_number: row.phone_number || '',
@@ -195,11 +187,16 @@ export default function UserManagement() {
     const phone = form.phone_number.trim();
     const dept = form.department.trim();
 
-    // MSSV/mã: chữ số hoặc chữ+số, 3–20 ký tự (vd 50214569, GV001)
+    // Khớp BE: user_code 3–50; username tùy chọn [A-Za-z0-9_.-]
     if (!code) err.user_code = 'MSSV / mã bắt buộc';
-    else if (!/^[A-Za-z0-9_-]{3,20}$/.test(code)) {
-      err.user_code = 'Mã 3–20 ký tự (chữ/số/_/-), không khoảng trắng.';
+    else if (!/^[A-Za-z0-9_-]{3,50}$/.test(code)) {
+      err.user_code = 'Mã 3–50 ký tự (chữ/số/_/-), không khoảng trắng.';
     }
+    const username = (form.username || '').trim();
+    if (!editing && username && !/^[A-Za-z0-9_.-]{3,50}$/.test(username)) {
+      err.username = 'Username 3–50 ký tự (chữ/số/._-), hoặc để trống để hệ thống tự tạo.';
+    }
+
 
     // Họ tên: ≥ 2 từ, chỉ chữ cái + khoảng trắng (có dấu tiếng Việt)
     if (!name) err.full_name = 'Họ tên bắt buộc';
@@ -245,6 +242,8 @@ export default function UserManagement() {
       department: form.department.trim(),
       role: form.role,
     };
+    const username = (form.username || '').trim();
+    if (!editing && username) payload.username = username;
 
     try {
       if (editing) {
@@ -724,8 +723,18 @@ export default function UserManagement() {
             value={form.user_code}
             disabled={Boolean(editing)}
             error={formErrors.user_code}
+            helperText={!editing && !formErrors.user_code ? '3–50 ký tự (chữ/số/_/-)' : undefined}
             onChange={(e) => setForm((f) => ({ ...f, user_code: e.target.value }))}
           />
+          {!editing && (
+            <Input
+              label="Username đăng nhập (tuỳ chọn)"
+              value={form.username}
+              error={formErrors.username}
+              helperText={!formErrors.username ? 'Để trống → hệ thống tạo sv{mã}. VD: demo_student_001' : undefined}
+              onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+            />
+          )}
           <Input
             label="Họ tên"
             value={form.full_name}

@@ -75,3 +75,11 @@ class UploadResponse(BaseModel):
     book_id: int
     file_path: str
     message: str
+
+
+class EbookConfigUpdate(BaseModel):
+    """Cập nhật cấu hình eBook khi đã có PDF (không cần upload lại file)."""
+
+    is_free: bool | None = None
+    preview_pages: int | None = Field(default=None, ge=5, le=10)
+    borrow_days: int | None = Field(default=None, ge=1, le=365)

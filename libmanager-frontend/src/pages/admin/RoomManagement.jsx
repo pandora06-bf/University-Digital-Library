@@ -23,7 +23,6 @@ const mapRoom = (r) => ({
   floor: r.floor || '',
   capacity: Number(r.capacity) || 0,
   slot_price: Number(r.price_per_slot ?? r.slot_price) || 0,
-  room_type: r.room_type || '',
   is_active: Boolean(r.is_active),
 });
 

@@ -325,11 +325,6 @@ export default function AdminLayout() {
                     )}
                     {item.icon}
                     <span className="flex-1 leading-tight">{item.label}</span>
-                    {item.comingSoon && (
-                      <span className="text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-400/90 text-amber-950 shrink-0">
-                        Đang PT
-                      </span>
-                    )}
                   </>
                 );
               }}

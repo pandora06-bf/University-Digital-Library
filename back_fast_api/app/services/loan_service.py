@@ -864,6 +864,21 @@ def lookup_fines_service(db: Session, user_code: str, include_paid: bool = False
     fines = db.scalars(stmt).all()
     unpaid_count = sum(1 for fine in fines if fine.payment_status == "UNPAID")
 
+    # Gắn loại phạt theo biên bản sự cố (tránh FE đoán sai từ số tiền).
+    loan_ids = [f.loan_id for f in fines if f.loan_id is not None]
+    incident_loan_ids: set[int] = set()
+    if loan_ids:
+        incident_loan_ids = set(
+            db.scalars(select(Incident.loan_id).where(Incident.loan_id.in_(loan_ids))).all()
+        )
+
+    def _fine_type(fine: Fine) -> str:
+        if fine.loan_id in incident_loan_ids:
+            return "LOST_DAMAGE"
+        if (fine.overdue_days or 0) > 0:
+            return "OVERDUE"
+        return "OTHER"
+
     return {
         "user_code": user.user_code,
         "full_name": user.full_name,
@@ -879,6 +894,8 @@ def lookup_fines_service(db: Session, user_code: str, include_paid: bool = False
                 "total_amount": f.total_amount,
                 "payment_status": f.payment_status,
                 "created_at": f.created_at,
+                "has_incident": f.loan_id in incident_loan_ids,
+                "fine_type": _fine_type(f),
             }
             for f in fines
         ],

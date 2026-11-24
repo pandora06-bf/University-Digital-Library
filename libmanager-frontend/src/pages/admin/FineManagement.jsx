@@ -105,16 +105,39 @@ export default function FineManagement() {
       }
       const mapped = fines.map((f) => {
         const paid = String(f.payment_status || '').toUpperCase() === 'PAID';
+        const overdueDays = Number(f.overdue_days) || 0;
+        const total = Number(f.total_amount || 0);
+        // Ưu tiên fine_type/has_incident từ BE; fallback heuristic chỉ khi thiếu field.
+        const apiType = String(f.fine_type || '').toUpperCase();
+        let fineType = 'OTHER';
+        if (apiType === 'LOST_DAMAGE' || apiType === 'OVERDUE' || apiType === 'OTHER') {
+          fineType = apiType;
+        } else if (f.has_incident) {
+          fineType = 'LOST_DAMAGE';
+        } else if (overdueDays > 0) {
+          fineType = 'OVERDUE';
+        } else if (total > 0) {
+          fineType = 'OTHER';
+        }
+        let reason;
+        if (fineType === 'LOST_DAMAGE') {
+          reason = overdueDays > 0
+            ? `Bồi thường mất/hỏng + trễ hạn ${overdueDays} ngày (phiếu ${f.loan_id || '—'})`
+            : `Bồi thường mất/hỏng sách (phiếu ${f.loan_id || '—'})`;
+        } else if (fineType === 'OVERDUE') {
+          reason = `Trễ hạn ${overdueDays} ngày (phiếu mượn ${f.loan_id || '—'})`;
+        } else {
+          reason = `Phạt phiếu mượn ${f.loan_id || '—'}`;
+        }
         return {
           id: String(f.fine_id),
           date: f.created_at ? new Date(f.created_at).toLocaleDateString('vi-VN') : '—',
           user: data.full_name || q,
           mssv: data.user_code || q,
-          reason: f.overdue_days
-            ? `Trễ hạn ${f.overdue_days} ngày (phiếu mượn ${f.loan_id || '—'})`
-            : `Phạt phiếu mượn ${f.loan_id || '—'}`,
-          amount: `${Number(f.total_amount || 0).toLocaleString('vi-VN')} ₫`,
-          amountNum: Number(f.total_amount || 0),
+          fineType,
+          reason,
+          amount: `${total.toLocaleString('vi-VN')} ₫`,
+          amountNum: total,
           status: paid ? 'Đã hoàn tất' : 'Chưa thu',
           statusColor: paid ? 'emerald' : 'rose',
           action: paid ? 'Chi tiết' : 'Thu tiền',
@@ -181,7 +204,7 @@ export default function FineManagement() {
       render: (value, row) => (
         <div className="flex items-center gap-2 min-w-0 max-w-xs">
           <AlertCircle className={`w-4 h-4 shrink-0 ${
-            row.reason.includes('Trễ hạn') ? 'text-amber-500' : 'text-rose-500'
+            row.fineType === 'OVERDUE' ? 'text-amber-500' : 'text-rose-500'
           }`} />
           <span className="font-medium text-slate-700 truncate" title={row.reason}>{row.reason}</span>
         </div>
@@ -266,8 +289,9 @@ export default function FineManagement() {
   // Ô MSSV là khóa tra cứu API, không lọc lại bảng (dễ loại mất đúng dòng vừa tìm).
   const filteredData = finesData.filter((item) => {
     const matchType = typeFilter === 'Loại vi phạm (Tất cả)'
-      || (typeFilter === 'Trễ hạn trả sách' && item.reason.includes('Trễ hạn'))
-      || (typeFilter === 'Phạt phiếu mượn' && item.reason.includes('Phạt phiếu'));
+      || (typeFilter === 'Trễ hạn trả sách' && item.fineType === 'OVERDUE')
+      || (typeFilter === 'Mất / hỏng sách' && item.fineType === 'LOST_DAMAGE')
+      || (typeFilter === 'Phạt khác' && item.fineType === 'OTHER');
     const matchStatus = statusFilter === 'Trạng thái (Tất cả)' || item.status === statusFilter;
     return matchType && matchStatus;
   });
@@ -397,7 +421,8 @@ export default function FineManagement() {
             >
               <option>Loại vi phạm (Tất cả)</option>
               <option>Trễ hạn trả sách</option>
-              <option>Phạt phiếu mượn</option>
+              <option>Mất / hỏng sách</option>
+              <option>Phạt khác</option>
             </select>
             <select
               className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"

@@ -49,7 +49,6 @@ export default function InventoryManagement() {
     zone: 'Khu A',
     floor: 'Tầng 1',
     shelf: 'Kệ 1',
-    status: 'AVAILABLE',
     condition: ''
   });
 
@@ -120,8 +119,20 @@ export default function InventoryManagement() {
   const isCopyRetired = (status) =>
     status === 'DAMAGED' || status === 'RETIRED' || status === 'LOST';
 
-  // Thanh lý = ngừng lưu thông. UC09 không có bước đưa lại Sẵn sàng.
-  const isLiquidatedStatus = (status) => status === 'DAMAGED' || status === 'RETIRED';
+  // Ngừng lưu thông: không đưa lại Sẵn sàng (UC09).
+  const isLiquidatedStatus = (status) =>
+    status === 'DAMAGED' || status === 'RETIRED' || status === 'LOST';
+  // Đang mượn / đã ngừng: không đổi status tay trên form sửa.
+  const isStatusLocked = (status) => isLiquidatedStatus(status) || status === 'BORROWED';
+
+  // Ưu tiên status lưu thông: ghi chú [Thanh lý]/mất không được đè thành "Hư hỏng".
+  const mapConditionLabel = (status, damageNotes) => {
+    if (status === 'LOST') return 'Báo mất';
+    if (status === 'RETIRED') return 'Đã thanh lý';
+    if (status === 'DAMAGED') return 'Hư hỏng';
+    if (damageNotes) return 'Hư hỏng';
+    return 'Nguyên vẹn';
+  };
 
   const mapCopyRow = (c, targetBook) => ({
     id: c.copy_barcode || c.barcode,
@@ -129,7 +140,7 @@ export default function InventoryManagement() {
     location: `${c.zone} - ${c.floor} - ${c.shelf}`,
     status: mapCopyStatusLabel(c.status),
     statusType: mapCopyStatusType(c.status),
-    condition: c.damage_notes ? 'Hư hỏng' : 'Nguyên vẹn',
+    condition: mapConditionLabel(c.status, c.damage_notes),
     title: targetBook?.title || '...',
     author: targetBook?.author || '',
     rawZone: c.zone,
@@ -415,8 +426,8 @@ export default function InventoryManagement() {
         shelf: editForm.shelf.trim(),
         damage_notes: editForm.condition ? editForm.condition.trim() : null,
       };
-      // Bản đã thanh lý: chỉ sửa vị trí và ghi chú, không gửi status (tránh đưa lại Sẵn sàng).
-      if (!isLiquidatedStatus(editingRow.rawStatus)) {
+      // Bản đang mượn / đã ngừng lưu thông: chỉ sửa vị trí và ghi chú, không gửi status.
+      if (!isStatusLocked(editingRow.rawStatus)) {
         payload.status = editForm.status;
       }
       await axiosInstance.patch(`/api/admin/copies/${editingRow.barcode}/condition`, payload);
@@ -525,12 +536,12 @@ export default function InventoryManagement() {
         zone: addForm.zone.trim(),
         floor: addForm.floor.trim(),
         shelf: addForm.shelf.trim(),
-        status: addForm.status,
+        status: 'AVAILABLE',
         damage_notes: addForm.condition ? addForm.condition.trim() : null
       });
       showToast('Thêm bản sao thành công!', 'success');
       setShowAddModal(false);
-      setAddForm({ barcode: '', zone: 'Khu A', floor: 'Tầng 1', shelf: 'Kệ 1', status: 'AVAILABLE', condition: '' });
+      setAddForm({ barcode: '', zone: 'Khu A', floor: 'Tầng 1', shelf: 'Kệ 1', condition: '' });
       fetchInventory(bookId, bookInfo); // Refresh bảng
     } catch (error) {
       console.error('Lỗi thêm bản sao:', error);
@@ -601,14 +612,17 @@ export default function InventoryManagement() {
     {
       key: 'condition',
       header: 'Tình Trạng',
-      render: (val, row) => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
-          row.rawStatus === 'DAMAGED' ? 'bg-rose-50 text-rose-600 border-rose-200' : 
-          'bg-slate-50 text-slate-700 border-slate-200'
-        }`}>
-          {row.rawStatus === 'DAMAGED' ? 'Hư hỏng' : 'Nguyên vẹn'}
-        </span>
-      )
+      render: (val, row) => {
+        const label = val || mapConditionLabel(row.rawStatus, row.rawCondition);
+        const isIssue = ['Hư hỏng', 'Báo mất', 'Đã thanh lý'].includes(label);
+        return (
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
+            isIssue ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-50 text-slate-700 border-slate-200'
+          }`}>
+            {label}
+          </span>
+        );
+      }
     },
     {
       key: 'status',
@@ -623,7 +637,6 @@ export default function InventoryManagement() {
         let navAction = null;
         if (val === 'Đang mượn' || val === 'Đang cho mượn') navAction = () => navigate('/admin/loans');
         if (val === 'Báo mất') navAction = () => navigate('/admin/incidents');
-        if (val === 'Cần sửa chữa') navAction = () => navigate('/admin/fines');
         
         return (
           <button 
@@ -672,9 +685,26 @@ export default function InventoryManagement() {
               <Edit2 className="w-4 h-4" />
             </AdminIconButton>
             <AdminIconButton
-              onClick={() => setDeletingRow(row)}
-              className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
-              title="Xóa bản sao"
+              onClick={() => {
+                if (row.rawStatus !== 'AVAILABLE') {
+                  showToast(
+                    'Chỉ xóa cứng bản Sẵn sàng (chưa từng lưu thông). Bản đã mượn/mất/hỏng hãy dùng Thanh lý.',
+                    'warning'
+                  );
+                  return;
+                }
+                setDeletingRow(row);
+              }}
+              className={`w-8 h-8 rounded-full transition-colors ${
+                row.rawStatus === 'AVAILABLE'
+                  ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer'
+                  : 'bg-slate-100 text-slate-400 cursor-pointer opacity-70'
+              }`}
+              title={
+                row.rawStatus === 'AVAILABLE'
+                  ? 'Xóa cứng bản sao (chỉ khi chưa từng mượn)'
+                  : 'Không xóa cứng — dùng Thanh lý để ngừng lưu thông'
+              }
             >
               <Trash2 className="w-4 h-4" />
             </AdminIconButton>
@@ -1071,16 +1101,10 @@ export default function InventoryManagement() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-              <select 
-                className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
-                value={addForm.status}
-                onChange={e => setAddForm({...addForm, status: e.target.value})}
-              >
-                <option value="AVAILABLE">Sẵn sàng</option>
-                <option value="BORROWED">Đang mượn</option>
-                <option value="DAMAGED">Hư hỏng</option>
-                <option value="LOST">Báo mất</option>
-              </select>
+              <Input defaultValue="Sẵn sàng" disabled className="w-full bg-slate-50 text-slate-500" />
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Bản sao mới luôn vào kho ở trạng thái Sẵn sàng. Mượn / mất / hỏng do nghiệp vụ quầy, không chọn tay.
+              </p>
             </div>
           </div>
         </div>
@@ -1161,24 +1185,33 @@ export default function InventoryManagement() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-                {isLiquidatedStatus(editingRow.rawStatus) ? (
+                {isStatusLocked(editingRow.rawStatus) ? (
                   <>
-                    <Input defaultValue={editingRow.rawStatus === 'DAMAGED' ? 'Hư hỏng' : 'Đã thanh lý'} disabled className="w-full bg-slate-50 text-slate-500" />
+                    <Input
+                      defaultValue={mapCopyStatusLabel(editingRow.rawStatus)}
+                      disabled
+                      className="w-full bg-slate-50 text-slate-500"
+                    />
                     <p className="mt-1.5 text-[11px] text-slate-500">
-                      Bản sao đã ngừng lưu thông. Không đưa lại trạng thái Sẵn sàng hoặc Đang mượn.
+                      {editingRow.rawStatus === 'BORROWED'
+                        ? 'Bản đang cho mượn — trạng thái do quầy trả/sự cố cập nhật, không sửa tay.'
+                        : 'Bản đã ngừng lưu thông (mất / hỏng / thanh lý). Không đưa lại Sẵn sàng.'}
                     </p>
                   </>
                 ) : (
-                  <select
-                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
-                    value={editForm.status}
-                    onChange={e => setEditForm({...editForm, status: e.target.value})}
-                  >
-                    <option value="AVAILABLE">Sẵn sàng</option>
-                    <option value="BORROWED">Đang mượn</option>
-                    <option value="DAMAGED">Hư hỏng</option>
-                    <option value="LOST">Báo mất</option>
-                  </select>
+                  <>
+                    <select
+                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
+                      value={editForm.status}
+                      onChange={e => setEditForm({...editForm, status: e.target.value})}
+                    >
+                      <option value="AVAILABLE">Sẵn sàng</option>
+                      <option value="RETIRED">Đã thanh lý</option>
+                    </select>
+                    <p className="mt-1.5 text-[11px] text-slate-500">
+                      Mất / hỏng khi đang mượn lập ở quầy Sự cố hoặc Trả sách. Tại đây chỉ giữ Sẵn sàng hoặc Thanh lý kho.
+                    </p>
+                  </>
                 )}
               </div>
             </div>
@@ -1190,7 +1223,7 @@ export default function InventoryManagement() {
       <Modal
         isOpen={!!deletingRow}
         onClose={() => setDeletingRow(null)}
-        title="Xác nhận xóa bản sao"
+        title="Xóa cứng bản sao"
         footer={
           <>
             <Button variant="outline" onClick={() => setDeletingRow(null)}>Hủy bỏ</Button>
@@ -1199,7 +1232,7 @@ export default function InventoryManagement() {
               className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600"
               onClick={handleConfirmDelete}
             >
-              Xác nhận Xóa
+              Xác nhận xóa cứng
             </Button>
           </>
         }
@@ -1209,15 +1242,19 @@ export default function InventoryManagement() {
             <Trash2 className="w-6 h-6 text-rose-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-bold text-slate-800">Bạn có chắc chắn muốn xóa bản sao này không?</h3>
+            <h3 className="text-sm font-bold text-slate-800">Xóa hẳn bản sao khỏi kho?</h3>
             <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
               <p className="font-bold text-slate-800 text-sm">{deletingRow?.title}</p>
               <p className="text-xs font-mono text-slate-500">Mã vạch: {deletingRow?.barcode}</p>
               <p className="text-xs text-slate-500">Vị trí: {deletingRow?.location}</p>
             </div>
-            <p className="text-xs font-medium text-rose-600 mt-3 flex items-center gap-1">
+            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+              Khác <strong>Thanh lý</strong> (giữ barcode, đánh dấu ngừng lưu thông): xóa cứng chỉ dành cho bản
+              <strong> Sẵn sàng</strong> chưa từng có lịch sử mượn. BE sẽ từ chối nếu bản đã từng mượn.
+            </p>
+            <p className="text-xs font-medium text-rose-600 mt-2 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
-              Hành động này không thể hoàn tác sau khi xác nhận.
+              Không hoàn tác sau khi xác nhận.
             </p>
           </div>
         </div>

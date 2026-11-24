@@ -708,6 +708,18 @@ export default function CatalogManagement() {
               borrow_days: validBorrowDays,
             },
           });
+        } else if (
+          bookId
+          && isEbookType
+          && !pdfFile
+          && (editingBook?.has_ebook || editingBook?.ebook || savedBook?.ebook || savedBook?.has_pdf)
+        ) {
+          // Đã có PDF: lưu cấu hình eBook mà không cần upload lại file
+          await axiosInstance.patch(`/api/admin/books/${bookId}/ebook-config`, {
+            preview_pages: validPreviewPages,
+            is_free: validIsFree,
+            borrow_days: validBorrowDays,
+          });
         }
 
         showToast(

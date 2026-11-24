@@ -288,23 +288,45 @@ export default function EbookManagement() {
     }
   };
 
+  const parseEbookConfig = () => {
+    const pages = Math.min(10, Math.max(5, parseInt(previewPages, 10) || 10));
+    const daysRaw = parseInt(borrowDays, 10);
+    const days = Number.isFinite(daysRaw) && daysRaw >= 1 && daysRaw <= 365 ? daysRaw : 14;
+    return { pages, days };
+  };
+
   const handleReplace = async () => {
     if (!selectedEbook?.id) return;
-    if (!replaceFile) {
-      showToast('Vui lòng chọn tệp PDF mới.', 'warning');
-      return;
-    }
+    const { pages, days } = parseEbookConfig();
     setBusy(true);
     try {
-      await tryApiUpload(selectedEbook.id, replaceFile);
-      applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
-      showToast('Đã cập nhật PDF thành công.', 'success');
+      if (replaceFile) {
+        await tryApiUpload(selectedEbook.id, replaceFile);
+        applyLocalUpload(selectedEbook.id, replaceFile, selectedEbook.title);
+        showToast('Đã cập nhật PDF thành công.', 'success');
+      } else if (selectedEbook.hasPdf !== false) {
+        // Chỉ sửa cấu hình (xem trước / ngày mượn / miễn phí), giữ PDF cũ
+        await axiosInstance.patch(`/api/admin/books/${selectedEbook.id}/ebook-config`, {
+          preview_pages: pages,
+          borrow_days: days,
+          is_free: isFree,
+        });
+        setRows((prev) => prev.map((row) => (
+          String(row.id) === String(selectedEbook.id)
+            ? { ...row, previewPages: pages, borrowDays: days, isFree }
+            : row
+        )));
+        showToast('Đã lưu cấu hình eBook.', 'success');
+      } else {
+        showToast('Chưa có PDF — hãy chọn tệp để tải lên.', 'warning');
+        return;
+      }
       setShowReplaceModal(false);
       setReplaceFile(null);
       setSelectedEbook(null);
     } catch (error) {
       showToast(
-        getApiErrorMessage(error, 'Không cập nhật được PDF. Kiểm tra đầu sách và tệp.'),
+        getApiErrorMessage(error, 'Không cập nhật được eBook. Kiểm tra đầu sách và tệp.'),
         'error'
       );
     } finally {
@@ -740,7 +762,7 @@ export default function EbookManagement() {
               Hủy
             </Button>
             <Button variant="primary" onClick={handleReplace} loading={busy}>
-              Cập nhật file
+              {replaceFile ? 'Cập nhật file' : 'Lưu cấu hình'}
             </Button>
           </>
         }
@@ -749,12 +771,15 @@ export default function EbookManagement() {
           <p className="text-sm text-slate-600">
             Cập nhật tài liệu cho: <strong className="text-slate-800">{selectedEbook?.title}</strong>
           </p>
+          <p className="text-xs text-slate-500">
+            Có thể chỉ sửa trang xem trước / ngày mượn / miễn phí rồi bấm <strong>Lưu cấu hình</strong>, không bắt buộc chọn PDF mới.
+          </p>
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tệp PDF mới</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tệp PDF mới (tuỳ chọn)</label>
             <label className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition-colors">
               <UploadCloud className="w-10 h-10 text-slate-400 mb-3" />
               <p className="text-sm font-medium text-slate-700 text-center">
-                {replaceFile ? replaceFile.name : 'Chọn hoặc kéo thả tệp PDF'}
+                {replaceFile ? replaceFile.name : 'Chọn PDF mới hoặc bỏ trống để chỉ lưu cấu hình'}
               </p>
               <input
                 type="file"

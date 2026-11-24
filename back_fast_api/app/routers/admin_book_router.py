@@ -5,7 +5,13 @@ from app.core.database import get_db
 from app.core.dependencies import require_roles
 from app.models.book import Book, Category, Ebook, Subject
 from app.models.user import Account
-from app.schemas.book import BookCreate, BookResponse, BookUpdate, UploadResponse
+from app.schemas.book import (
+    BookCreate,
+    BookResponse,
+    BookUpdate,
+    EbookConfigUpdate,
+    UploadResponse,
+)
 from app.services.upload_service import delete_static_file, save_cover_image, save_ebook_pdf
 
 
@@ -146,6 +152,44 @@ async def upload_cover(
         file_path=new_path,
         message="Upload ảnh bìa thành công",
     )
+
+
+@router.patch(
+    "/{book_id}/ebook-config",
+    response_model=BookResponse,
+    summary="Cập nhật cấu hình eBook (không upload lại PDF)",
+)
+def update_ebook_config(
+    book_id: int,
+    payload: EbookConfigUpdate,
+    db: Session = Depends(get_db),
+    _: Account = Depends(require_roles("ADMIN")),
+) -> Book:
+    book = _get_book_or_404(db, book_id)
+    if book.book_type not in ("EBOOK", "BOTH"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Chỉ sách EBOOK hoặc BOTH mới có cấu hình eBook",
+        )
+    if book.ebook is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách chưa có PDF — hãy upload PDF trước khi sửa cấu hình",
+        )
+
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Không có trường cấu hình nào để cập nhật",
+        )
+
+    for field, value in changes.items():
+        setattr(book.ebook, field, value)
+
+    db.commit()
+    db.refresh(book)
+    return book
 
 
 @router.post(

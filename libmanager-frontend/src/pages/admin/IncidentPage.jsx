@@ -20,8 +20,10 @@ const EMPTY_CREATE_FORM = {
   incident_type: 'LOST',
   description: '',
   book_price: 0,
+  catalog_price: 0,
   book_title: '',
   barcode: '',
+  loan_id: null,
   loan_code: '',
   borrower_name: '',
   borrower_code: '',
@@ -130,19 +132,24 @@ export default function IncidentPage() {
   };
 
   const applyLookupHit = (found, code) => {
+    const numericLoanId = Number(found.loan_id ?? found.id);
+    const loanId = Number.isFinite(numericLoanId) && numericLoanId > 0 ? numericLoanId : null;
+    const catalogPrice = Number(found.book_price ?? found.price ?? 0) || 0;
     setLoanLookedUp(true);
     setCreateForm((prev) => ({
       ...prev,
       code,
-      book_price: found.book_price ?? found.price ?? 0,
+      catalog_price: catalogPrice,
+      book_price: catalogPrice,
       book_title: found.book_title || found.title || '',
       barcode: found.barcode || found.copy_barcode || code,
-      loan_code: found.loan_code || found.loan_id || found.id || '',
+      loan_id: loanId,
+      loan_code: found.loan_code || (loanId != null ? `PM-${loanId}` : ''),
       borrower_name: found.borrower_name || found.user_name || found.full_name || '',
       borrower_code: found.borrower_code || found.user_code || '',
       borrower_class: found.borrower_class || found.department || '',
     }));
-    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id || code}.`, 'success');
+    showToast(`Đã tra cứu phiếu ${found.loan_code || loanId || code}.`, 'success');
   };
 
   const handleLookupLoan = async () => {
@@ -217,8 +224,10 @@ export default function IncidentPage() {
       setCreateForm((prev) => ({
         ...prev,
         book_price: 0,
+        catalog_price: 0,
         book_title: '',
         barcode: '',
+        loan_id: null,
         loan_code: '',
         borrower_name: '',
         borrower_code: '',
@@ -267,13 +276,15 @@ export default function IncidentPage() {
   const handleSaveIncident = async () => {
     const errors = {};
     if (!createForm.code.trim()) errors.code = 'Mã vạch hoặc mã phiếu không được để trống';
-    if (!loanLookedUp || !createForm.loan_code) {
+    if (!loanLookedUp || !createForm.loan_id) {
       errors.code = errors.code || 'Vui lòng bấm Tra cứu và chọn phiếu đang mượn hợp lệ';
     }
     if (!createForm.description.trim()) errors.description = 'Mô tả chi tiết sự cố không được để trống';
+    const catalogPrice = Number(createForm.catalog_price) || 0;
     const compensation = Number(createForm.book_price);
-    if (!compensation || compensation <= 0) {
-      errors.book_price = 'Nhập số tiền bồi thường (> 0). Nếu thiếu giá bìa, nhập thủ công.';
+    // BE chỉ dùng manual_penalty khi sách thiếu giá bìa; có giá thì phạt = giá (+ quá hạn).
+    if (catalogPrice <= 0 && (!compensation || compensation <= 0)) {
+      errors.book_price = 'Sách thiếu giá bìa — nhập số tiền bồi thường (> 0).';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -285,16 +296,19 @@ export default function IncidentPage() {
 
     const isLost = createForm.incident_type === 'LOST';
     try {
-      const loanId = Number(createForm.loan_code);
+      const loanId = Number(createForm.loan_id);
       let apiIncidentId = null;
       if (Number.isFinite(loanId) && loanId > 0) {
-        const { data } = await axiosInstance.post('/api/admin/loans/incident', {
+        const payload = {
           loan_id: loanId,
           incident_type: isLost ? 'BOOK_LOST' : 'BOOK_DAMAGED',
           description: createForm.description.trim(),
-          manual_penalty: compensation,
-          manual_reason: createForm.description.trim(),
-        });
+        };
+        if (catalogPrice <= 0) {
+          payload.manual_penalty = compensation;
+          payload.manual_reason = createForm.description.trim();
+        }
+        const { data } = await axiosInstance.post('/api/admin/loans/incident', payload);
         if (data?.incident_id != null) apiIncidentId = data.incident_id;
       } else if (createForm.barcode) {
         await axiosInstance.post('/api/admin/loans/checkin', {
@@ -302,7 +316,7 @@ export default function IncidentPage() {
           condition_notes: createForm.description.trim(),
           is_lost: isLost,
           is_damaged: !isLost,
-          damage_penalty: compensation,
+          ...(catalogPrice <= 0 ? { damage_penalty: compensation } : {}),
         });
       } else {
         showToast('Thiếu mã phiếu hoặc mã vạch để lập biên bản.', 'error');
@@ -895,19 +909,33 @@ export default function IncidentPage() {
             )}
           </div>
 
-          {/* Bồi thường: giá bìa hoặc nhập tay (E2) — 4-15.b */}
-          <Input
-            label="Số tiền bồi thường (VNĐ)"
-            type="number"
-            min={0}
-            value={createForm.book_price || ''}
-            error={formErrors.book_price}
-            helperText="Mặc định theo giá bìa. Thiếu giá thì nhập thủ công."
-            onChange={(e) => {
-              setCreateForm({ ...createForm, book_price: Number(e.target.value) || 0 });
-              if (formErrors.book_price) setFormErrors({ ...formErrors, book_price: '' });
-            }}
-          />
+          {/* Bồi thường: có giá bìa → BE lấy giá; thiếu giá → nhập tay (E2) */}
+          {Number(createForm.catalog_price) > 0 ? (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Khoản bồi thường (theo giá bìa)
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">
+                {formatVND(createForm.catalog_price)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Hệ thống chốt theo giá bìa sách (+ phạt trễ hạn nếu có). Không chỉnh tay trên form này.
+              </p>
+            </div>
+          ) : (
+            <Input
+              label="Số tiền bồi thường (VNĐ)"
+              type="number"
+              min={0}
+              value={createForm.book_price || ''}
+              error={formErrors.book_price}
+              helperText="Sách thiếu giá bìa — bắt buộc nhập thủ công trước khi lưu."
+              onChange={(e) => {
+                setCreateForm({ ...createForm, book_price: Number(e.target.value) || 0 });
+                if (formErrors.book_price) setFormErrors({ ...formErrors, book_price: '' });
+              }}
+            />
+          )}
         </div>
       </Modal>
     </div>
