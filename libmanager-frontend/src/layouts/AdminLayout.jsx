@@ -147,7 +147,7 @@ export default function AdminLayout() {
 
   const getBreadcrumbs = () => {
     const pathname = location.pathname;
-    const root = { label: 'Quản trị viên', path: ADMIN_HOME };
+    const root = { label: 'Thủ thư', path: ADMIN_HOME };
 
     // Dynamic routes: /admin/inventory/:bookId
     if (pathname.startsWith('/admin/inventory/')) {

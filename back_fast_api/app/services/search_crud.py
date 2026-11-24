@@ -3,10 +3,10 @@ import re
 import unicodedata
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.book import Book, Category
+from app.models.book import Book, BookCopy, Category
 
 DEFAULT_PAGE_SIZE = 20   # NFR-PE-02
 MAX_PAGE_SIZE = 50       # NFR-PE-02
@@ -51,6 +51,35 @@ def _ilike(column, value: str):
     return column.ilike(f"%{_escape_like(value)}%", escape="\\")
 
 
+def _attach_copy_counts(db: Session, books: List[Book]) -> None:
+    """Gắn tổng bản in và số bản đang AVAILABLE. available_stock có thể lệch bản sao thật."""
+    for book in books:
+        book.total_copies = 0
+        book.available_copies = 0
+    if not books:
+        return
+    rows = db.execute(
+        select(
+            BookCopy.book_id,
+            func.count().label("total"),
+            func.coalesce(
+                func.sum(case((BookCopy.status == "AVAILABLE", 1), else_=0)),
+                0,
+            ).label("available"),
+        )
+        .where(BookCopy.book_id.in_([book.id for book in books]))
+        .group_by(BookCopy.book_id)
+    ).all()
+    by_id = {
+        book_id: (int(total or 0), int(available or 0))
+        for book_id, total, available in rows
+    }
+    for book in books:
+        total, available = by_id.get(book.id, (0, 0))
+        book.total_copies = total
+        book.available_copies = available
+
+
 def search_books_advanced(
     db: Session,
     query_text: Optional[str] = None,       # q: tìm toàn văn trên siêu dữ liệu
@@ -61,6 +90,8 @@ def search_books_advanced(
     category: Optional[str] = None,         # id hoặc tên danh mục
     attribute: Optional[str] = None,        # thuộc tính / từ khóa (keywords)
     format: Optional[str] = None,           # PRINTED | EBOOK | BOTH
+    exact_format: bool = False,            # True = khớp đúng loại, không gộp BOTH
+    exact_publisher: bool = False,         # True = khớp đúng tên nhà xuất bản
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
 ) -> Dict[str, Any]:
@@ -103,7 +134,10 @@ def search_books_advanced(
 
     publisher = normalize_text(publisher)
     if publisher:
-        stmt = stmt.where(_ilike(Book.publisher, publisher))
+        if exact_publisher:
+            stmt = stmt.where(func.lower(Book.publisher) == publisher.lower())
+        else:
+            stmt = stmt.where(_ilike(Book.publisher, publisher))
 
     if year is not None:
         stmt = stmt.where(Book.publication_year == year)
@@ -127,8 +161,8 @@ def search_books_advanced(
 
     if format:
         target = format.upper()
-        if target in ("PRINTED", "EBOOK"):
-            # Sách BOTH đáp ứng cả hai định dạng
+        if target in ("PRINTED", "EBOOK") and not exact_format:
+            # Sách BOTH đáp ứng cả hai định dạng. exact_format dùng khi lọc đúng một loại.
             stmt = stmt.where(or_(Book.book_type == target, Book.book_type == "BOTH"))
         else:
             stmt = stmt.where(Book.book_type == target)
@@ -148,6 +182,7 @@ def search_books_advanced(
         .offset(offset)
     )
     books: List[Book] = db.scalars(paginated_stmt).unique().all()
+    _attach_copy_counts(db, books)
 
     total_pages = math.ceil(total_records / page_size) if total_records > 0 else 1
 

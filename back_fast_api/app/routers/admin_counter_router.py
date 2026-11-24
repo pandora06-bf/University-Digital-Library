@@ -15,9 +15,12 @@ from app.schemas.loan import (
 from app.services.loan_service import (
     checkin_at_counter_service,
     checkout_at_counter_service,
+    get_active_return_service,
+    get_checkout_copy_service,
     collect_counter_fines_service,
     lookup_fines_service,
     lookup_loans_service,
+    lookup_reader_service,
 )
 
 router = APIRouter(
@@ -36,14 +39,25 @@ def api_lookup_loans(
     db: Session = Depends(get_db),
 ):
     loans = lookup_loans_service(db=db, q=q)
+    reader = lookup_reader_service(db=db, q=q)
     return {
         "total": len(loans),
+        "reader": None if reader is None else {
+            "user_code": reader.user_code,
+            "full_name": reader.full_name,
+            "total_fines": float(reader.total_fines or 0),
+            "is_borrowing_blocked": bool(reader.is_borrowing_blocked),
+        },
         "data": [
             {
                 "id": loan.id,
+                "loan_code": loan.loan_code,
                 "user_code": loan.user_code,
+                "full_name": loan.user.full_name if loan.user else None,
+                "department": loan.user.department if loan.user else None,
                 "book_id": loan.book_id,
                 "book_title": loan.book.title if loan.book else None,
+                "book_price": float(loan.book.price) if loan.book and loan.book.price is not None else 0,
                 "copy_barcode": loan.copy_barcode,
                 "loan_status": loan.loan_status,
                 "borrow_date": loan.borrow_date,
@@ -52,6 +66,17 @@ def api_lookup_loans(
             for loan in loans
         ]
     }
+
+
+# ----------------------------------------------------------------------
+# 1c. GET /api/admin/loans/copy: mã vạch để gắn vào phiếu xuất
+# ----------------------------------------------------------------------
+@router.get("/loans/copy", summary="Tra bản sao theo mã vạch trước khi xuất mượn")
+def api_checkout_copy(
+    barcode: str = Query(..., description="Mã vạch bản sao, không phải mã phiếu"),
+    db: Session = Depends(get_db),
+):
+    return get_checkout_copy_service(db=db, barcode=barcode)
 
 
 # ----------------------------------------------------------------------
@@ -96,6 +121,17 @@ def api_checkout_loan(
 
 
 # ----------------------------------------------------------------------
+# 2b. GET /api/admin/loans/active-return: thẻ sách đang mượn theo mã vạch
+# ----------------------------------------------------------------------
+@router.get("/loans/active-return", summary="Phiếu đang mượn hoặc quá hạn theo mã vạch")
+def api_active_return(
+    barcode: str = Query(..., description="Mã vạch bản sao đang mượn"),
+    db: Session = Depends(get_db),
+):
+    return get_active_return_service(db=db, barcode=barcode)
+
+
+# ----------------------------------------------------------------------
 # 3. POST /api/admin/loans/checkin: Check-in nhận trả sách tại quầy
 # ----------------------------------------------------------------------
 @router.post("/loans/checkin", summary="Nhận sách trả lại, tính phạt quá hạn hoặc báo sự cố")
@@ -129,9 +165,10 @@ def api_checkin_loan(
 @router.get("/fines/lookup", summary="Tra cứu công nợ phạt của bạn đọc theo MSSV")
 def api_lookup_fines(
     user_code: str = Query(..., description="MSSV/Mã bạn đọc cần tra cứu"),
+    include_paid: bool = Query(True, description="Kèm các khoản đã thu"),
     db: Session = Depends(get_db),
 ):
-    return lookup_fines_service(db=db, user_code=user_code)
+    return lookup_fines_service(db=db, user_code=user_code, include_paid=include_paid)
 
 
 # ----------------------------------------------------------------------

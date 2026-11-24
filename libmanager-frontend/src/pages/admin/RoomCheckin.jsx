@@ -156,6 +156,7 @@ export default function RoomCheckin() {
     {
       key: 'id',
       header: 'Mã lượt',
+      width: '10%',
       render: (val) => (
         <span className="font-mono text-sm font-semibold text-indigo-700">#{val}</span>
       ),
@@ -163,11 +164,13 @@ export default function RoomCheckin() {
     {
       key: 'user_code',
       header: 'Bạn đọc',
+      width: '16%',
       render: (val) => <span className="font-mono text-sm text-slate-700">{val}</span>,
     },
     {
       key: 'room_id',
       header: 'Phòng',
+      width: '16%',
       render: (val) => (
         <span className="text-sm text-slate-700">
           {typeof val === 'number' ? `Phòng #${val}` : val || '—'}
@@ -177,6 +180,7 @@ export default function RoomCheckin() {
     {
       key: 'slot',
       header: 'Khung giờ',
+      width: '24%',
       render: (_, row) => (
         <span className="text-sm text-slate-600 whitespace-nowrap">
           {row.slot_start}–{row.slot_end}
@@ -187,6 +191,7 @@ export default function RoomCheckin() {
     {
       key: 'status',
       header: 'Trạng thái',
+      width: '16%',
       render: (val) => {
         const m = statusMeta(val);
         return <StatusBadge status={m.label} type={m.type} />;
@@ -195,6 +200,7 @@ export default function RoomCheckin() {
     {
       key: 'actions',
       header: 'Thao tác',
+      width: '18%',
       align: 'right',
       render: (_, row) => {
         if (row.status !== 'CONFIRMED') {
@@ -345,6 +351,8 @@ export default function RoomCheckin() {
         columns={columns}
         data={filteredRows}
         loading={loadingList}
+        pagination
+        itemsPerPage={10}
         emptyMessage="Chưa có lượt đặt trong ngày này."
         rowKey={(r) => String(r.id)}
       />

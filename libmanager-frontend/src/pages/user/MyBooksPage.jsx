@@ -112,13 +112,14 @@ function buildLoanColumns({ renewingId, onRenew }) {
     {
       key: 'bookTitle',
       header: 'Tài liệu & Tác giả',
+      width: '32%',
       align: 'left',
       render: (val, row) => (
         <div className="flex items-center gap-3">
           <div className="w-9 h-11 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
             {row.isEbook ? <FileText className="w-4 h-4" /> : <BookOpen className="w-4 h-4" />}
           </div>
-          <div className="flex flex-col w-64 whitespace-normal">
+          <div className="flex flex-col min-w-0 flex-1 whitespace-normal">
             <Link to={`/books/${row.bookId}`} className="font-semibold text-slate-900 line-clamp-2 hover:text-indigo-600">{val}</Link>
             <span className="text-xs text-slate-500 line-clamp-1">
               {[row.author, row.isEbook ? 'eBook' : 'Sách in', row.renewalCount > 0 ? `Đã GH ${row.renewalCount}` : null]
@@ -131,24 +132,28 @@ function buildLoanColumns({ renewingId, onRenew }) {
     {
       key: 'borrowDate',
       header: 'Ngày đặt',
+      width: '12%',
       align: 'left',
       render: (val) => <span className="text-slate-600 font-medium">{shortDate(val)}</span>,
     },
     {
       key: 'dueDate',
       header: 'Hạn',
+      width: '14%',
       align: 'left',
       render: (_, row) => <DueText loan={row} />,
     },
     {
       key: 'status',
       header: 'Trạng thái',
+      width: '14%',
       align: 'center',
       render: (val, row) => <StatusBadge status={val} type={row.statusType} />,
     },
     {
       key: 'actions',
       header: 'Thao tác',
+      width: '16%',
       align: 'right',
       render: (_, row) => (
         <div className="inline-flex justify-end max-w-[220px] text-right">

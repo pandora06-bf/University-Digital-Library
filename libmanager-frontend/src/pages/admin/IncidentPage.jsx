@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { 
   AlertOctagon, Plus, Search, Eye, 
   FileText, AlertTriangle, DollarSign,
   ScanLine, BookOpen, User, Receipt
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -60,22 +60,29 @@ function mapApiIncident(item) {
 
 export default function IncidentPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoFilterDone = useRef('');
   const { toast, showToast, hideToast } = useToast();
 
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const loadIncidents = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await axiosInstance.get('/api/admin/incidents', {
-        params: { page: 1, size: 100 },
-      });
-      const items = data?.data || data?.items || (Array.isArray(data) ? data : []);
-      setIncidents(items.map(mapApiIncident));
+      const pageSize = 100;
+      const all = [];
+      for (let page = 1; page <= 20; page += 1) {
+        const { data } = await axiosInstance.get('/api/admin/incidents', {
+          params: { page, size: pageSize },
+        });
+        const items = data?.data || data?.items || (Array.isArray(data) ? data : []);
+        all.push(...items);
+        if (items.length < pageSize) break;
+      }
+      setIncidents(all.map(mapApiIncident));
       return true;
     } catch (error) {
       setIncidents([]);
@@ -95,6 +102,17 @@ export default function IncidentPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadIncidents]);
+
+  // Từ Thu phạt: /admin/incidents?mssv=… → lọc bảng theo MSSV
+  useEffect(() => {
+    const mssv = (searchParams.get('mssv') || '').trim();
+    if (!mssv || autoFilterDone.current === mssv) return;
+    autoFilterDone.current = mssv;
+    setSearchTerm(mssv);
+    const next = new URLSearchParams(searchParams);
+    next.delete('mssv');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Modal states
   const [detailRow, setDetailRow] = useState(null);
@@ -124,7 +142,7 @@ export default function IncidentPage() {
       borrower_code: found.borrower_code || found.user_code || '',
       borrower_class: found.borrower_class || found.department || '',
     }));
-    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id}.`, 'success');
+    showToast(`Đã tra cứu phiếu ${found.loan_code || found.id || code}.`, 'success');
   };
 
   const handleLookupLoan = async () => {
@@ -142,24 +160,55 @@ export default function IncidentPage() {
       return next;
     });
 
-    // UC15 / 4-15.b: API quầy lookup (MSSV | mã phiếu | barcode)
+    // UC15: lookup MSSV / mã phiếu / barcode; barcode ưu tiên phiếu đang mượn
     try {
       const { data } = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: code } });
       const loans = Array.isArray(data?.data)
         ? data.data
         : (data?.loans || data?.items || []);
+      const codeUpper = code.toUpperCase();
       const active = loans.filter((l) =>
         ['BORROWED', 'OVERDUE'].includes(String(l.loan_status || l.status || '').toUpperCase())
       );
-      const hit = active[0] || null;
+      const byBarcode = active.find(
+        (l) => String(l.copy_barcode || l.barcode || '').toUpperCase() === codeUpper
+      );
+      let hit = byBarcode || active[0] || null;
+
+      if (!hit) {
+        const maybeBarcode = !/^\d+$/.test(code) && !/^(SV|GV|ADMIN|LIBRARIAN)[-_]/i.test(code);
+        const maybeLoanCode = /^PM[-_]/i.test(code);
+        if (maybeBarcode && !maybeLoanCode) {
+          try {
+            const slip = await axiosInstance.get('/api/admin/loans/active-return', {
+              params: { barcode: code },
+            });
+            hit = {
+              id: slip.data?.loan_id,
+              loan_status: slip.data?.loan_status,
+              copy_barcode: slip.data?.copy_barcode || code,
+              book_title: slip.data?.book_title,
+              book_id: slip.data?.book_id,
+              user_code: slip.data?.user_code,
+              full_name: slip.data?.full_name,
+              department: slip.data?.department,
+              book_price: slip.data?.book_price ?? 0,
+            };
+          } catch {
+            // Giữ thông báo lookup bên dưới
+          }
+        }
+      }
+
       if (hit) {
         applyLookupHit({
           ...hit,
           book_title: hit.book_title || hit.title,
           barcode: hit.copy_barcode || hit.barcode || code,
-          loan_code: hit.loan_code || String(hit.id),
+          loan_code: hit.loan_code || String(hit.id || hit.loan_id || ''),
           borrower_name: hit.full_name || hit.borrower_name,
           borrower_code: hit.user_code || hit.borrower_code,
+          borrower_class: hit.department || hit.borrower_class || '',
           book_price: hit.book_price ?? hit.price ?? 0,
         }, code);
         return;
@@ -204,9 +253,8 @@ export default function IncidentPage() {
       item.borrower_code.toLowerCase().includes(term);
 
     const matchType = typeFilter === 'ALL' || item.incident_type === typeFilter;
-    const matchStatus = statusFilter === 'ALL' || item.status === statusFilter;
 
-    return matchSearch && matchType && matchStatus;
+    return matchSearch && matchType;
   });
 
   // Thống kê nhanh
@@ -281,6 +329,7 @@ export default function IncidentPage() {
     {
       key: 'incident_code',
       header: 'Mã Biên Bản',
+      width: '12%',
       render: (val, row) => (
         <div className="min-w-[130px]">
           <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
@@ -295,6 +344,7 @@ export default function IncidentPage() {
     {
       key: 'book_title',
       header: 'Tài Liệu & Mã Mượn',
+      width: '12%',
       render: (val, row) => (
         <div className="min-w-[220px] max-w-sm">
           <p className="font-bold text-slate-800 text-sm truncate" title={val}>
@@ -311,6 +361,7 @@ export default function IncidentPage() {
     {
       key: 'borrower',
       header: 'Người Mượn',
+      width: '14%',
       render: (_, row) => (
         <div className="min-w-0 max-w-[180px]">
           <span className="font-semibold text-slate-800 block text-sm truncate" title={row.borrower_name}>{row.borrower_name}</span>
@@ -323,6 +374,7 @@ export default function IncidentPage() {
     {
       key: 'incident_type',
       header: 'Loại Sự Cố',
+      width: '11%',
       render: (val) => {
         const isLost = val === 'LOST';
         return (
@@ -340,6 +392,7 @@ export default function IncidentPage() {
     {
       key: 'description',
       header: 'Mô Tả Tình Trạng',
+      width: '11%',
       render: (val) => (
         <div className="min-w-0 max-w-xs">
           <p className="text-xs text-slate-600 truncate" title={val}>
@@ -351,6 +404,7 @@ export default function IncidentPage() {
     {
       key: 'compensation_amount',
       header: 'Giá Bìa / Bồi Thường',
+      width: '11%',
       align: 'right',
       render: (val) => (
         <div className="min-w-[120px] text-right">
@@ -364,6 +418,7 @@ export default function IncidentPage() {
     {
       key: 'status',
       header: 'Trạng Thái',
+      width: '13%',
       render: (val) => {
         let style = 'bg-slate-100 text-slate-600 border-slate-200';
         let label = 'Chờ xử lý';
@@ -384,6 +439,7 @@ export default function IncidentPage() {
     {
       key: 'actions',
       header: 'Thao Tác',
+      width: '16%',
       align: 'right',
       render: (_, row) => (
         <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
@@ -400,7 +456,10 @@ export default function IncidentPage() {
             size="sm"
             className="!h-8 !px-2 !text-[11px]"
             icon={<Receipt className="w-3.5 h-3.5" />}
-            onClick={() => navigate('/admin/fines')}
+            onClick={() => {
+              const mssv = (row.borrower_code || '').trim();
+              navigate(mssv ? `/admin/fines?mssv=${encodeURIComponent(mssv)}` : '/admin/fines');
+            }}
             title="Thu bồi thường / công nợ tại quầy (UC10)"
           >
             Thu phạt
@@ -424,10 +483,13 @@ export default function IncidentPage() {
               : 'Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Button 
             variant="outline" 
-            onClick={() => navigate('/admin/fines')}
+            onClick={() => {
+              const mssv = (detailRow?.borrower_code || createForm?.borrower_code || '').trim();
+              navigate(mssv ? `/admin/fines?mssv=${encodeURIComponent(mssv)}` : '/admin/fines');
+            }}
             icon={<Receipt className="w-4 h-4" />}
           >
             Thu phạt &amp; Công nợ
@@ -451,10 +513,7 @@ export default function IncidentPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <button
           type="button"
-          onClick={() => {
-            setTypeFilter('ALL');
-            setStatusFilter('ALL');
-          }}
+          onClick={() => setTypeFilter('ALL')}
           className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
             typeFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-slate-300'
           }`}
@@ -473,10 +532,7 @@ export default function IncidentPage() {
 
         <button
           type="button"
-          onClick={() => {
-            setTypeFilter('LOST');
-            setStatusFilter('ALL');
-          }}
+          onClick={() => setTypeFilter('LOST')}
           className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-rose-50/30 transition-colors ${
             typeFilter === 'LOST' ? 'border-rose-400 ring-2 ring-rose-200' : 'border-rose-100 hover:border-rose-300'
           }`}
@@ -495,10 +551,7 @@ export default function IncidentPage() {
 
         <button
           type="button"
-          onClick={() => {
-            setTypeFilter('DAMAGED');
-            setStatusFilter('ALL');
-          }}
+          onClick={() => setTypeFilter('DAMAGED')}
           className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-amber-50/30 transition-colors ${
             typeFilter === 'DAMAGED' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
           }`}
@@ -574,31 +627,23 @@ export default function IncidentPage() {
               Tra cứu
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <select
-              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="ALL">Loại sự cố (Tất cả)</option>
-              <option value="LOST">Mất sách</option>
-              <option value="DAMAGED">Hỏng nặng</option>
-            </select>
-            <select
-              className="h-10 w-full px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">Trạng thái (Tất cả)</option>
-              <option value="RESOLVED">Đã ghi nhận</option>
-            </select>
-          </div>
+          <select
+            className="h-10 w-full sm:max-w-xs px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            <option value="ALL">Loại sự cố (Tất cả)</option>
+            <option value="LOST">Mất sách</option>
+            <option value="DAMAGED">Hỏng nặng</option>
+          </select>
         </div>
 
         {/* Table Hiển thị biên bản */}
         <Table 
           columns={incidentColumns}
           data={filteredData}
+          pagination
+          itemsPerPage={10}
           className="border-0 shadow-none rounded-none rounded-b-2xl"
           emptyMessage={
             <div className="py-8 text-center space-y-2">
@@ -623,8 +668,9 @@ export default function IncidentPage() {
               variant="primary" 
               icon={<Receipt className="w-4 h-4" />}
               onClick={() => {
+                const mssv = (detailRow?.borrower_code || '').trim();
                 setDetailRow(null);
-                navigate('/admin/fines');
+                navigate(mssv ? `/admin/fines?mssv=${encodeURIComponent(mssv)}` : '/admin/fines');
               }}
             >
               Xem tại Thu phạt &amp; Công nợ

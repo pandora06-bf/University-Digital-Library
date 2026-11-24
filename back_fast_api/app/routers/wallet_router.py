@@ -58,8 +58,9 @@ class AssignUnmatched(BaseModel):
 
 @admin_router.get("/unmatched")
 def list_unmatched(page: int = Query(1, ge=1), size: int = Query(20, ge=1, le=50),
+                   status: str = Query("unresolved", pattern="^(unresolved|assigned|all)$"),
                    _=Depends(require_roles("ADMIN")), db: Session = Depends(get_db)):
-    return ws.list_unmatched(db, page, size)
+    return ws.list_unmatched(db, page, size, status)
 
 
 @admin_router.post("/unmatched/{unmatched_id}/assign")

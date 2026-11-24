@@ -87,7 +87,7 @@ class LoanCheckoutRequest(BaseModel):
 
 class LoanCheckinRequest(BaseModel):
     """
-    Input Check-in: Quét mã vạch bản sao sách trả về tại quầy (UC10)
+    Input Check-in: vạch bản sao sách trả về tại quầy (UC10)
     """
     copy_barcode: str = Field(..., description="Mã vạch cuốn sách trả về quét tại quầy")
     condition_notes: Optional[str] = Field(None, description="Tình trạng nhận lại sách")

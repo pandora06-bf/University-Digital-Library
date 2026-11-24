@@ -198,6 +198,10 @@ def test_admin_list_and_assign_unmatched(client, auth_headers, admin_headers, db
                         headers=admin_headers)
     assert again.status_code == 409 and _balance(client, auth_headers) == 30_000
     assert client.get("/api/admin/wallet/unmatched", headers=admin_headers).json()["total"] == 0
+    assigned = client.get("/api/admin/wallet/unmatched?status=assigned", headers=admin_headers)
+    assert assigned.status_code == 200 and assigned.json()["total"] == 1
+    assert assigned.json()["data"][0]["assigned_user_code"] == USER
+    assert client.get("/api/admin/wallet/unmatched?status=all", headers=admin_headers).json()["total"] == 1
 
 
 def test_admin_assign_requires_admin_and_valid_user(client, auth_headers, admin_headers, db_session):

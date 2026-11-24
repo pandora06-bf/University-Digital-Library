@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WalletCards, Link2, Search, Users } from 'lucide-react';
+import { WalletCards, Link2, Search, Users, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -31,7 +31,7 @@ const mapRow = (u) => {
     bank_account_number: u.bank_account_number || '',
     transfer_content: u.transfer_content || '',
     received_at: u.received_at || u.created_at || '',
-    status: assigned || u.status === 'ASSIGNED' ? 'ASSIGNED' : 'UNRESOLVED',
+    status: assigned ? 'ASSIGNED' : 'UNRESOLVED',
     assigned_user_code: assigned,
     resolved_by: u.resolved_by || null,
     resolution_notes: u.resolution_notes || null,
@@ -42,9 +42,9 @@ export default function UnmatchedTxPage() {
   const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
   const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState('');
+  const [matchFilter, setMatchFilter] = useState('UNRESOLVED');
   const [assignTarget, setAssignTarget] = useState(null);
   const [userCode, setUserCode] = useState('');
   const [userQuery, setUserQuery] = useState('');
@@ -56,15 +56,20 @@ export default function UnmatchedTxPage() {
   const loadRows = useCallback(async ({ silent = false } = {}) => {
     setLoading(true);
     try {
-      const { items, total: t } = await walletService.listUnmatched(1, 50);
-      setRows((items || []).map(mapRow));
-      setTotal(Number(t) || (items || []).length);
+      const items = [];
+      let t = 0;
+      for (let page = 1; page <= 40; page += 1) {
+        const batch = await walletService.listUnmatched(page, 50, 'all');
+        t = Number(batch.total) || t;
+        items.push(...(batch.items || []));
+        if (!batch.items?.length || items.length >= t) break;
+      }
+      setRows(items.map(mapRow));
       if (!silent) {
         showToast(`Đã tải ${t ?? items?.length ?? 0} giao dịch chưa khớp.`, 'success');
       }
     } catch (error) {
       setRows([]);
-      setTotal(0);
       if (!silent) {
         showToast(
           getApiErrorMessage(error, 'Không tải được danh sách giao dịch.'),
@@ -91,14 +96,27 @@ export default function UnmatchedTxPage() {
         return d !== 0 ? d : String(a.user_code).localeCompare(String(b.user_code));
       });
 
+    const fetchRole = async (role) => {
+      const items = [];
+      for (let page = 1; page <= 20; page += 1) {
+        const { data } = await axiosInstance.get('/api/admin/users', {
+          params: { role, page, page_size: 100 },
+        });
+        const batch = data?.items || [];
+        items.push(...batch);
+        const totalPages = Number(data?.total_pages) || 1;
+        if (page >= totalPages || batch.length === 0) break;
+      }
+      return items;
+    };
     try {
       const [students, lecturers] = await Promise.all([
-        axiosInstance.get('/api/admin/users', { params: { role: 'STUDENT', page: 1, page_size: 50 } }),
-        axiosInstance.get('/api/admin/users', { params: { role: 'LECTURER', page: 1, page_size: 50 } }),
+        fetchRole('STUDENT'),
+        fetchRole('LECTURER'),
       ]);
       const items = sortReaders([
-        ...(students.data?.items || []).map(mapUser),
-        ...(lecturers.data?.items || []).map(mapUser),
+        ...students.map(mapUser),
+        ...lecturers.map(mapUser),
       ]);
       setUserOptions(items);
     } catch {
@@ -114,21 +132,25 @@ export default function UnmatchedTxPage() {
     return () => window.clearTimeout(timer);
   }, [loadRows, loadUserOptions]);
 
-  // BE GET /unmatched chỉ trả giao dịch chưa gán (assigned_user_code IS NULL).
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return rows.filter((r) => {
+      if (matchFilter !== 'ALL' && r.status !== matchFilter) return false;
       if (!term) return true;
       return (
         r.bank_tx_id.toLowerCase().includes(term)
         || (r.transfer_content || '').toLowerCase().includes(term)
         || (r.assigned_user_code || '').toLowerCase().includes(term)
+        || (r.bank_account_number || '').toLowerCase().includes(term)
       );
     });
-  }, [rows, q]);
+  }, [rows, q, matchFilter]);
 
-  const openCount = rows.length;
-  const openAmount = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+  const openRows = rows.filter((r) => r.status === 'UNRESOLVED');
+  const assignedRows = rows.filter((r) => r.status === 'ASSIGNED');
+  const openCount = openRows.length;
+  const assignedCount = assignedRows.length;
+  const openAmount = openRows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
   const filteredUserOptions = useMemo(() => {
     const term = userQuery.trim().toLowerCase();
@@ -176,6 +198,7 @@ export default function UnmatchedTxPage() {
     {
       key: 'bank_tx_id',
       header: 'Mã ngân hàng',
+      width: '22%',
       render: (val, row) => (
         <div className="min-w-0 max-w-[200px]">
           <p className="font-mono text-sm font-semibold text-slate-800 truncate" title={val}>{val}</p>
@@ -186,12 +209,14 @@ export default function UnmatchedTxPage() {
     {
       key: 'amount',
       header: 'Số tiền',
+      width: '14%',
       align: 'right',
       render: (val) => <span className="font-bold text-emerald-700">{formatVND(val)}</span>,
     },
     {
       key: 'transfer_content',
       header: 'Nội dung CK',
+      width: '25%',
       render: (val) => (
         <span className="text-sm text-slate-700 block max-w-xs truncate" title={val}>{val}</span>
       ),
@@ -199,10 +224,11 @@ export default function UnmatchedTxPage() {
     {
       key: 'status',
       header: 'Trạng thái',
+      width: '20%',
       render: (val, row) =>
         val === 'ASSIGNED' ? (
           <div className="flex items-center gap-2 min-w-0">
-            <StatusBadge status="Đã gán" type="success" />
+            <StatusBadge status="Đã khớp" type="success" />
             <span className="text-[11px] text-slate-500 font-mono truncate" title={row.assigned_user_code}>
               {row.assigned_user_code}
             </span>
@@ -214,6 +240,7 @@ export default function UnmatchedTxPage() {
     {
       key: 'actions',
       header: 'Thao tác',
+      width: '19%',
       align: 'right',
       render: (_, row) =>
         row.status === 'UNRESOLVED' ? (
@@ -252,8 +279,14 @@ export default function UnmatchedTxPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm bg-gradient-to-br from-white to-amber-50/40 min-w-0 relative overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <button
+          type="button"
+          onClick={() => setMatchFilter('UNRESOLVED')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm bg-gradient-to-br from-white to-amber-50/40 min-w-0 relative overflow-hidden transition-colors ${
+            matchFilter === 'UNRESOLVED' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-100 hover:border-amber-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <WalletCards className="w-6 h-6 text-amber-500 opacity-20" />
           </div>
@@ -261,22 +294,36 @@ export default function UnmatchedTxPage() {
           <p className="text-3xl font-extrabold text-amber-600 leading-none">
             {openCount} <span className="text-sm font-medium text-amber-500">giao dịch</span>
           </p>
-          <p className="mt-3 text-[11px] font-medium text-amber-700">
-            Danh sách giao dịch chờ gán ví{total ? ` · ${total}` : ''}
+          <p className="mt-3 text-[11px] font-medium text-amber-700">Bấm để lọc chưa gán ví</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMatchFilter('ASSIGNED')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm bg-gradient-to-br from-white to-emerald-50/40 min-w-0 relative overflow-hidden transition-colors ${
+            matchFilter === 'ASSIGNED' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-100 hover:border-emerald-300'
+          }`}
+        >
+          <div className="absolute top-4 right-4">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-20" />
+          </div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã khớp</p>
+          <p className="text-3xl font-extrabold text-emerald-600 leading-none">
+            {assignedCount} <span className="text-sm font-medium text-emerald-500">giao dịch</span>
           </p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-emerald-700">Bấm để lọc đã gán ví</p>
+        </button>
         <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm min-w-0 relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40">
           <div className="absolute top-4 right-4">
             <WalletCards className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Số tiền chưa khớp</p>
           <p className="text-2xl font-extrabold text-indigo-600 leading-none">{formatVND(openAmount)}</p>
-          <p className="mt-3 text-[11px] font-medium text-indigo-600">Tổng số tiền chờ gán ví</p>
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Tổng tiền đang chờ gán</p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
-        <div className="flex items-stretch gap-2 min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-stretch gap-2 min-w-0">
           <div className="min-w-0 flex-1">
             <Input
               placeholder="Tìm mã ngân hàng, nội dung CK…"
@@ -286,6 +333,15 @@ export default function UnmatchedTxPage() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
+          <select
+            className="h-10 w-full sm:w-44 shrink-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+            value={matchFilter}
+            onChange={(e) => setMatchFilter(e.target.value)}
+          >
+            <option value="ALL">Tất cả</option>
+            <option value="UNRESOLVED">Chưa khớp</option>
+            <option value="ASSIGNED">Đã khớp</option>
+          </select>
           <Button
             type="button"
             variant="primary"
@@ -309,7 +365,15 @@ export default function UnmatchedTxPage() {
         columns={columns}
         data={filtered}
         loading={loading}
-        emptyMessage="Không có giao dịch chưa khớp."
+        pagination
+        itemsPerPage={10}
+        emptyMessage={
+          matchFilter === 'ASSIGNED'
+            ? 'Chưa có giao dịch đã khớp.'
+            : matchFilter === 'ALL'
+              ? 'Không có giao dịch.'
+              : 'Không có giao dịch chưa khớp.'
+        }
       />
 
       <Modal

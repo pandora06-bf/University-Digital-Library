@@ -60,9 +60,9 @@ export const walletService = {
   },
 
   // 4-07 / UC16 Admin: list giao dịch chưa gán (assigned_user_code IS NULL).
-  async listUnmatched(page = 1, size = 50) {
+  async listUnmatched(page = 1, size = 50, status = 'unresolved') {
     const { data } = await axiosInstance.get('/api/admin/wallet/unmatched', {
-      params: { page, size },
+      params: { page, size, status },
     });
     return {
       items: data?.data ?? data?.items ?? [],

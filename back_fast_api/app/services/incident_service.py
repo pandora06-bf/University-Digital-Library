@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.loan import Loan, Incident
 from app.models.user import User
 from app.models.fine import Fine
@@ -61,7 +61,7 @@ def record_incident(db: Session, loan_id: int, incident_type: str, description: 
     loan.return_date = now
     loan.checkin_condition = description
     if copy:
-        copy.status = 'RETIRED'
+        copy.status = 'LOST' if incident_type == 'BOOK_LOST' else 'RETIRED'
         copy.damage_notes = description
     user.total_fines = Decimal(user.total_fines or 0) + penalty
     user.is_borrowing_blocked = True
@@ -70,8 +70,35 @@ def record_incident(db: Session, loan_id: int, incident_type: str, description: 
             'penalty_amount': str(penalty), 'overdue_days': days, 'loan_status': loan.loan_status}
 
 def list_incidents(db: Session, page: int, size: int):
-    rows = db.scalars(select(Incident).order_by(Incident.id.desc()).offset((page-1)*size).limit(size)).all()
-    return {'data': [{'id': x.id, 'loan_id': x.loan_id, 'user_code': x.user_code,
-              'incident_type': x.incident_type, 'penalty_amount': str(x.penalty_amount),
-              'description': x.description, 'status': x.status, 'created_at': x.created_at}
-              for x in rows], 'page': page, 'size': size}
+    rows = db.scalars(
+        select(Incident)
+        .options(
+            joinedload(Incident.user),
+            joinedload(Incident.loan).joinedload(Loan.book),
+        )
+        .order_by(Incident.id.desc())
+        .offset((page - 1) * size)
+        .limit(size)
+    ).unique().all()
+    data = []
+    for x in rows:
+        loan = x.loan
+        book = loan.book if loan else None
+        user = x.user
+        data.append({
+            'id': x.id,
+            'loan_id': x.loan_id,
+            'loan_code': loan.loan_code if loan else None,
+            'user_code': x.user_code,
+            'full_name': user.full_name if user else None,
+            'department': user.department if user else None,
+            'book_title': book.title if book else None,
+            'copy_barcode': loan.copy_barcode if loan else None,
+            'barcode': loan.copy_barcode if loan else None,
+            'incident_type': x.incident_type,
+            'penalty_amount': str(x.penalty_amount),
+            'description': x.description,
+            'status': x.status,
+            'created_at': x.created_at,
+        })
+    return {'data': data, 'page': page, 'size': size}

@@ -164,8 +164,9 @@ export default function RoomManagement() {
     {
       key: 'name',
       header: 'Phòng',
+      width: '32%',
       render: (val, row) => (
-        <div className="min-w-0 max-w-[220px]">
+        <div className="min-w-0 w-full">
           <p className="font-semibold text-slate-800 truncate" title={val}>{val}</p>
           <p className="text-xs text-slate-500 truncate">{row.floor || '—'}</p>
         </div>
@@ -174,17 +175,20 @@ export default function RoomManagement() {
     {
       key: 'capacity',
       header: 'Sức chứa',
+      width: '14%',
       render: (val) => <span className="font-medium">{val} chỗ</span>,
     },
     {
       key: 'slot_price',
       header: 'Giá / khung 2h',
+      width: '18%',
       align: 'right',
       render: (val) => <span className="font-semibold text-slate-800">{formatVND(val)}</span>,
     },
     {
       key: 'is_active',
       header: 'Trạng thái',
+      width: '16%',
       render: (val) => (
         <StatusBadge status={val ? 'Hoạt động' : 'Ngừng dùng'} type={val ? 'success' : 'neutral'} />
       ),
@@ -192,6 +196,7 @@ export default function RoomManagement() {
     {
       key: 'actions',
       header: 'Thao tác',
+      width: '20%',
       align: 'right',
       render: (_, row) => (
         <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
@@ -310,6 +315,8 @@ export default function RoomManagement() {
       <Table
         columns={columns}
         data={filtered}
+        pagination
+        itemsPerPage={10}
         emptyMessage={loading ? 'Đang tải danh mục phòng…' : 'Không có phòng phù hợp.'}
       />
 

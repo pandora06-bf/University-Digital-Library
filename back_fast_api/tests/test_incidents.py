@@ -110,7 +110,7 @@ def test_record_incident_book_lost_with_overdue(db_session, test_account):
 
     assert loan.loan_status == "LOST"
     assert loan.return_date is not None
-    assert copy.status == "RETIRED"
+    assert copy.status == "LOST"
     assert user.is_borrowing_blocked is True
     assert Decimal(user.total_fines) == Decimal("115000")
 

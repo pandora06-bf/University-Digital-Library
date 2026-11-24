@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { 
   Search,
   Wallet, Receipt, AlertCircle, Banknote, ShieldAlert,
   CheckCircle2, Eye, AlertOctagon, ArrowLeftRight
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
@@ -17,6 +17,8 @@ import { AdminIconButton } from '../../components/AdminIconButton';
 
 export default function FineManagement() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoLookupDone = useRef('');
   const { toast, showToast, hideToast } = useToast();
   // UC10: bảng trống đến khi tra cứu MSSV qua /api/admin/fines/lookup
   const [finesData, setFinesData] = useState([]);
@@ -47,7 +49,7 @@ export default function FineManagement() {
     }
     setIsProcessing(true);
     try {
-      await axiosInstance.post('/api/admin/fines/collect', {
+      const res = await axiosInstance.post('/api/admin/fines/collect', {
         user_code: userCode,
         amount,
         notes: `Thu tại quầy — phiếu ${row.id}`,
@@ -61,7 +63,13 @@ export default function FineManagement() {
       );
       setCollectingRow(null);
       setLookupTotal(null);
-      showToast(`Đã thu đủ ${amount.toLocaleString('vi-VN')} ₫ cho ${userCode}.`, 'success');
+      const warning = res.data?.warning;
+      showToast(
+        warning
+          ? `Đã thu đủ ${amount.toLocaleString('vi-VN')} ₫. ${warning}`
+          : `Đã thu đủ ${amount.toLocaleString('vi-VN')} ₫ cho ${userCode}.`,
+        warning ? 'warning' : 'success'
+      );
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Thu phạt thất bại.'), 'error');
     } finally {
@@ -69,15 +77,17 @@ export default function FineManagement() {
     }
   };
 
-  const handleSearchSubmit = async () => {
-    const q = searchTerm.trim();
+  const handleSearchSubmit = async (presetMssv) => {
+    const fromArg = typeof presetMssv === 'string' ? presetMssv : '';
+    const q = (fromArg || searchTerm).trim();
     if (!q) {
       showToast('Nhập MSSV rồi bấm Tra cứu (không để trống).', 'warning');
       return;
     }
+    setSearchTerm(q);
     try {
       const res = await axiosInstance.get('/api/admin/fines/lookup', {
-        params: { user_code: q },
+        params: { user_code: q, include_paid: true },
       });
       const data = res.data || {};
       const fines = data.fines || [];
@@ -87,30 +97,37 @@ export default function FineManagement() {
         setFinesData([]);
         showToast(
           data.total_fines > 0
-            ? `${data.full_name || q}: tổng nợ ${Number(data.total_fines).toLocaleString('vi-VN')} ₫ nhưng chưa có khoản chưa thu.`
-            : `${data.full_name || q}: không còn công nợ.`,
+            ? `${data.full_name || q}: tổng nợ ${Number(data.total_fines).toLocaleString('vi-VN')} ₫ nhưng chưa có khoản phạt.`
+            : `${data.full_name || q}: không có khoản phạt.`,
           'warning'
         );
         return;
       }
-      const mapped = fines.map((f) => ({
-        id: String(f.fine_id),
-        date: f.created_at ? new Date(f.created_at).toLocaleDateString('vi-VN') : '—',
-        user: data.full_name || q,
-        mssv: data.user_code || q,
-        reason: f.overdue_days
-          ? `Trễ hạn ${f.overdue_days} ngày (phiếu mượn ${f.loan_id || '—'})`
-          : `Phạt phiếu mượn ${f.loan_id || '—'}`,
-        amount: `${Number(f.total_amount || 0).toLocaleString('vi-VN')} ₫`,
-        amountNum: Number(f.total_amount || 0),
-        status: 'Chưa thu',
-        statusColor: 'rose',
-        action: 'Thu tiền',
-      }));
+      const mapped = fines.map((f) => {
+        const paid = String(f.payment_status || '').toUpperCase() === 'PAID';
+        return {
+          id: String(f.fine_id),
+          date: f.created_at ? new Date(f.created_at).toLocaleDateString('vi-VN') : '—',
+          user: data.full_name || q,
+          mssv: data.user_code || q,
+          reason: f.overdue_days
+            ? `Trễ hạn ${f.overdue_days} ngày (phiếu mượn ${f.loan_id || '—'})`
+            : `Phạt phiếu mượn ${f.loan_id || '—'}`,
+          amount: `${Number(f.total_amount || 0).toLocaleString('vi-VN')} ₫`,
+          amountNum: Number(f.total_amount || 0),
+          status: paid ? 'Đã hoàn tất' : 'Chưa thu',
+          statusColor: paid ? 'emerald' : 'rose',
+          action: paid ? 'Chi tiết' : 'Thu tiền',
+        };
+      });
       setFinesData(mapped);
+      const unpaidCount = mapped.filter((row) => row.status === 'Chưa thu').length;
+      const paidCount = mapped.length - unpaidCount;
       showToast(
-        `Tìm thấy ${mapped.length} khoản chưa thu · Tổng nợ ${Number(data.total_fines || 0).toLocaleString('vi-VN')} ₫`,
-        'success'
+        unpaidCount
+          ? `Tìm thấy ${unpaidCount} khoản chưa thu${paidCount ? `, ${paidCount} khoản đã thu` : ''} · Tổng nợ ${Number(data.total_fines || 0).toLocaleString('vi-VN')} ₫`
+          : `${data.full_name || q}: không còn nợ. ${paidCount} khoản đã thu.`,
+        unpaidCount ? 'success' : 'warning'
       );
     } catch (error) {
       setFinesData([]);
@@ -120,10 +137,23 @@ export default function FineManagement() {
     }
   };
 
+  // Từ Báo mất/hỏng: /admin/fines?mssv=SV-DEMO-005 → tự điền + tra cứu
+  useEffect(() => {
+    const mssv = (searchParams.get('mssv') || '').trim();
+    if (!mssv || autoLookupDone.current === mssv) return;
+    autoLookupDone.current = mssv;
+    handleSearchSubmit(mssv);
+    const next = new URLSearchParams(searchParams);
+    next.delete('mssv');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query mssv đổi
+  }, [searchParams]);
+
   const fineColumns = [
     {
       key: 'id',
       header: 'Mã Phiếu & Ngày',
+      width: '14%',
       render: (value, row) => (
         <div className="min-w-[120px]">
           <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
@@ -136,6 +166,7 @@ export default function FineManagement() {
     {
       key: 'user',
       header: 'Độc Giả (MSSV)',
+      width: '16%',
       render: (value, row) => (
         <div className="min-w-0 max-w-[180px]">
           <span className="font-bold text-slate-800 block truncate" title={row.user}>{row.user}</span>
@@ -146,6 +177,7 @@ export default function FineManagement() {
     {
       key: 'reason',
       header: 'Lý do vi phạm',
+      width: '16%',
       render: (value, row) => (
         <div className="flex items-center gap-2 min-w-0 max-w-xs">
           <AlertCircle className={`w-4 h-4 shrink-0 ${
@@ -158,6 +190,7 @@ export default function FineManagement() {
     {
       key: 'amount',
       header: 'Tổng Tiền Phạt',
+      width: '12%',
       align: 'right',
       render: (value, row) => (
         <div className="min-w-[120px]">
@@ -171,6 +204,7 @@ export default function FineManagement() {
     {
       key: 'status',
       header: 'Trạng Thái',
+      width: '12%',
       render: (value, row) => (
         <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
           row.statusColor === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-200' :
@@ -184,6 +218,7 @@ export default function FineManagement() {
     {
       key: 'actions',
       header: 'Thao Tác',
+      width: '30%',
       align: 'right',
       render: (value, row) => (
         <div className="min-w-[150px] inline-flex items-center justify-end gap-2 whitespace-nowrap">
@@ -218,7 +253,7 @@ export default function FineManagement() {
           )}
           <AdminIconButton
             className="w-8 h-8 rounded-full text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-            onClick={() => navigate('/admin/loans')}
+            onClick={() => navigate(row.mssv ? `/admin/loans?mssv=${encodeURIComponent(row.mssv)}` : '/admin/loans')}
             title="Xem phiếu mượn liên quan"
           >
             <Receipt className="w-4 h-4" />
@@ -253,14 +288,20 @@ export default function FineManagement() {
           <Button
             variant="outline"
             icon={<AlertOctagon className="w-4 h-4" />}
-            onClick={() => navigate('/admin/incidents')}
+            onClick={() => {
+              const mssv = (searchTerm || finesData[0]?.mssv || '').trim();
+              navigate(mssv ? `/admin/incidents?mssv=${encodeURIComponent(mssv)}` : '/admin/incidents');
+            }}
           >
             Biên bản Mất / Hỏng
           </Button>
           <Button
             variant="primary"
             icon={<ArrowLeftRight className="w-4 h-4" />}
-            onClick={() => navigate('/admin/loans')}
+            onClick={() => {
+              const mssv = (searchTerm || finesData[0]?.mssv || '').trim();
+              navigate(mssv ? `/admin/loans?mssv=${encodeURIComponent(mssv)}` : '/admin/loans');
+            }}
           >
             Xem Phiếu Mượn
           </Button>
@@ -343,7 +384,7 @@ export default function FineManagement() {
               variant="primary"
               className="!h-10 shrink-0 px-3 sm:px-4"
               icon={<Search className="w-4 h-4" />}
-              onClick={handleSearchSubmit}
+              onClick={() => handleSearchSubmit()}
             >
               Tra cứu
             </Button>
@@ -374,7 +415,15 @@ export default function FineManagement() {
         <Table
           columns={fineColumns}
           data={filteredData}
-          emptyMessage="Nhập MSSV rồi bấm Tra cứu (không để trống)."
+          pagination
+          itemsPerPage={10}
+          emptyMessage={
+            finesData.length === 0
+              ? (lookedUpName
+                ? `${lookedUpName}: không có khoản phạt.`
+                : 'Nhập MSSV rồi bấm Tra cứu (không để trống).')
+              : 'Không có phiếu khớp bộ lọc này.'
+          }
           className="border-0 shadow-none rounded-none rounded-b-2xl"
         />
       </div>
@@ -443,7 +492,11 @@ export default function FineManagement() {
             <Button
               variant="primary"
               icon={<ArrowLeftRight className="w-4 h-4" />}
-              onClick={() => { setDetailRow(null); navigate('/admin/loans'); }}
+              onClick={() => {
+                const mssv = (detailRow?.mssv || '').trim();
+                setDetailRow(null);
+                navigate(mssv ? `/admin/loans?mssv=${encodeURIComponent(mssv)}` : '/admin/loans');
+              }}
             >
               Xem phiếu mượn
             </Button>

@@ -518,6 +518,18 @@ def _seed_room_bookings(db, rooms, now: datetime, vn_now: datetime) -> None:
         # 6. CONFIRMED – ngày mai, giảng viên hướng dẫn đồ án
         ("DEMO-RB-006", 3, "GV-DEMO-006",
          vn_tomorrow,    "10:00", "12:00", "CONFIRMED",  None),
+        # 7. CONFIRMED hôm nay – slot bắt đầu ~5 phút trước (còn trong cửa sổ check-in 15 phút)
+        ("DEMO-RB-CHECKIN-NOW", 2, "SV-DEMO-001",
+         vn_today,
+         (vn_now - timedelta(minutes=5)).time().replace(second=0, microsecond=0),
+         (vn_now + timedelta(hours=1, minutes=55)).time().replace(second=0, microsecond=0),
+         "CONFIRMED", None),
+        # 8. CONFIRMED hôm nay – slot sau (hiện trên bảng, chưa tới giờ check-in)
+        ("DEMO-RB-CHECKIN-LATER", 2, "GV-DEMO-002",
+         vn_today,
+         "16:00" if vn_now.hour < 16 else "22:00",
+         "18:00" if vn_now.hour < 16 else "23:59",
+         "CONFIRMED", None),
     ]
 
     for ref, room_idx, user_code, booking_date, start_str, end_str, status, checkin_dt in definitions:
@@ -769,7 +781,7 @@ def _seed_demo_loans_and_waitlists(db, books, now):
         if copy is None:
             continue
         if loan_status == "LOST":
-            copy.status = "RETIRED"
+            copy.status = "LOST"
             copy.damage_notes = "Mất sách – fixture demo UC15"
         else:
             copy.status = "BORROWED"
@@ -803,9 +815,54 @@ def _seed_demo_loans_and_waitlists(db, books, now):
             incident.penalty_amount = penalty
             incident.description = f"DEMO: báo mất {book.title}; bồi thường theo giá bìa"
             incident.status = "RESOLVED"
+            # UC10/UC15: bồi thường mất sách phải có Fine UNPAID khớp Total_Fines để lookup/collect.
+            fine = db.query(Fine).filter_by(loan_id=loan.id).one_or_none()
+            if fine is None:
+                fine = Fine(loan_id=loan.id, user_code=user_code)
+                db.add(fine)
+            fine.overdue_days = 0
+            fine.fine_rate = 5_000
+            fine.total_amount = penalty
+            fine.payment_status = "UNPAID"
             db.query(User).filter_by(user_code=user_code).update(
                 {User.total_fines: penalty, User.is_borrowing_blocked: True}
             )
+
+    # Thêm SV demo đang nợ thật để test UC10 (lookup + thu đủ).
+    extra_unpaid = [
+        ("SV-DEMO-007", books[3], "DEMO-UNPAID-FINE-007", 7, 35_000),
+        ("SV-DEMO-009", books[4], "DEMO-UNPAID-FINE-009", 9, 45_000),
+    ]
+    for user_code, book, marker, overdue_days, amount in extra_unpaid:
+        if db.query(User).filter_by(user_code=user_code).first() is None:
+            continue
+        copy = first_copy(book, "AVAILABLE")
+        existing = db.query(Loan).filter_by(user_code=user_code).filter(
+            Loan.checkout_condition == marker
+        ).one_or_none()
+        if existing and existing.copy_barcode:
+            copy = db.query(BookCopy).filter_by(copy_barcode=existing.copy_barcode).one_or_none() or copy
+        if copy is None:
+            continue
+        copy.status = "BORROWED"
+        loan = loan_for(
+            user_code, book, "PHYSICAL", "OVERDUE", copy.copy_barcode,
+            now - timedelta(days=overdue_days + 14),
+            now - timedelta(days=overdue_days),
+            marker,
+        )
+        db.flush()
+        fine = db.query(Fine).filter_by(loan_id=loan.id).one_or_none()
+        if fine is None:
+            fine = Fine(loan_id=loan.id, user_code=user_code)
+            db.add(fine)
+        fine.overdue_days = overdue_days
+        fine.fine_rate = 5_000
+        fine.total_amount = amount
+        fine.payment_status = "UNPAID"
+        db.query(User).filter_by(user_code=user_code).update(
+            {User.total_fines: amount, User.is_borrowing_blocked: True}
+        )
 
     # EBook loan uses a book that has a matching Ebook row.
     ebook = db.query(Book).join(Ebook).filter(Book.title.like("[DEMO-%")).order_by(Book.id).first()
@@ -813,7 +870,9 @@ def _seed_demo_loans_and_waitlists(db, books, now):
         loan_for("GV-DEMO-002", ebook, "EBOOK", "BORROWED", None,
                  now - timedelta(days=3), now + timedelta(days=11), "DEMO-EBOOK-LOAN")
     # A REQUESTED loan is a hold request, so it has no copy and does not change stock.
-    loan_for("SV-DEMO-007", books[4], "PHYSICAL", "REQUESTED", None,
+    # SV-DEMO-007 đã dùng cho nợ demo; REQUESTED chuyển sang SV-DEMO-011 nếu còn.
+    requested_user = "SV-DEMO-011" if db.query(User).filter_by(user_code="SV-DEMO-011").first() else "SV-DEMO-007"
+    loan_for(requested_user, books[4], "PHYSICAL", "REQUESTED", None,
              now - timedelta(hours=2), now + timedelta(hours=22), "DEMO-REQUESTED-LOAN")
 
     # Make the waitlisted title genuinely unavailable, with one borrowed loan per copy.

@@ -56,6 +56,8 @@ def search_books(
     category_id: Optional[int] = Query(None, include_in_schema=False),
     book_type: Optional[BookFormat] = Query(None, include_in_schema=False),
     keyword: Optional[str] = Query(None, max_length=200, include_in_schema=False),
+    exact_format: bool = Query(False, description="True = khớp đúng loại sách, không gộp BOTH"),
+    exact_publisher: bool = Query(False, description="True = khớp đúng tên nhà xuất bản"),
     db: Session = Depends(get_db),
 ):
     fmt = format or book_type
@@ -69,6 +71,8 @@ def search_books(
         category=category or (str(category_id) if category_id is not None else None),
         attribute=attribute or keyword,
         format=fmt.value if fmt else None,
+        exact_format=exact_format,
+        exact_publisher=exact_publisher,
         page=page,
         page_size=page_size,
     )

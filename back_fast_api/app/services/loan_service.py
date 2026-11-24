@@ -121,19 +121,47 @@ def promote_waitlist_stub(db: Session, book_id: int):
 # 1. Tra cứu phiếu mượn (Hỗ trợ màn hình quầy thủ thư)
 # ----------------------------------------------------------------------
 def lookup_loans_service(db: Session, q: str) -> List[Loan]:
+    """Tra phiếu theo id, MSSV (gần đúng), hoặc đúng mã vạch bản in."""
+    code = (q or "").strip()
     query = (
         select(Loan)
         .join(User, Loan.user_code == User.user_code)
         .join(Book, Loan.book_id == Book.id)
-        .options(joinedload(Loan.book))
+        .options(joinedload(Loan.book), joinedload(Loan.user))
     )
 
-    if q.isdigit():
-        query = query.where(or_(Loan.id == int(q), Loan.user_code == q))
+    if code.isdigit():
+        query = query.where(or_(Loan.id == int(code), Loan.user_code == code))
     else:
-        query = query.where(Loan.user_code.ilike(f"%{q}%"))
+        query = query.where(
+            or_(
+                Loan.user_code.ilike(f"%{code}%"),
+                func.upper(Loan.copy_barcode) == code.upper(),
+                func.upper(Loan.loan_code) == code.upper(),
+            )
+        )
 
     return list(db.scalars(query.order_by(Loan.borrow_date.desc())).all())
+
+
+def lookup_reader_service(db: Session, q: str) -> Optional[User]:
+    """Hồ sơ đúng mã bạn đọc. Tra theo MSSV (không phân biệt hoa thường),
+    mã phiếu số, hoặc loan_code (vd PM-…)."""
+    code = (q or "").strip()
+    if not code:
+        return None
+    reader = db.scalar(select(User).where(func.upper(User.user_code) == code.upper()))
+    if reader is not None:
+        return reader
+    if code.isdigit():
+        loan = db.get(Loan, int(code))
+        if loan is not None:
+            return db.get(User, loan.user_code)
+        return None
+    loan = db.scalar(select(Loan).where(func.upper(Loan.loan_code) == code.upper()))
+    if loan is not None:
+        return db.get(User, loan.user_code)
+    return None
 
 
 # ----------------------------------------------------------------------
@@ -356,6 +384,51 @@ def renew_loan_service(db: Session, user_code: str, loan_id: int) -> Loan:
     db.commit()
     db.refresh(loan)
     return loan
+
+
+# ----------------------------------------------------------------------
+# 1c. Bản sao để gắn vào phiếu xuất (GET /api/admin/loans/copy)
+# ----------------------------------------------------------------------
+def get_checkout_copy_service(db: Session, barcode: str) -> Dict[str, Any]:
+    """Tra mã vạch bản in. Nếu người dùng nhập mã phiếu thì chỉ rõ bản sẵn sàng, không trả 404 chung."""
+    code = (barcode or "").strip()
+    if not code:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Thiếu mã vạch sách")
+
+    copy = db.scalar(
+        select(BookCopy).where(func.upper(BookCopy.copy_barcode) == code.upper())
+    )
+    if copy is not None:
+        book = db.get(Book, copy.book_id)
+        return {
+            "copy_barcode": copy.copy_barcode,
+            "book_id": copy.book_id,
+            "book_title": book.title if book else None,
+            "status": copy.status,
+        }
+
+    loan = db.get(Loan, int(code)) if code.isdigit() else None
+    if loan is None:
+        loan = db.scalar(select(Loan).where(Loan.loan_code == code))
+    if loan is not None:
+        available = list(db.scalars(
+            select(BookCopy.copy_barcode)
+            .where(BookCopy.book_id == loan.book_id, BookCopy.status == "AVAILABLE")
+            .order_by(BookCopy.copy_barcode)
+        ).all())
+        ready = ", ".join(available) if available else "không còn bản sẵn sàng"
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"#{code} là mã phiếu, không phải mã vạch. "
+                f"Phiếu #{loan.id} chưa gắn bản in. Quét một bản sẵn sàng: {ready}."
+            ),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Không tìm thấy bản sao sách có mã vạch {code}",
+    )
 
 
 # ----------------------------------------------------------------------
@@ -622,6 +695,47 @@ def checkout_at_counter_service(
 
 
 # ----------------------------------------------------------------------
+# 2b. Phiếu đang mượn theo mã vạch (GET /api/admin/loans/active-return)
+# ----------------------------------------------------------------------
+def get_active_return_service(db: Session, barcode: str) -> Dict[str, Any]:
+    """Thẻ trả tại quầy: phiếu BORROWED hoặc OVERDUE của đúng mã vạch."""
+    code = (barcode or "").strip()
+    if not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nhập mã vạch sách đang mượn.",
+        )
+    loan = db.scalar(
+        select(Loan)
+        .options(joinedload(Loan.book), joinedload(Loan.user))
+        .where(
+            func.upper(Loan.copy_barcode) == code.upper(),
+            Loan.loan_status.in_(["BORROWED", "OVERDUE"]),
+        )
+    )
+    if loan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy phiếu đang mượn hoặc quá hạn cho mã vạch này. Kiểm tra lại mã, hoặc phiếu đã được trả.",
+        )
+    now = datetime.utcnow()
+    overdue = loan.loan_status == "OVERDUE" or (loan.due_date is not None and now > loan.due_date)
+    return {
+        "loan_id": loan.id,
+        "user_code": loan.user_code,
+        "full_name": loan.user.full_name if loan.user else None,
+        "department": loan.user.department if loan.user else None,
+        "book_id": loan.book_id,
+        "book_title": loan.book.title if loan.book else None,
+        "book_price": float(loan.book.price) if loan.book and loan.book.price is not None else 0,
+        "copy_barcode": loan.copy_barcode,
+        "loan_status": loan.loan_status,
+        "due_date": loan.due_date,
+        "overdue": overdue,
+    }
+
+
+# ----------------------------------------------------------------------
 # 3. Check-in tại quầy (POST /api/admin/loans/checkin)
 # ----------------------------------------------------------------------
 def checkin_at_counter_service(
@@ -720,24 +834,26 @@ def checkin_at_counter_service(
 # ----------------------------------------------------------------------
 # 4. Tra cứu nợ phạt (GET /api/admin/fines/lookup)
 # ----------------------------------------------------------------------
-def lookup_fines_service(db: Session, user_code: str) -> Dict[str, Any]:
-    user = db.scalar(select(User).where(User.user_code == user_code))
+def lookup_fines_service(db: Session, user_code: str, include_paid: bool = False) -> Dict[str, Any]:
+    user = db.scalar(select(User).where(func.upper(User.user_code) == (user_code or "").strip().upper()))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy bạn đọc với MSSV {user_code}"
         )
 
-    unpaid_fines = db.scalars(
-        select(Fine).where(Fine.user_code == user_code, Fine.payment_status == "UNPAID")
-    ).all()
+    stmt = select(Fine).where(Fine.user_code == user.user_code).order_by(Fine.id.desc())
+    if not include_paid:
+        stmt = stmt.where(Fine.payment_status == "UNPAID")
+    fines = db.scalars(stmt).all()
+    unpaid_count = sum(1 for fine in fines if fine.payment_status == "UNPAID")
 
     return {
         "user_code": user.user_code,
         "full_name": user.full_name,
         "total_fines": user.total_fines,
         "is_borrowing_blocked": user.is_borrowing_blocked,
-        "unpaid_count": len(unpaid_fines),
+        "unpaid_count": unpaid_count,
         "fines": [
             {
                 "fine_id": f.id,
@@ -745,9 +861,10 @@ def lookup_fines_service(db: Session, user_code: str) -> Dict[str, Any]:
                 "overdue_days": f.overdue_days,
                 "fine_rate": f.fine_rate,
                 "total_amount": f.total_amount,
+                "payment_status": f.payment_status,
                 "created_at": f.created_at,
             }
-            for f in unpaid_fines
+            for f in fines
         ],
     }
 

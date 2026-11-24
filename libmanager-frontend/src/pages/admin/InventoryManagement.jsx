@@ -13,6 +13,7 @@ import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
+import { BookTypeBadge } from '../../components/BookTypeBadge';
 
 export default function InventoryManagement() {
   const { bookId } = useParams();
@@ -20,9 +21,11 @@ export default function InventoryManagement() {
   const location = useLocation();
   const { toast, showToast, hideToast } = useToast();
 
-  // State nạp danh sách đầu sách cho Combobox (NFR-PE-02: page_size ≤ 50)
+  // Chọn đầu sách: gõ mã/tên hoặc chọn trong danh sách đủ kho.
+  const [bookPickMode, setBookPickMode] = useState('type'); // 'type' | 'suggest'
   const [booksList, setBooksList] = useState([]);
-  const [isLoadingBooks, setIsLoadingBooks] = useState(true);
+  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
+  const [bookPickerQuery, setBookPickerQuery] = useState('');
 
   const [tableData, setTableData] = useState([]);
   const [bookInfo, setBookInfo] = useState(null);
@@ -54,29 +57,53 @@ export default function InventoryManagement() {
     zone: '', floor: '', shelf: '', status: '', condition: ''
   });
 
-  // Nạp danh sách đầu sách cho combobox chọn sách
+  const inventoryBasePath = location.pathname.startsWith('/admin/books')
+    ? '/admin/books'
+    : '/admin/inventory';
+
+  const mergeBookIntoList = (book) => {
+    if (!book?.id) return;
+    setBooksList((prev) => {
+      const rest = prev.filter((b) => String(b.id) !== String(book.id));
+      return [book, ...rest];
+    });
+  };
+
+  const loadBookSuggestions = async (q = '') => {
+    setIsLoadingBooks(true);
+    try {
+      const items = [];
+      const query = q.trim();
+      for (let page = 1; page <= 40; page += 1) {
+        const res = await axiosInstance.get('/api/books/search', {
+          params: { page, page_size: 50, ...(query ? { q: query } : {}) },
+        });
+        const batch = res.data?.items || [];
+        items.push(...batch);
+        const totalPages = Number(res.data?.total_pages) || 1;
+        if (page >= totalPages || batch.length === 0) break;
+      }
+      setBooksList(items);
+    } catch (error) {
+      setBooksList([]);
+      showToast(getApiErrorMessage(error, 'Không tải được danh sách đầu sách.'), 'error');
+    } finally {
+      setIsLoadingBooks(false);
+    }
+  };
+
+  // Gợi ý gồm mọi đầu sách đang dùng, không dừng ở 50 cuốn đầu.
   useEffect(() => {
-    axiosInstance.get('/api/books/search?page_size=50')
-      .then(res => {
-        setBooksList(res.data?.items || []);
-      })
-      .catch((error) => {
-        setBooksList([]);
-        showToast(
-          getApiErrorMessage(error, 'Không tải được danh sách đầu sách.'),
-          'error'
-        );
-      })
-      .finally(() => {
-        setIsLoadingBooks(false);
-      });
-  }, [showToast]);
+    loadBookSuggestions('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mapCopyStatusLabel = (status) => {
     if (status === 'AVAILABLE') return 'Sẵn sàng';
     if (status === 'BORROWED') return 'Đang cho mượn';
     if (status === 'LOST') return 'Báo mất';
-    if (status === 'DAMAGED' || status === 'RETIRED') return 'Đã thanh lý';
+    if (status === 'DAMAGED') return 'Hư hỏng';
+    if (status === 'RETIRED') return 'Đã thanh lý';
     return status || 'Không rõ';
   };
 
@@ -115,41 +142,114 @@ export default function InventoryManagement() {
     const targetBook = currentBookInfo || bookInfo;
     try {
       const res = await axiosInstance.get(`/api/admin/books/${idToFetch}/copies`);
-      const copies = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      let copies = Array.isArray(res.data) ? res.data : (res.data?.items || []);
+      // Fallback: chi tiết sách đã có locations — tránh bảng trống khi copies lỗi shape
+      if (!copies.length && Array.isArray(targetBook?.locations) && targetBook.locations.length) {
+        copies = targetBook.locations;
+      }
       setTableData(copies.map((c) => mapCopyRow(c, targetBook)));
     } catch (error) {
-      setTableData([]);
-      showToast(
-        getApiErrorMessage(error, 'Không tải được danh sách bản sao.'),
-        'error'
-      );
+      const fallback = Array.isArray(targetBook?.locations) ? targetBook.locations : [];
+      if (fallback.length) {
+        setTableData(fallback.map((c) => mapCopyRow(c, targetBook)));
+        showToast('Dùng vị trí từ chi tiết sách (API copies lỗi).', 'warning');
+      } else {
+        setTableData([]);
+        showToast(
+          getApiErrorMessage(error, 'Không tải được danh sách bản sao.'),
+          'error'
+        );
+      }
     }
   };
 
-  // Nạp thông tin sách và các bản sao khi `bookId` thay đổi
+  // Danh mục search chỉ loại đầu sách đã vô hiệu hóa, nên sách 404 ở cổng bạn đọc vẫn tìm được ở đây.
+  const findActiveCatalogBook = async (id) => {
+    for (let page = 1; page <= 40; page += 1) {
+      const res = await axiosInstance.get('/api/books/search', {
+        params: { page, page_size: 50 },
+      });
+      const items = res.data?.items || [];
+      const found = items.find((book) => String(book.id) === String(id));
+      if (found) return found;
+      const totalPages = Number(res.data?.total_pages) || 1;
+      if (page >= totalPages || items.length === 0) break;
+    }
+    return null;
+  };
+
+  // Nạp đúng đầu sách theo ID trên URL; reset lọc bảng mỗi lần đổi sách
   useEffect(() => {
-    if (!bookId) return;
+    if (!bookId) {
+      setBookInfo(null);
+      setTableData([]);
+      return;
+    }
+
+    setSearchTerm('');
+    setLocationFilter('ALL');
+    setStatusFilter('ALL');
 
     let isMounted = true;
-    axiosInstance.get('/api/books/search?page_size=50')
-      .then(res => {
+    axiosInstance
+      .get(`/api/books/${bookId}`)
+      .then((res) => {
         if (!isMounted) return;
-        const found = res.data?.items?.find(x => x.id.toString() === bookId.toString());
-        if (found) {
-          setBookInfo(found);
-          fetchInventory(bookId, found);
+        const found = res.data;
+        setBookInfo(found);
+        mergeBookIntoList(found);
+        // Đồng bộ field theo chế độ đang dùng — không trộn hai ô
+        if (bookPickMode === 'type') {
+          setBookPickerQuery(String(found.id));
         } else {
-          setBookInfo(null);
-          setTableData([]);
-          showToast('Không tìm thấy đầu sách này.', 'error');
+          setBookPickerQuery('');
         }
+        fetchInventory(bookId, found);
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        if (!isMounted) return;
+        // Chi tiết bạn đọc trả 404 khi mọi bản in đã ngừng lưu hành, dù đầu sách vẫn is_active.
+        // Không gọi API mới: tìm trong danh mục đang bật, rồi lấy bản sao ở endpoint kho sẵn có.
+        const status = error?.response?.status;
+        if (status === 404) {
+          let found = null;
+          try {
+            found = await findActiveCatalogBook(bookId);
+          } catch {
+            found = null;
+          }
+          if (!isMounted) return;
+          if (!found) {
+            try {
+              const copiesRes = await axiosInstance.get(`/api/admin/books/${bookId}/copies`);
+              const copies = Array.isArray(copiesRes.data)
+                ? copiesRes.data
+                : (copiesRes.data?.items || []);
+              if (copies.length) {
+                found = { id: Number(bookId), title: `Đầu sách #${bookId}`, author: '' };
+              }
+            } catch {
+              found = null;
+            }
+          }
+          if (!isMounted) return;
+          if (found) {
+            setBookInfo(found);
+            mergeBookIntoList(found);
+            if (bookPickMode === 'type') setBookPickerQuery(String(found.id));
+            fetchInventory(bookId, found);
+            showToast(
+              'Đầu sách vẫn đang dùng. Mọi bản in đã thanh lý hoặc hỏng nên cổng bạn đọc không mở sách này.',
+              'warning'
+            );
+            return;
+          }
+        }
         if (!isMounted) return;
         setBookInfo(null);
         setTableData([]);
         showToast(
-          getApiErrorMessage(error, 'Không tải được thông tin đầu sách.'),
+          getApiErrorMessage(error, `Không tìm thấy đầu sách #${bookId}.`),
           'error'
         );
       });
@@ -160,13 +260,98 @@ export default function InventoryManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookId]);
 
+  const switchBookPickMode = (mode) => {
+    setBookPickMode(mode);
+    if (mode === 'type') {
+      setBookPickerQuery(bookId ? String(bookId) : '');
+      // không đụng booksList
+    } else {
+      setBookPickerQuery('');
+      if (!booksList.length) loadBookSuggestions('');
+    }
+  };
+
   const handleSelectBook = (e) => {
     const newId = e.target.value;
-    const basePath = location.pathname.startsWith('/admin/books') ? '/admin/books' : '/admin/inventory';
+    // Chế độ gợi ý: chọn là xong — không dùng ô gõ / nút Tra cứu
+    setBookPickerQuery('');
     if (newId) {
-      navigate(`${basePath}/${newId}`);
+      navigate(`${inventoryBasePath}/${newId}`);
     } else {
-      navigate(basePath);
+      navigate(inventoryBasePath);
+    }
+  };
+
+  const handleBookPickerSubmit = async () => {
+    if (bookPickMode !== 'type') {
+      showToast('Đang dùng danh sách gợi ý — chọn dòng trong dropdown, không cần Tra cứu.', 'warning');
+      return;
+    }
+    const q = bookPickerQuery.trim();
+    if (!q) {
+      showToast('Nhập mã sách (vd 207) hoặc từ khóa tên sách rồi Tra cứu.', 'warning');
+      return;
+    }
+
+    // Chỉ số → mở đúng ID qua GET /api/books/{id}
+    if (/^\d+$/.test(q) || /^#\d+$/.test(q)) {
+      const id = q.replace(/^#/, '');
+      navigate(`${inventoryBasePath}/${id}`);
+      return;
+    }
+
+    // Mã vạch bản sao (DEMO-BC-001-02) → mở đầu sách chứa bản đó
+    const looksLikeBarcode = !/\s/.test(q) && /[A-Za-z]/.test(q) && /\d/.test(q) && q.includes('-');
+    if (looksLikeBarcode) {
+      const candidates = q === q.toUpperCase() ? [q] : [q, q.toUpperCase()];
+      for (const code of candidates) {
+        try {
+          const { data } = await axiosInstance.get(`/api/admin/copies/${encodeURIComponent(code)}`);
+          if (data?.book_id) {
+            navigate(`${inventoryBasePath}/${data.book_id}`);
+            showToast(`Mã ${data.copy_barcode} thuộc đầu sách #${data.book_id}.`, 'success');
+            return;
+          }
+        } catch (error) {
+          if (error?.response?.status !== 404) {
+            showToast(getApiErrorMessage(error, 'Không tra được mã vạch.'), 'error');
+            return;
+          }
+        }
+      }
+    }
+
+    setIsLoadingBooks(true);
+    try {
+      const items = await (async () => {
+        const found = [];
+        for (let page = 1; page <= 40; page += 1) {
+          const res = await axiosInstance.get('/api/books/search', {
+            params: { q, page, page_size: 50 },
+          });
+          const batch = res.data?.items || [];
+          found.push(...batch);
+          const totalPages = Number(res.data?.total_pages) || 1;
+          if (page >= totalPages || batch.length === 0) break;
+        }
+        return found;
+      })();
+      if (items.length === 1) {
+        navigate(`${inventoryBasePath}/${items[0].id}`);
+        showToast(`Đã chọn #${items[0].id} — ${items[0].title}`, 'success');
+      } else if (items.length === 0) {
+        showToast(`Không tìm thấy đầu sách cho «${q}».`, 'warning');
+      } else if (items.length > 1) {
+        // Nhiều kết quả → chuyển sang chế độ gợi ý để chọn 1 cuốn (không trộn ô gõ)
+        setBooksList(items);
+        setBookPickMode('suggest');
+        setBookPickerQuery('');
+        showToast(`Tìm thấy ${items.length} đầu sách — chọn trong danh sách gợi ý.`, 'success');
+      }
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không tìm được đầu sách.'), 'error');
+    } finally {
+      setIsLoadingBooks(false);
     }
   };
 
@@ -363,8 +548,6 @@ export default function InventoryManagement() {
     const matchStatus =
       statusFilter === 'ALL'
       || (statusFilter === 'ISSUE' && ['DAMAGED', 'LOST', 'RETIRED'].includes(item.rawStatus))
-      || (statusFilter === 'RETIRED' && (item.rawStatus === 'RETIRED' || item.rawStatus === 'DAMAGED'))
-      || (statusFilter === 'DAMAGED' && item.rawStatus === 'DAMAGED')
       || item.rawStatus === statusFilter;
     
     return matchSearch && matchLocation && matchStatus;
@@ -413,10 +596,10 @@ export default function InventoryManagement() {
       header: 'Tình Trạng',
       render: (val, row) => (
         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
-          row.statusType === 'danger' ? 'bg-rose-50 text-rose-600 border-rose-200' : 
+          row.rawStatus === 'DAMAGED' ? 'bg-rose-50 text-rose-600 border-rose-200' : 
           'bg-slate-50 text-slate-700 border-slate-200'
         }`}>
-          {row.statusType === 'danger' ? 'Hư hỏng' : 'Nguyên vẹn'}
+          {row.rawStatus === 'DAMAGED' ? 'Hư hỏng' : 'Nguyên vẹn'}
         </span>
       )
     },
@@ -516,27 +699,80 @@ export default function InventoryManagement() {
           </p>
         </div>
 
-        {/* Dropdown chọn đầu sách */}
-        <div className="w-full sm:w-auto flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
-          <label htmlFor="inventory-book-select" className="text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
-            Chọn đầu sách:
-            {isLoadingBooks && <span className="text-indigo-600 font-normal text-xs ml-1">(Đang tải...)</span>}
-          </label>
-          <div className="w-full sm:w-80 md:w-96">
-            <select
-              id="inventory-book-select"
-              className="w-full h-10 px-3 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-lg text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all truncate shadow-xs"
-              value={bookId ? bookId.toString() : ''}
-              onChange={handleSelectBook}
-            >
-              <option value="">-- Chọn đầu sách để quản lý tồn kho --</option>
-              {booksList.map(b => (
-                <option key={b.id} value={b.id}>
-                  #{b.id} - {b.title} {b.author ? `(${b.author})` : ''}
-                </option>
-              ))}
-            </select>
+        {/* Chọn đầu sách — chỉ 1 trong 2: gõ tay hoặc danh sách gợi ý */}
+        <div className="w-full sm:max-w-xl flex flex-col gap-2 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-semibold text-slate-700">
+              Chọn đầu sách
+              {isLoadingBooks && <span className="text-indigo-600 font-normal text-xs ml-1">(Đang tải…)</span>}
+            </span>
+            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-semibold">
+              <button
+                type="button"
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  bookPickMode === 'type' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+                onClick={() => switchBookPickMode('type')}
+              >
+                Gõ mã / tên
+              </button>
+              <button
+                type="button"
+                className={`px-2.5 py-1 rounded-md transition-colors ${
+                  bookPickMode === 'suggest' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+                onClick={() => switchBookPickMode('suggest')}
+              >
+                Danh sách gợi ý
+              </button>
+            </div>
           </div>
+
+          {bookPickMode === 'type' ? (
+            <>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  id="inventory-book-picker"
+                  className="flex-1 min-w-0"
+                  placeholder="Mã sách, mã vạch hoặc tên"
+                  value={bookPickerQuery}
+                  onChange={(e) => setBookPickerQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleBookPickerSubmit()}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  icon={<Search className="w-4 h-4" />}
+                  disabled={isLoadingBooks}
+                  onClick={handleBookPickerSubmit}
+                >
+                  Tra cứu
+                </Button>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Nhập ID đầu sách, mã vạch bản sao hoặc tên rồi Tra cứu. Nhiều kết quả theo tên sẽ chuyển sang danh sách gợi ý.
+              </p>
+            </>
+          ) : (
+            <>
+              <select
+                id="inventory-book-select"
+                className="w-full h-10 px-3 bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-lg text-sm font-medium text-slate-700 focus:outline-none cursor-pointer transition-all truncate shadow-xs"
+                value={bookId ? bookId.toString() : ''}
+                onChange={handleSelectBook}
+              >
+                <option value="">-- Chọn đầu sách --</option>
+                {booksList.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    #{b.id} — {b.title}{b.author ? ` (${b.author})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Danh sách gồm mọi đầu sách đang dùng. Chọn một dòng là mở tồn kho ngay.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -572,6 +808,7 @@ export default function InventoryManagement() {
                 <h2 className="text-lg sm:text-xl font-bold text-slate-800 truncate min-w-0">
                   {bookInfo?.title || 'Đang tải thông tin sách...'}
                 </h2>
+                {bookInfo?.book_type && <BookTypeBadge type={bookInfo.book_type} />}
               </div>
               <p className="text-xs text-slate-500 mt-1 truncate">
                 Tác giả: <span className="font-semibold text-slate-700">{bookInfo?.author || 'Chưa cập nhật'}</span>
@@ -667,7 +904,7 @@ export default function InventoryManagement() {
           <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
             {brokenCopies} <span className="text-sm font-medium text-rose-400">cuốn</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc thanh lý / mất · {brokenPercent}%</p>
+          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc hư hỏng, thanh lý, mất · {brokenPercent}%</p>
         </button>
       </div>
 
@@ -723,12 +960,12 @@ export default function InventoryManagement() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">Tình trạng (Tất cả)</option>
+              <option value="ALL">Tất cả</option>
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="BORROWED">Đang cho mượn</option>
-              <option value="ISSUE">Cần xử lý (thanh lý / mất)</option>
+              <option value="ISSUE">Cần xử lý</option>
               <option value="RETIRED">Đã thanh lý</option>
-              <option value="DAMAGED">Hỏng (DAMAGED)</option>
+              <option value="DAMAGED">Hư hỏng</option>
               <option value="LOST">Báo mất</option>
             </select>
           </div>
@@ -738,6 +975,8 @@ export default function InventoryManagement() {
         <Table 
           columns={inventoryColumns}
           data={filteredData}
+          pagination
+          itemsPerPage={10}
           className="border-0 shadow-none rounded-none rounded-b-2xl"
         />
       </div>
@@ -778,36 +1017,45 @@ export default function InventoryManagement() {
             <div className="col-span-2">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ <span className="text-rose-500">*</span></label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                 <Input 
-                   placeholder="Khu vực (VD: Khu A)" 
-                   className="text-sm" 
-                   value={addForm.zone} 
-                   error={addFormErrors.zone}
-                   onChange={e => {
-                     setAddForm({...addForm, zone: e.target.value});
-                     if (addFormErrors.zone) setAddFormErrors(prev => ({...prev, zone: ''}));
-                   }} 
-                 />
-                 <Input 
-                   placeholder="Tầng (VD: Tầng 1)" 
-                   className="text-sm" 
-                   value={addForm.floor} 
-                   error={addFormErrors.floor}
-                   onChange={e => {
-                     setAddForm({...addForm, floor: e.target.value});
-                     if (addFormErrors.floor) setAddFormErrors(prev => ({...prev, floor: ''}));
-                   }} 
-                 />
-                 <Input 
-                   placeholder="Kệ (VD: Kệ 1)" 
-                   className="text-sm" 
-                   value={addForm.shelf} 
-                   error={addFormErrors.shelf}
-                   onChange={e => {
-                     setAddForm({...addForm, shelf: e.target.value});
-                     if (addFormErrors.shelf) setAddFormErrors(prev => ({...prev, shelf: ''}));
-                   }} 
-                 />
+                 <div>
+                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
+                   <Input 
+                     placeholder="VD: Khu A" 
+                     className="text-sm" 
+                     value={addForm.zone} 
+                     error={addFormErrors.zone}
+                     onChange={e => {
+                       setAddForm({...addForm, zone: e.target.value});
+                       if (addFormErrors.zone) setAddFormErrors(prev => ({...prev, zone: ''}));
+                     }} 
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
+                   <Input 
+                     placeholder="VD: Tầng 1" 
+                     className="text-sm" 
+                     value={addForm.floor} 
+                     error={addFormErrors.floor}
+                     onChange={e => {
+                       setAddForm({...addForm, floor: e.target.value});
+                       if (addFormErrors.floor) setAddFormErrors(prev => ({...prev, floor: ''}));
+                     }} 
+                   />
+                 </div>
+                 <div>
+                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
+                   <Input 
+                     placeholder="VD: Dãy 1 / Kệ 1" 
+                     className="text-sm" 
+                     value={addForm.shelf} 
+                     error={addFormErrors.shelf}
+                     onChange={e => {
+                       setAddForm({...addForm, shelf: e.target.value});
+                       if (addFormErrors.shelf) setAddFormErrors(prev => ({...prev, shelf: ''}));
+                     }} 
+                   />
+                 </div>
               </div>
             </div>
             <div>
@@ -823,7 +1071,7 @@ export default function InventoryManagement() {
               >
                 <option value="AVAILABLE">Sẵn sàng</option>
                 <option value="BORROWED">Đang mượn</option>
-                <option value="DAMAGED">Đã thanh lý / Hỏng</option>
+                <option value="DAMAGED">Hư hỏng</option>
                 <option value="LOST">Báo mất</option>
               </select>
             </div>
@@ -859,36 +1107,45 @@ export default function InventoryManagement() {
               <div className="col-span-2">
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ <span className="text-rose-500">*</span></label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                   <Input 
-                     placeholder="Khu vực" 
-                     className="text-sm" 
-                     value={editForm.zone} 
-                     error={editFormErrors.zone}
-                     onChange={e => {
-                       setEditForm({...editForm, zone: e.target.value});
-                       if (editFormErrors.zone) setEditFormErrors(prev => ({...prev, zone: ''}));
-                     }} 
-                   />
-                   <Input 
-                     placeholder="Tầng" 
-                     className="text-sm" 
-                     value={editForm.floor} 
-                     error={editFormErrors.floor}
-                     onChange={e => {
-                       setEditForm({...editForm, floor: e.target.value});
-                       if (editFormErrors.floor) setEditFormErrors(prev => ({...prev, floor: ''}));
-                     }} 
-                   />
-                   <Input 
-                     placeholder="Kệ" 
-                     className="text-sm" 
-                     value={editForm.shelf} 
-                     error={editFormErrors.shelf}
-                     onChange={e => {
-                       setEditForm({...editForm, shelf: e.target.value});
-                       if (editFormErrors.shelf) setEditFormErrors(prev => ({...prev, shelf: ''}));
-                     }} 
-                   />
+                   <div>
+                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
+                     <Input 
+                       placeholder="VD: Khu A" 
+                       className="text-sm" 
+                       value={editForm.zone} 
+                       error={editFormErrors.zone}
+                       onChange={e => {
+                         setEditForm({...editForm, zone: e.target.value});
+                         if (editFormErrors.zone) setEditFormErrors(prev => ({...prev, zone: ''}));
+                       }} 
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
+                     <Input 
+                       placeholder="VD: Tầng 1" 
+                       className="text-sm" 
+                       value={editForm.floor} 
+                       error={editFormErrors.floor}
+                       onChange={e => {
+                         setEditForm({...editForm, floor: e.target.value});
+                         if (editFormErrors.floor) setEditFormErrors(prev => ({...prev, floor: ''}));
+                       }} 
+                     />
+                   </div>
+                   <div>
+                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
+                     <Input 
+                       placeholder="VD: Dãy 1 / Kệ 1" 
+                       className="text-sm" 
+                       value={editForm.shelf} 
+                       error={editFormErrors.shelf}
+                       onChange={e => {
+                         setEditForm({...editForm, shelf: e.target.value});
+                         if (editFormErrors.shelf) setEditFormErrors(prev => ({...prev, shelf: ''}));
+                       }} 
+                     />
+                   </div>
                 </div>
               </div>
               <div>
@@ -899,7 +1156,7 @@ export default function InventoryManagement() {
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
                 {isLiquidatedStatus(editingRow.rawStatus) ? (
                   <>
-                    <Input defaultValue="Đã thanh lý" disabled className="w-full bg-slate-50 text-slate-500" />
+                    <Input defaultValue={editingRow.rawStatus === 'DAMAGED' ? 'Hư hỏng' : 'Đã thanh lý'} disabled className="w-full bg-slate-50 text-slate-500" />
                     <p className="mt-1.5 text-[11px] text-slate-500">
                       Bản sao đã ngừng lưu thông. Không đưa lại trạng thái Sẵn sàng hoặc Đang mượn.
                     </p>
@@ -912,7 +1169,7 @@ export default function InventoryManagement() {
                   >
                     <option value="AVAILABLE">Sẵn sàng</option>
                     <option value="BORROWED">Đang mượn</option>
-                    <option value="DAMAGED">Đã thanh lý / Hỏng</option>
+                    <option value="DAMAGED">Hư hỏng</option>
                     <option value="LOST">Báo mất</option>
                   </select>
                 )}

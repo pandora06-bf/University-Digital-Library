@@ -231,8 +231,14 @@ def serialize_unmatched(u: UnmatchedTx) -> Dict[str, Any]:
             "resolution_notes": u.resolution_notes, "created_at": u.created_at}
 
 
-def list_unmatched(db: Session, page: int = 1, size: int = 20) -> Dict[str, Any]:
-    base = select(UnmatchedTx).where(UnmatchedTx.assigned_user_code.is_(None))
+def list_unmatched(db: Session, page: int = 1, size: int = 20, status_filter: str = "unresolved") -> Dict[str, Any]:
+    """Mặc định chỉ giao dịch chưa gán. status_filter: unresolved | assigned | all.
+    Đã khớp = đã có mã bạn đọc (ví đã được cộng), không dựa vào cột status."""
+    base = select(UnmatchedTx)
+    if status_filter == "assigned":
+        base = base.where(UnmatchedTx.assigned_user_code.is_not(None))
+    elif status_filter != "all":
+        base = base.where(UnmatchedTx.assigned_user_code.is_(None))
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     items = db.scalars(base.order_by(UnmatchedTx.received_at.desc(), UnmatchedTx.id.desc())
                        .offset((page - 1) * size).limit(size)).all()

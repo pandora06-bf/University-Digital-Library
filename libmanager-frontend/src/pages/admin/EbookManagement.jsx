@@ -12,6 +12,23 @@ import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
+import { BookTypeBadge, bookTypeLabelVi } from '../../components/BookTypeBadge';
+
+const SEARCH_PAGE_SIZE = 50;
+
+async function fetchAllBookSearch(params) {
+  const items = [];
+  for (let page = 1; page <= 40; page += 1) {
+    const res = await axiosInstance.get('/api/books/search', {
+      params: { ...params, page, page_size: SEARCH_PAGE_SIZE },
+    });
+    const batch = res.data?.items || res.data?.data || [];
+    items.push(...batch);
+    const totalPages = Number(res.data?.total_pages) || 1;
+    if (page >= totalPages || batch.length === 0) break;
+  }
+  return items;
+}
 
 function formatSize(file) {
   if (!file?.size) return '—';
@@ -58,6 +75,10 @@ export default function EbookManagement() {
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [selectedEbook, setSelectedEbook] = useState(null);
   const [uploadBookId, setUploadBookId] = useState('');
+  const [uploadBookLabel, setUploadBookLabel] = useState('');
+  const [bookPickMode, setBookPickMode] = useState('type'); // 'type' | 'suggest'
+  const [bookPickerQuery, setBookPickerQuery] = useState('');
+  const [pickingBook, setPickingBook] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [replaceFile, setReplaceFile] = useState(null);
   const [previewPages, setPreviewPages] = useState('10');
@@ -71,10 +92,7 @@ export default function EbookManagement() {
   const loadFromApi = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axiosInstance.get('/api/books/search', {
-        params: { book_type: 'EBOOK', page: 1, page_size: 50 },
-      });
-      const items = res.data?.items || res.data?.data || [];
+      const items = await fetchAllBookSearch({ book_type: 'EBOOK' });
       const mapped = items.map(mapApiEbook);
       setRows(mapped);
       setBookOptions(mapped.map((r) => ({ id: r.id, title: r.title })));
@@ -153,6 +171,89 @@ export default function EbookManagement() {
     });
   };
 
+  const isEbookCapable = (book) => {
+    const t = String(book?.book_type || book?.bookType || '').toUpperCase();
+    return t === 'EBOOK' || t === 'BOTH';
+  };
+
+  const selectUploadBook = (book) => {
+    if (!book?.id) return false;
+    if (!isEbookCapable(book)) {
+      showToast('Đầu sách này không phải eBook / Cả hai — không tải PDF được.', 'error');
+      return false;
+    }
+    setUploadBookId(String(book.id));
+    setUploadBookLabel(book.title || `Sách #${book.id}`);
+    setBookOptions((prev) => {
+      const rest = prev.filter((b) => String(b.id) !== String(book.id));
+      return [{ id: book.id, title: book.title || `Sách #${book.id}`, bookType: book.book_type || book.bookType }, ...rest];
+    });
+    return true;
+  };
+
+  const switchBookPickMode = (mode) => {
+    setBookPickMode(mode);
+    setBookPickerQuery('');
+    if (mode === 'suggest' && uploadBookId) {
+      // giữ selection; ô gõ không dùng
+    }
+  };
+
+  const handleBookPickerSubmit = async () => {
+    if (bookPickMode !== 'type') {
+      showToast('Đang dùng danh sách gợi ý — chọn trong dropdown.', 'warning');
+      return;
+    }
+    const q = bookPickerQuery.trim();
+    if (!q) {
+      showToast('Nhập mã sách hoặc tên rồi Tra cứu.', 'warning');
+      return;
+    }
+
+    setPickingBook(true);
+    try {
+      if (/^\d+$/.test(q) || /^#\d+$/.test(q)) {
+        const id = q.replace(/^#/, '');
+        const { data } = await axiosInstance.get(`/api/books/${id}`);
+        if (selectUploadBook(data)) {
+          setBookPickerQuery(String(data.id));
+          showToast(`Đã chọn #${data.id} — ${data.title}`, 'success');
+        }
+        return;
+      }
+
+      const items = await fetchAllBookSearch({ q, book_type: 'EBOOK' });
+      if (items.length === 1) {
+        if (selectUploadBook(items[0])) {
+          setBookPickerQuery(String(items[0].id));
+          showToast(`Đã chọn #${items[0].id} — ${items[0].title}`, 'success');
+        }
+      } else if (items.length === 0) {
+        showToast(`Không tìm thấy eBook cho «${q}».`, 'warning');
+      } else {
+        setBookOptions(items.map((b) => ({ id: b.id, title: b.title, bookType: b.book_type })));
+        setBookPickMode('suggest');
+        setBookPickerQuery('');
+        setUploadBookId('');
+        setUploadBookLabel('');
+        showToast(`Tìm thấy ${items.length} đầu sách — chọn trong danh sách gợi ý.`, 'success');
+      }
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không tìm được đầu sách.'), 'error');
+    } finally {
+      setPickingBook(false);
+    }
+  };
+
+  const openUploadModal = () => {
+    setUploadBookId('');
+    setUploadBookLabel('');
+    setBookPickerQuery('');
+    setBookPickMode('type');
+    setUploadFile(null);
+    setShowUploadModal(true);
+  };
+
   const handleUpload = async () => {
     if (!uploadBookId) {
       showToast('Chọn đầu sách eBook.', 'warning');
@@ -169,10 +270,12 @@ export default function EbookManagement() {
     setBusy(true);
     try {
       await tryApiUpload(uploadBookId, uploadFile);
-      applyLocalUpload(uploadBookId, uploadFile);
+      applyLocalUpload(uploadBookId, uploadFile, uploadBookLabel);
       showToast('Đã tải PDF lên thành công.', 'success');
       setShowUploadModal(false);
       setUploadBookId('');
+      setUploadBookLabel('');
+      setBookPickerQuery('');
       setUploadFile(null);
     } catch (error) {
       showToast(
@@ -278,20 +381,18 @@ export default function EbookManagement() {
     {
       key: 'title',
       header: 'Tên Sách',
+      width: '46%',
       render: (val, row) => (
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="font-semibold text-slate-800 truncate" title={val}>{val}</span>
-          {row.bookType && (
-            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-              {row.bookType}
-            </span>
-          )}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-semibold text-slate-800 truncate min-w-0" title={val}>{val}</span>
+          <BookTypeBadge type={row.bookType || row.book_type} />
         </div>
       ),
     },
     {
       key: 'filename',
       header: 'Tên File PDF',
+      width: '24%',
       render: (val, row) => (
         <div className={`flex items-center gap-2 min-w-0 ${row.hasPdf === false ? 'text-slate-400' : 'text-indigo-600'}`}>
           <FileText className="w-4 h-4 shrink-0" />
@@ -302,6 +403,7 @@ export default function EbookManagement() {
     {
       key: 'status',
       header: 'Trạng Thái',
+      width: '16%',
       render: (val) => (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
           val === 'Sẵn sàng'
@@ -316,6 +418,7 @@ export default function EbookManagement() {
     {
       key: 'actions',
       header: 'Thao Tác',
+      width: '14%',
       align: 'right',
       render: (_val, row) => (
         <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
@@ -331,6 +434,9 @@ export default function EbookManagement() {
             onClick={() => {
               setSelectedEbook(row);
               setReplaceFile(null);
+              setPreviewPages(String(row.previewPages ?? row.preview_pages ?? 10));
+              setBorrowDays(String(row.borrowDays ?? row.borrow_days ?? 14));
+              setIsFree(Boolean(row.isFree ?? row.is_free));
               setShowReplaceModal(true);
             }}
             className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
@@ -358,12 +464,10 @@ export default function EbookManagement() {
           variant="primary"
           icon={<UploadCloud className="w-4 h-4" strokeWidth={2} />}
           onClick={() => {
-            setUploadBookId('');
-            setUploadFile(null);
             setPreviewPages('10');
             setBorrowDays('14');
             setIsFree(false);
-            setShowUploadModal(true);
+            openUploadModal();
           }}
         >
           Tải lên PDF mới
@@ -455,7 +559,7 @@ export default function EbookManagement() {
           columns={columns}
           data={filteredData}
           emptyMessage={loading ? 'Đang tải danh sách eBook…' : 'Chưa có đầu sách điện tử trong danh mục.'}
-          className="border-0 shadow-none rounded-none [&_table]:table-fixed [&_th:nth-child(1)]:w-[46%] [&_th:nth-child(2)]:w-[24%] [&_th:nth-child(3)]:w-[16%] [&_th:nth-child(4)]:w-[14%]"
+          className="border-0 shadow-none rounded-none"
           pagination
           itemsPerPage={5}
         />
@@ -479,21 +583,92 @@ export default function EbookManagement() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-              Chọn đầu sách <span className="text-rose-500">*</span>
-            </label>
-            <select
-              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-              value={uploadBookId}
-              onChange={(e) => setUploadBookId(e.target.value)}
-            >
-              <option value="">-- Chọn đầu sách --</option>
-              {bookOptions.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.title}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase">
+                Chọn đầu sách <span className="text-rose-500">*</span>
+              </label>
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    bookPickMode === 'type' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                  }`}
+                  onClick={() => switchBookPickMode('type')}
+                >
+                  Gõ mã / tên
+                </button>
+                <button
+                  type="button"
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    bookPickMode === 'suggest' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'
+                  }`}
+                  onClick={() => switchBookPickMode('suggest')}
+                >
+                  Danh sách gợi ý
+                </button>
+              </div>
+            </div>
+
+            {bookPickMode === 'type' ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1 min-w-0"
+                    placeholder="Mã sách (vd 303) hoặc tên"
+                    value={bookPickerQuery}
+                    onChange={(e) => setBookPickerQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleBookPickerSubmit()}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    icon={<Search className="w-4 h-4" />}
+                    disabled={pickingBook}
+                    onClick={handleBookPickerSubmit}
+                  >
+                    Tra cứu
+                  </Button>
+                </div>
+                {uploadBookId && (
+                  <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                    Đã chọn <span className="font-mono font-bold">#{uploadBookId}</span>
+                    {uploadBookLabel ? ` — ${uploadBookLabel}` : ''}
+                  </p>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  Gõ đúng mã sách hoặc tên rồi Tra cứu.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <select
+                  className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  value={uploadBookId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setBookPickerQuery('');
+                    if (!id) {
+                      setUploadBookId('');
+                      setUploadBookLabel('');
+                      return;
+                    }
+                    const hit = bookOptions.find((b) => String(b.id) === String(id));
+                    setUploadBookId(id);
+                    setUploadBookLabel(hit?.title || `Sách #${id}`);
+                  }}
+                >
+                  <option value="">-- Chọn trong danh sách gợi ý --</option>
+                  {bookOptions.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      #{b.id} — {b.title} · {bookTypeLabelVi(b.bookType || b.book_type)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400">
+                  Chọn một dòng là xong — không dùng ô gõ / Tra cứu ở tab này.
+                </p>
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
@@ -532,10 +707,24 @@ export default function EbookManagement() {
               helperText="Mặc định 14 (1–365)"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={isFree} onChange={(e) => setIsFree(e.target.checked)} />
-            Miễn phí đọc toàn bộ
-          </label>
+          <div className="flex items-start gap-2">
+            <input
+              id="ebook-upload-is-free"
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
+            />
+            <label htmlFor="ebook-upload-is-free" className="text-sm font-medium text-slate-700 cursor-pointer">
+              Miễn phí đọc toàn bộ
+              <span className="block text-xs font-normal text-slate-500 mt-0.5">
+                Bật: đọc toàn bộ PDF, không cắt xem trước.
+              </span>
+              <span className="block text-xs font-normal text-slate-500">
+                Tắt: sách bản quyền, xem trước 5–10 trang.
+              </span>
+            </label>
+          </div>
         </div>
       </Modal>
 
@@ -592,6 +781,24 @@ export default function EbookManagement() {
               onChange={(e) => setBorrowDays(e.target.value)}
               helperText="Mặc định 14 (1–365)"
             />
+          </div>
+          <div className="flex items-start gap-2">
+            <input
+              id="ebook-replace-is-free"
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
+            />
+            <label htmlFor="ebook-replace-is-free" className="text-sm font-medium text-slate-700 cursor-pointer">
+              Miễn phí đọc toàn bộ
+              <span className="block text-xs font-normal text-slate-500 mt-0.5">
+                Bật: đọc toàn bộ PDF, không cắt xem trước.
+              </span>
+              <span className="block text-xs font-normal text-slate-500">
+                Tắt: sách bản quyền, xem trước 5–10 trang.
+              </span>
+            </label>
           </div>
         </div>
       </Modal>

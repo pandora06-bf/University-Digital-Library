@@ -85,6 +85,107 @@ def test_lookup_loans_by_partial_user_code(db_session):
     assert len(results) == 1 and results[0].user_code == "CTABC1"
 
 
+def test_lookup_loans_by_copy_barcode(db_session):
+    user = _make_reader(db_session, user_code="CTBAR1")
+    book = _make_book(db_session, title="Sách barcode lookup")
+    copy = _make_copy(db_session, book, barcode="BC-CT-LOOKUP-1", status="BORROWED")
+    loan = _make_loan(
+        db_session,
+        user_code=user.user_code,
+        book_id=book.id,
+        copy_barcode=copy.copy_barcode,
+        loan_status="OVERDUE",
+    )
+    results = svc.lookup_loans_service(db_session, "bc-ct-lookup-1")
+    assert len(results) == 1
+    assert results[0].id == loan.id
+    assert results[0].copy_barcode == "BC-CT-LOOKUP-1"
+
+
+def test_lookup_loans_by_loan_code(db_session):
+    user = _make_reader(db_session, user_code="CTCODE1")
+    book = _make_book(db_session)
+    loan = _make_loan(
+        db_session,
+        user_code=user.user_code,
+        book_id=book.id,
+        loan_status="BORROWED",
+        loan_code="PM-2026-LOOKUP1",
+    )
+    results = svc.lookup_loans_service(db_session, "pm-2026-lookup1")
+    assert len(results) == 1 and results[0].id == loan.id
+    reader = svc.lookup_reader_service(db_session, "PM-2026-LOOKUP1")
+    assert reader is not None and reader.user_code == "CTCODE1"
+
+
+def test_lookup_reader_by_user_code_ignores_case(db_session):
+    user = _make_reader(db_session, user_code="CTABC2", total_fines=25_000, is_borrowing_blocked=True)
+    found = svc.lookup_reader_service(db_session, "ctabc2")
+    assert found is not None
+    assert found.user_code == user.user_code
+    assert found.is_borrowing_blocked is True
+    assert svc.lookup_reader_service(db_session, "KHONG-CO") is None
+
+
+def test_checkout_copy_by_barcode(db_session):
+    book = _make_book(db_session, title="Sách xuất quầy")
+    copy = _make_copy(db_session, book, barcode="BC-CT-OUT-1", status="AVAILABLE")
+    found = svc.get_checkout_copy_service(db_session, "bc-ct-out-1")
+    assert found["copy_barcode"] == copy.copy_barcode
+    assert found["book_id"] == book.id
+    assert found["status"] == "AVAILABLE"
+    assert found["book_title"] == "Sách xuất quầy"
+
+
+def test_checkout_copy_loan_id_names_available_barcode(db_session):
+    user = _make_reader(db_session, user_code="CTOUT2")
+    book = _make_book(db_session, available_stock=1)
+    _make_copy(db_session, book, barcode="BC-CT-OUT-READY", status="AVAILABLE")
+    loan = _make_loan(db_session, user_code=user.user_code, book_id=book.id,
+                      loan_status="REQUESTED", copy_barcode=None)
+    with pytest.raises(HTTPException) as raised:
+        svc.get_checkout_copy_service(db_session, str(loan.id))
+    assert raised.value.status_code == 409
+    assert "BC-CT-OUT-READY" in raised.value.detail
+    assert "mã phiếu" in raised.value.detail
+
+
+def test_checkout_copy_missing_barcode(db_session):
+    with pytest.raises(HTTPException) as raised:
+        svc.get_checkout_copy_service(db_session, "BC-CT-OUT-NONE")
+    assert raised.value.status_code == 404
+    assert "BC-CT-OUT-NONE" in raised.value.detail
+
+
+def test_active_return_by_barcode(db_session):
+    user = _make_reader(db_session, user_code="CTRET1")
+    book = _make_book(db_session, title="Sách đang mượn")
+    copy = _make_copy(db_session, book, barcode="BC-CT-RET-1", status="BORROWED")
+    loan = _make_loan(
+        db_session,
+        user_code=user.user_code,
+        book_id=book.id,
+        copy_barcode=copy.copy_barcode,
+        due_date=datetime.now() + timedelta(days=3),
+    )
+    slip = svc.get_active_return_service(db_session, "BC-CT-RET-1")
+    assert slip["loan_id"] == loan.id
+    assert slip["full_name"] == "Loan Counter Tester"
+    assert slip["book_title"] == "Sách đang mượn"
+    assert slip["overdue"] is False
+    with pytest.raises(HTTPException) as missing:
+        svc.get_active_return_service(db_session, "BC-KHONG-CO")
+    assert missing.value.status_code == 404
+
+
+def test_lookup_reader_by_loan_id(db_session):
+    user = _make_reader(db_session, user_code="CTABC3")
+    book = _make_book(db_session)
+    loan = _make_loan(db_session, user_code=user.user_code, book_id=book.id)
+    found = svc.lookup_reader_service(db_session, str(loan.id))
+    assert found is not None and found.user_code == "CTABC3"
+
+
 # ---------------------------------------------------------------- lookup_fines_service
 
 def test_lookup_fines_not_found(db_session):
@@ -103,6 +204,24 @@ def test_lookup_fines_lists_unpaid(db_session):
     result = svc.lookup_fines_service(db_session, user.user_code)
     assert result["unpaid_count"] == 1
     assert result["is_borrowing_blocked"] is True
+    assert result["fines"][0]["payment_status"] == "UNPAID"
+
+
+def test_lookup_fines_include_paid_keeps_reader_default_unpaid(db_session):
+    user = _make_reader(db_session, user_code="CTPAID1", total_fines=0)
+    book = _make_book(db_session)
+    loan = _make_loan(db_session, user_code=user.user_code, book_id=book.id)
+    db_session.add(Fine(loan_id=loan.id, user_code=user.user_code, overdue_days=10,
+                        fine_rate=Decimal(5000), total_amount=Decimal(50000), payment_status="PAID"))
+    db_session.commit()
+    hidden = svc.lookup_fines_service(db_session, "ctpaid1")
+    assert hidden["unpaid_count"] == 0
+    assert hidden["fines"] == []
+    shown = svc.lookup_fines_service(db_session, "ctpaid1", include_paid=True)
+    assert shown["user_code"] == "CTPAID1"
+    assert len(shown["fines"]) == 1
+    assert shown["fines"][0]["payment_status"] == "PAID"
+    assert shown["fines"][0]["total_amount"] == Decimal(50000)
 
 
 # ---------------------------------------------------------------- renew_loan_service

@@ -13,6 +13,8 @@ class BookSearchItemResponse(BaseModel):
     publisher: Optional[str] = None
     price: int
     available_stock: int
+    total_copies: int = 0
+    available_copies: int = 0
     cover_image_path: Optional[str] = None
     category_name: Optional[str] = Field(
         default=None,
@@ -47,6 +49,8 @@ class BookSearchItemResponse(BaseModel):
             "publisher": getattr(data, "publisher", None),
             "price": data.price,
             "available_stock": data.available_stock,
+            "total_copies": int(getattr(data, "total_copies", 0) or 0),
+            "available_copies": int(getattr(data, "available_copies", 0) or 0),
             "cover_image_path": getattr(data, "cover_image_path", None),
             "category_name": getattr(category, "category_name", None) if category else None,
             "book_type": data.book_type,

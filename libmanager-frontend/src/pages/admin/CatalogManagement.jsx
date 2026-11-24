@@ -9,27 +9,32 @@ import { Button } from '../../components/Button';
 import { Table } from '../../components/Table';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
-import {
-  SEED_PUBLISHERS,
-  getLocalBookPrice,
-  setLocalBookPrice,
-  resolveBookPrice,
-} from '../../mocks/adminCatalogMock';
 import { Toast } from '../../components/Toast';
 import { useToast } from '../../hooks/useToast';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { AdminIconButton } from '../../components/AdminIconButton';
+import { BookTypeBadge } from '../../components/BookTypeBadge';
 
 const formatVND = (val) => {
   if (val === undefined || val === null || val === '') return null;
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
 };
 
+/** Chỉ lấy giá từ API / row đã map — không cache sessionStorage. */
+const readBookPrice = (book) => {
+  if (!book) return null;
+  const raw = book.price ?? book.book_price;
+  if (raw === undefined || raw === null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
 const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'cover',
     header: 'Bìa',
+    width: '7%',
     align: 'center',
     render: (value, row) => {
       const coverSrc = resolveMediaUrl(value || row.cover || row.cover_image_path);
@@ -65,12 +70,11 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'title',
     header: 'Tên sách',
+    width: '18%',
     render: (value, row) => {
-      const priceVal = resolveBookPrice(row);
+      const priceVal = readBookPrice(row);
       const priceText = formatVND(priceVal);
       const bookType = row.book_type || row.bookType;
-      const isEbook = bookType === 'EBOOK' || bookType === 'eBook';
-      const isBoth = bookType === 'BOTH';
       // Chỉ hiện barcode thật từ dữ liệu; không tạo mã giả kiểu BC-{id}000
       const realBarcode = row.copy_barcode || (row.barcode && !String(row.barcode).startsWith('BC-') ? row.barcode : null);
 
@@ -85,19 +89,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
             >
               {row.title}
             </button>
-            {isBoth ? (
-              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200 whitespace-nowrap">
-                Cả hai
-              </span>
-            ) : isEbook ? (
-              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200 whitespace-nowrap">
-                eBook
-              </span>
-            ) : (
-              <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
-                Vật lý
-              </span>
-            )}
+            <BookTypeBadge type={bookType} />
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono min-w-0">
             <span className="truncate">
@@ -120,6 +112,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'author',
     header: 'Tác Giả & Nhà Xuất Bản',
+    width: '15%',
     render: (value, row) => (
       <div className="min-w-[150px]">
         <span className="font-bold text-slate-700 block truncate">{row.author}</span>
@@ -130,6 +123,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'category',
     header: 'Thể Loại',
+    width: '12%',
     render: (value, row) => {
       const cat = categories.find(c => c.id === row.category_id);
       const catName = cat ? cat.category_name : (row.category || 'Chưa phân loại');
@@ -143,6 +137,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'year',
     header: 'Năm Xuất Bản',
+    width: '8%',
     align: 'center',
     render: (value, row) => (
       <span className="font-mono text-slate-600">{row.year || row.publication_year}</span>
@@ -151,6 +146,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'copies',
     header: 'Số Bản Sao (Sẵn Sàng)',
+    width: '13%',
     render: (value, row) => {
       const totalCopies = row.copies ?? (row.available_stock || 0);
       const availableCopies = row.available ?? (row.available_stock || 0);
@@ -179,6 +175,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'status',
     header: 'Trạng Thái',
+    width: '12%',
     render: (value, row) => {
       if (row.status === 'Hết bản hiện' || row.status === 'Hết bản in') {
         return (
@@ -202,6 +199,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'actions',
     header: 'Thao Tác',
+    width: '15%',
     align: 'right',
     render: (value, row) => (
       <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
@@ -237,18 +235,18 @@ export default function CatalogManagement() {
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'grid'
   const [editingBook, setEditingBook] = useState(null);
   const [isAddingBook, setIsAddingBook] = useState(false);
+  const [deletingBook, setDeletingBook] = useState(null);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [categoryFormName, setCategoryFormName] = useState('');
   const [editingCategory, setEditingCategory] = useState(null);
   const [deletingCategory, setDeletingCategory] = useState(null);
   const [isSavingCategory, setIsSavingCategory] = useState(false);
-  const [deletingBook, setDeletingBook] = useState(null);
-  
-  // Form State for Validation
+
+  // Form sách — field có API: books + upload + categories
   const [bookForm, setBookForm] = useState({ 
     title: '', author: '', publisher: '', year: '', 
     bookType: 'Vật lý', categoryId: '', courseCode: '', description: '', keywords: '',
-    price: '', numPages: '', previewPages: '', borrowDays: '14'
+    price: '', numPages: '', previewPages: '10', borrowDays: '14', isFree: false
   });
   const [formErrors, setFormErrors] = useState({});
   const [coverFile, setCoverFile] = useState(null);
@@ -263,19 +261,18 @@ export default function CatalogManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [formatFilter, setFormatFilter] = useState('');
   const [publisherFilter, setPublisherFilter] = useState('Tất cả nhà xuất bản');
-  const [publisherOptions, setPublisherOptions] = useState(SEED_PUBLISHERS);
+  const [publisherOptions, setPublisherOptions] = useState([]);
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const fetchSeqRef = useRef(0);
 
   const mapBookRow = useCallback((b) => {
-    const uiPrice =
-      b.price ??
-      b.book_price ??
-      getLocalBookPrice(b.id) ??
-      null;
+    const uiPrice = readBookPrice(b);
+    const availableCopies = Number(b.available_copies ?? b.available_stock ?? 0);
+    const totalCopies = Number(b.total_copies ?? availableCopies);
 
     return {
       ...b,
@@ -292,10 +289,10 @@ export default function CatalogManagement() {
         || 'Chưa phân loại',
       categoryColor: 'blue',
       year: b.publication_year || b.published_year || 2024,
-      copies: b.available_stock ?? 0,
-      available: b.available_stock ?? 0,
-      status: (b.available_stock === 0) ? 'Hết bản in' : 'Sẵn sàng',
-      statusColor: (b.available_stock === 0) ? 'rose' : 'emerald',
+      copies: totalCopies,
+      available: availableCopies,
+      status: availableCopies === 0 ? 'Hết bản in' : 'Sẵn sàng',
+      statusColor: availableCopies === 0 ? 'rose' : 'emerald',
       book_type: b.book_type || 'PRINTED',
       bookType:
         b.book_type === 'BOTH'
@@ -319,6 +316,7 @@ export default function CatalogManagement() {
     const pageNum = opts.page ?? page;
     const q = opts.q !== undefined ? opts.q : debouncedSearch;
     const catId = opts.categoryId !== undefined ? opts.categoryId : categoryFilter;
+    const format = opts.format !== undefined ? opts.format : formatFilter;
     const publisher = opts.publisher !== undefined ? opts.publisher : publisherFilter;
 
     const seq = ++fetchSeqRef.current;
@@ -330,6 +328,10 @@ export default function CatalogManagement() {
       };
       if (q && q.trim()) params.q = q.trim();
       if (catId) params.category_id = catId;
+      if (format) {
+        params.book_type = format;
+        params.exact_format = true;
+      }
       if (publisher && publisher !== 'Tất cả nhà xuất bản') params.publisher = publisher;
 
       const res = await axiosInstance.get('/api/books/search', { params });
@@ -354,7 +356,7 @@ export default function CatalogManagement() {
       if (seq === fetchSeqRef.current) setIsLoadingBooks(false);
     }
   }, [
-    page, debouncedSearch, categoryFilter, publisherFilter,
+    page, debouncedSearch, categoryFilter, formatFilter, publisherFilter,
     mapBookRow, showToast,
   ]);
 
@@ -370,11 +372,11 @@ export default function CatalogManagement() {
     });
   };
 
-  /** Nạp NXB từ DB rồi gộp với seed — dropdown khớp dữ liệu thật. */
+  /** Nạp NXB chỉ từ API search (không seed cứng). */
   const fetchPublisherOptions = useCallback(async () => {
-    const pubs = new Set(SEED_PUBLISHERS);
+    const pubs = new Set();
     try {
-      for (let p = 1; p <= 3; p += 1) {
+      for (let p = 1; p <= 5; p += 1) {
         const res = await axiosInstance.get('/api/books/search', {
           params: { page: p, page_size: 50 },
         });
@@ -384,11 +386,15 @@ export default function CatalogManagement() {
         const pages = res.data?.total_pages ?? 1;
         if (p >= pages) break;
       }
-    } catch {
-      /* giữ seed nếu API lỗi */
+      setPublisherOptions([...pubs].filter(Boolean).sort((a, b) => a.localeCompare(b, 'vi')));
+    } catch (error) {
+      setPublisherOptions([]);
+      showToast(
+        getApiErrorMessage(error, 'Không tải được danh sách nhà xuất bản.'),
+        'warning'
+      );
     }
-    setPublisherOptions([...pubs].filter(Boolean).sort((a, b) => a.localeCompare(b, 'vi')));
-  }, []);
+  }, [showToast]);
 
   // Debounce ô tìm kiếm → chỉ khi ổn định mới gọi API
   useEffect(() => {
@@ -415,13 +421,13 @@ export default function CatalogManagement() {
     }, 0);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch khi page/filter ổn định
-  }, [page, debouncedSearch, categoryFilter, publisherFilter]);
+  }, [page, debouncedSearch, categoryFilter, formatFilter, publisherFilter]);
 
   const handleOpenAdd = () => {
     setBookForm({ 
       title: '', author: '', publisher: '', year: '', 
       bookType: 'Vật lý', categoryId: '', courseCode: '', description: '', keywords: '',
-      price: '', numPages: '', previewPages: '', borrowDays: '14'
+      price: '', numPages: '', previewPages: '10', borrowDays: '14', isFree: false
     });
     setFormErrors({});
     setCoverFile(null);
@@ -446,7 +452,7 @@ export default function CatalogManagement() {
       description: book.description || '',
       keywords: book.keywords || '',
       price: (() => {
-        const p = resolveBookPrice(book);
+        const p = readBookPrice(book);
         return p !== null && p !== undefined ? String(p) : '';
       })(),
       numPages: (book.num_pages !== undefined && book.num_pages !== null) ? book.num_pages.toString() : (book.numPages || ''),
@@ -456,11 +462,12 @@ export default function CatalogManagement() {
           ? book.previewPages.toString()
           : (book.ebook?.preview_pages !== undefined && book.ebook?.preview_pages !== null
             ? book.ebook.preview_pages.toString()
-            : '')),
+            : '10')),
       borrowDays: (() => {
         const d = book.ebook?.borrow_days ?? book.borrow_days ?? book.borrowDays;
         return d !== undefined && d !== null ? String(d) : '14';
       })(),
+      isFree: Boolean(book.is_free ?? book.isFree ?? book.ebook?.is_free),
     });
     setFormErrors({});
     setCoverFile(null);
@@ -477,7 +484,15 @@ export default function CatalogManagement() {
   };
 
   const handleFieldChange = (field, value) => {
-    setBookForm(prev => ({ ...prev, [field]: value }));
+    setBookForm((prev) => {
+      const next = { ...prev, [field]: value };
+      // eBook/BOTH: mặc định preview 10 nếu đang trống (khớp BE default)
+      if (field === 'bookType' && (value === 'eBook' || value === 'BOTH')) {
+        if (!String(prev.previewPages ?? '').trim()) next.previewPages = '10';
+        if (!String(prev.borrowDays ?? '').trim()) next.borrowDays = '14';
+      }
+      return next;
+    });
     if (formErrors[field]) {
       setFormErrors(prev => {
         const nextErrors = { ...prev };
@@ -485,10 +500,11 @@ export default function CatalogManagement() {
         return nextErrors;
       });
     }
-    if (field === 'bookType' && value !== 'eBook' && formErrors.previewPages) {
+    if (field === 'bookType' && value !== 'eBook' && value !== 'BOTH') {
       setFormErrors(prev => {
         const nextErrors = { ...prev };
         delete nextErrors.previewPages;
+        delete nextErrors.borrowDays;
         return nextErrors;
       });
     }
@@ -540,7 +556,7 @@ export default function CatalogManagement() {
       }
     }
 
-    // 5. Thể loại (categoryId): Bắt buộc, phải tồn tại trong danh mục đang tải
+    // 5. Thể loại (categoryId): bắt buộc chọn; phải tồn tại trong danh mục đang tải
     const trimmedCatId = bookForm.categoryId !== undefined && bookForm.categoryId !== null
       ? bookForm.categoryId.toString().trim()
       : '';
@@ -554,7 +570,7 @@ export default function CatalogManagement() {
       }
     }
 
-    // 6. Số trang (numPages): Tùy chọn; nếu nhập phải là số nguyên dương >= 1
+    // 6. Số trang (num_pages) — API BookCreate/Update, tùy chọn ≥ 1
     let validNumPages = null;
     const trimmedPages = bookForm.numPages !== undefined && bookForm.numPages !== null
       ? bookForm.numPages.toString().trim()
@@ -572,27 +588,26 @@ export default function CatalogManagement() {
       }
     }
 
-        // 7. Số trang xem trước + số ngày mượn eBook (UC09)
-    let validPreviewPages = null;
+    // 7. preview_pages + borrow_days + is_free (upload-pdf)
+    let validPreviewPages = 10;
     let validBorrowDays = 14;
+    const validIsFree = Boolean(bookForm.isFree);
     if (bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') {
       const trimmedPreview = bookForm.previewPages !== undefined && bookForm.previewPages !== null
         ? bookForm.previewPages.toString().trim()
         : '';
-      if (trimmedPreview !== '') {
-        if (!/^\d+$/.test(trimmedPreview)) {
-          errors.previewPages = 'Số trang xem trước phải là số nguyên dương (không nhập chữ cái, số âm hay số thập phân)';
+      if (trimmedPreview === '') {
+        validPreviewPages = 10;
+      } else if (!/^\d+$/.test(trimmedPreview)) {
+        errors.previewPages = 'Số trang xem trước phải là số nguyên dương (không nhập chữ cái, số âm hay số thập phân)';
+      } else {
+        const previewVal = parseInt(trimmedPreview, 10);
+        if (previewVal < 5 || previewVal > 10) {
+          errors.previewPages = 'Số trang xem trước theo quy định từ 5 đến 10 trang';
+        } else if (validNumPages && previewVal > validNumPages) {
+          errors.previewPages = `Số trang xem trước (${previewVal}) không được vượt quá tổng số trang (${validNumPages})`;
         } else {
-          const previewVal = parseInt(trimmedPreview, 10);
-          if (previewVal < 1) {
-            errors.previewPages = 'Số trang xem trước phải là số nguyên dương (từ 5 đến 10 trang)';
-          } else if (previewVal < 5 || previewVal > 10) {
-            errors.previewPages = 'Số trang xem trước theo quy định từ 5 đến 10 trang';
-          } else if (validNumPages && previewVal > validNumPages) {
-            errors.previewPages = `Số trang xem trước (${previewVal}) không được vượt quá tổng số trang (${validNumPages})`;
-          } else {
-            validPreviewPages = previewVal;
-          }
+          validPreviewPages = previewVal;
         }
       }
 
@@ -612,7 +627,14 @@ export default function CatalogManagement() {
         }
       }
     }
-// Giá bìa (BE đã có field price ≥ 0)
+
+    // 8. subject_code — API books, max 50
+    const trimmedSubject = bookForm.courseCode?.trim() || '';
+    if (trimmedSubject.length > 50) {
+      errors.courseCode = 'Mã học phần không được vượt quá 50 ký tự';
+    }
+
+    // Giá bìa — tùy chọn, trống = 0
     const trimmedPrice = bookForm.price !== undefined && bookForm.price !== null
       ? bookForm.price.toString().trim()
       : '';
@@ -632,10 +654,6 @@ export default function CatalogManagement() {
     }
     setFormErrors({});
 
-    // Ghi chú API contract:
-    // 1. subject_code được Pydantic schema BookBase hỗ trợ (tối đa 50 ký tự, liên kết bảng subjects).
-    // 2. preview_pages gửi qua upload-pdf params; không có field book_attribute trên BE.
-    // 3. price đã có trên BE → gửi trong payload.
     const payload = {
       title: trimmedTitle,
       author: trimmedAuthor,
@@ -652,7 +670,7 @@ export default function CatalogManagement() {
       category_id: parseInt(trimmedCatId, 10),
       keywords: bookForm.keywords?.trim() || null,
       num_pages: validNumPages,
-      subject_code: bookForm.courseCode?.trim() || null
+      subject_code: trimmedSubject || null,
     };
 
     try {
@@ -685,39 +703,20 @@ export default function CatalogManagement() {
           pdfData.append('file', pdfFile);
           await axiosInstance.post(`/api/admin/books/${bookId}/upload-pdf`, pdfData, {
             params: {
-              preview_pages: validPreviewPages || 10,
-              is_free: false,
+              preview_pages: validPreviewPages,
+              is_free: validIsFree,
               borrow_days: validBorrowDays,
             },
           });
         }
-
-        // Đồng bộ cache FE (phòng khi list API chưa trả price ngay)
-        setLocalBookPrice(bookId, validPrice);
-
-        // Cập nhật state nội bộ để giữ preview_pages, giá bìa khi sửa lại trong session
-        setBooksData(prev => prev.map(b => {
-          if (b.id === bookId) {
-            return {
-              ...b,
-              ...payload,
-              preview_pages: validPreviewPages,
-              previewPages: validPreviewPages,
-              subject_code: payload.subject_code,
-              courseCode: payload.subject_code,
-              price: validPrice,
-              book_price: validPrice,
-            };
-          }
-          return b;
-        }));
 
         showToast(
           editingBook ? 'Cập nhật đầu sách thành công!' : 'Thêm sách mới thành công!',
           'success'
         );
         handleCloseModal();
-        fetchBooks(); // Load lại data (vẫn merge giá local)
+        fetchBooks();
+        fetchPublisherOptions();
       } else {
         showToast('Không nhận được phản hồi khi lưu đầu sách.', 'error');
       }
@@ -745,20 +744,25 @@ export default function CatalogManagement() {
   };
 
   const handleSaveCategory = async () => {
-    if (!categoryFormName.trim()) {
+    const trimmedCatName = categoryFormName.trim();
+    if (!trimmedCatName) {
       showToast('Tên thể loại không được để trống.', 'warning');
+      return;
+    }
+    if (trimmedCatName.length > 100) {
+      showToast('Tên thể loại không được vượt quá 100 ký tự.', 'warning');
       return;
     }
     setIsSavingCategory(true);
     try {
       if (editingCategory?.id != null) {
         await axiosInstance.put(`/api/admin/categories/${editingCategory.id}`, {
-          category_name: categoryFormName.trim(),
+          category_name: trimmedCatName,
         });
         showToast('Cập nhật thể loại thành công!', 'success');
       } else {
         await axiosInstance.post('/api/admin/categories', {
-          category_name: categoryFormName.trim(),
+          category_name: trimmedCatName,
         });
         showToast('Thêm thể loại mới thành công!', 'success');
       }
@@ -768,8 +772,7 @@ export default function CatalogManagement() {
       setCategoryFormName('');
     } catch (error) {
       console.error('Lỗi lưu thể loại:', error);
-      const errorMsg = getApiErrorMessage(error, 'Không thể lưu thể loại.');
-      showToast(errorMsg, 'error');
+      showToast(getApiErrorMessage(error, 'Không thể lưu thể loại.'), 'error');
     } finally {
       setIsSavingCategory(false);
     }
@@ -804,21 +807,10 @@ export default function CatalogManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Danh mục Sách</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Quản lý đầu sách, thể loại, tác giả và nhà xuất bản trong thư viện số.
+            Quản lý đầu sách, thể loại, bìa/PDF và cấu hình eBook.
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            icon={<BookType className="w-4 h-4" />}
-            onClick={() => {
-              setEditingCategory(null);
-              setCategoryFormName('');
-              setIsAddingCategory(true);
-            }}
-          >
-            Quản lý thể loại
-          </Button>
           <Button 
             variant="primary" 
             icon={<Plus className="w-4 h-4" />}
@@ -829,9 +821,25 @@ export default function CatalogManagement() {
         </div>
       </div>
 
-      {/* Stats — màu/tint giống Users · eBook */}
+      {/* Stats — bấm được giống eBook: Tổng = xem tất cả; Thể loại = mở quản lý category */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <button
+          type="button"
+          onClick={() => {
+            setSearchTerm('');
+            setDebouncedSearch('');
+            setCategoryFilter('');
+            setFormatFilter('');
+            setPublisherFilter('Tất cả nhà xuất bản');
+            setPage(1);
+            showToast('Đã bỏ lọc — đang xem toàn bộ đầu sách.', 'success');
+          }}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm relative overflow-hidden transition-colors ${
+            !searchTerm && !categoryFilter && !formatFilter && publisherFilter === 'Tất cả nhà xuất bản'
+              ? 'border-indigo-400 ring-2 ring-indigo-200'
+              : 'border-slate-200 hover:border-slate-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <Library className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
@@ -839,9 +847,17 @@ export default function CatalogManagement() {
           <h3 className="text-3xl font-extrabold text-slate-800 leading-none">
             {totalBooks} <span className="text-sm font-medium text-slate-500">tựa sách</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-slate-500">Toàn hệ thống</p>
-        </div>
-        <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40">
+          <p className="mt-3 text-[11px] font-medium text-slate-500">Bấm để xem tất cả (bỏ lọc)</p>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setEditingCategory(null);
+            setCategoryFormName('');
+            setIsAddingCategory(true);
+          }}
+          className="text-left bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40 transition-colors hover:border-indigo-300"
+        >
           <div className="absolute top-4 right-4">
             <LayoutGrid className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
@@ -849,18 +865,18 @@ export default function CatalogManagement() {
           <h3 className="text-3xl font-extrabold text-indigo-600 leading-none">
             {uniqueCategories} <span className="text-sm font-medium text-indigo-400">danh mục</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-indigo-600">Quản lý qua nút Thể loại</p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Bấm để quản lý thể loại</p>
+        </button>
       </div>
 
       {/* Main Content Area */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
         
         {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 w-full xl:w-auto flex-1">
+        <div className="p-4 border-b border-slate-100 flex flex-col 2xl:flex-row gap-4 items-start 2xl:items-center justify-between bg-slate-50/50 rounded-t-2xl">
+          <div className="flex flex-col xl:flex-row xl:items-center gap-3 w-full 2xl:flex-1">
             {/* Search + Tra cứu ngay (không chờ debounce) */}
-            <div className="w-full flex items-stretch gap-2 min-w-0 md:col-span-2 lg:col-span-1">
+            <div className="w-full xl:min-w-[22rem] xl:max-w-[26rem] xl:flex-1 flex items-stretch gap-2">
               <div className="min-w-0 flex-1">
                 <Input
                   type="text"
@@ -905,10 +921,25 @@ export default function CatalogManagement() {
                 Tra cứu
               </Button>
             </div>
+
+            <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto xl:ml-auto">
+            <select
+              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              value={formatFilter}
+              onChange={(e) => {
+                setFormatFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả định dạng</option>
+              <option value="PRINTED">Vật lý</option>
+              <option value="EBOOK">eBook</option>
+              <option value="BOTH">Cả hai</option>
+            </select>
             
             {/* Category Dropdown */}
             <select 
-              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={categoryFilter}
               onChange={(e) => {
                 setCategoryFilter(e.target.value);
@@ -923,7 +954,7 @@ export default function CatalogManagement() {
 
             {/* Publisher Dropdown */}
             <select 
-              className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={publisherFilter}
               onChange={(e) => {
                 setPublisherFilter(e.target.value);
@@ -935,9 +966,10 @@ export default function CatalogManagement() {
                 <option key={pub} value={pub}>{pub}</option>
               ))}
             </select>
+            </div>
           </div>
           
-          <div className="flex items-center gap-3 justify-end w-full xl:w-auto shrink-0 border-t xl:border-0 border-slate-200 pt-3 xl:pt-0">
+          <div className="flex items-center gap-3 justify-end w-full 2xl:w-auto shrink-0 border-t 2xl:border-0 border-slate-200 pt-3 2xl:pt-0">
             <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
               <Button 
                 variant="ghost" size="sm"
@@ -1052,12 +1084,12 @@ export default function CatalogManagement() {
                   <div className="mt-auto">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="font-bold text-slate-800 text-xs">{row.available} / {row.copies} <span className="font-normal text-slate-500">cuốn</span></span>
-                      <span className="text-[10px] font-bold text-indigo-600">{Math.round((row.available/row.copies)*100)}%</span>
+                      <span className="text-[10px] font-bold text-indigo-600">{row.copies > 0 ? Math.round((row.available / row.copies) * 100) : 0}%</span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-1.5">
                       <div 
                         className={`h-1.5 rounded-full ${row.available === 0 ? 'bg-rose-500' : 'bg-indigo-500'}`} 
-                        style={{ width: `${(row.available/row.copies)*100}%` }}
+                        style={{ width: `${row.copies > 0 ? Math.round((row.available / row.copies) * 100) : 0}%` }}
                       ></div>
                     </div>
                   </div>
@@ -1092,9 +1124,9 @@ export default function CatalogManagement() {
 
       </div>
 
-      {/* Modal Quản lý thể loại — GET/POST/PUT/DELETE /api/admin/categories */}
-      <Modal 
-        isOpen={isAddingCategory} 
+      {/* Modal Quản lý thể loại — /api/admin/categories */}
+      <Modal
+        isOpen={isAddingCategory}
         onClose={() => {
           setIsAddingCategory(false);
           setEditingCategory(null);
@@ -1138,10 +1170,12 @@ export default function CatalogManagement() {
               {editingCategory ? 'Tên thể loại (sửa)' : 'Thêm thể loại mới'}{' '}
               <span className="text-rose-500">*</span>
             </label>
-            <Input 
+            <Input
               value={categoryFormName}
               onChange={(e) => setCategoryFormName(e.target.value)}
-              className="w-full" 
+              className="w-full"
+              maxLength={100}
+              helperText="Tối đa 100 ký tự; không trùng tên đã có."
               placeholder="VD: Tâm lý học, Khoa học dữ liệu..."
               autoFocus
             />
@@ -1161,7 +1195,12 @@ export default function CatalogManagement() {
             >
               {editingCategory ? 'Hủy sửa' : 'Đóng'}
             </Button>
-            <Button variant="primary" onClick={handleSaveCategory} isLoading={isSavingCategory} disabled={!categoryFormName.trim()}>
+            <Button
+              variant="primary"
+              onClick={handleSaveCategory}
+              isLoading={isSavingCategory}
+              disabled={!categoryFormName.trim() || categoryFormName.trim().length > 100}
+            >
               {editingCategory ? 'Cập nhật' : 'Thêm thể loại'}
             </Button>
           </div>
@@ -1261,16 +1300,16 @@ export default function CatalogManagement() {
                 className="w-full"
                 placeholder="VD: 150000"
                 error={formErrors.price}
-                helperText={!formErrors.price ? 'Lưu cùng đầu sách (giá bìa).' : undefined}
+                
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Số trang</label>
-              <Input 
+              <Input
                 value={bookForm.numPages}
                 onChange={(e) => handleFieldChange('numPages', e.target.value)}
-                className="w-full" 
+                className="w-full"
                 error={formErrors.numPages}
                 placeholder="VD: 320"
               />
@@ -1302,7 +1341,7 @@ export default function CatalogManagement() {
                   onChange={(e) => handleFieldChange('previewPages', e.target.value)}
                   className="w-full" 
                   error={formErrors.previewPages}
-                  helperText={!formErrors.previewPages ? "Quy định từ 5 đến 10 trang cho eBook bản quyền" : undefined}
+                  helperText={!formErrors.previewPages ? "Mặc định 10; quy định 5–10 trang (sách bản quyền)" : undefined}
                   placeholder="VD: 10 (từ 5–10 trang)"
                 />
               </div>
@@ -1327,6 +1366,27 @@ export default function CatalogManagement() {
               </div>
             )}
 
+            {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  id="catalog-ebook-is-free"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={Boolean(bookForm.isFree)}
+                  onChange={(e) => handleFieldChange('isFree', e.target.checked)}
+                />
+                <label htmlFor="catalog-ebook-is-free" className="text-sm font-medium text-slate-700 cursor-pointer">
+                  Miễn phí đọc toàn bộ
+                  <span className="block text-xs font-normal text-slate-500 mt-0.5">
+                    Bật: đọc toàn bộ PDF, không cắt xem trước.
+                  </span>
+                  <span className="block text-xs font-normal text-slate-500">
+                    Tắt: sách bản quyền, xem trước 5–10 trang.
+                  </span>
+                </label>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                 Thể loại <span className="text-rose-500">*</span>
@@ -1336,7 +1396,7 @@ export default function CatalogManagement() {
                 value={bookForm.categoryId}
                 onChange={(e) => handleFieldChange('categoryId', e.target.value)}
               >
-                <option value="">-- Chọn thể loại sách --</option>
+                <option value="">Chọn thể loại sách</option>
                 {categories.map(c => (
                   <option key={c.id} value={c.id}>{c.category_name}</option>
                 ))}
@@ -1353,41 +1413,36 @@ export default function CatalogManagement() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã học phần</label>
-              <Input 
+              <Input
                 value={bookForm.courseCode}
                 onChange={(e) => handleFieldChange('courseCode', e.target.value)}
-                className="w-full" 
+                className="w-full"
+                error={formErrors.courseCode}
+                
                 placeholder="VD: IT, ECO, ENG, MATH..."
               />
             </div>
 
             <div className="col-span-1 sm:col-span-2">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Từ khóa</label>
-              <Input 
+              <Input
                 value={bookForm.keywords}
                 onChange={(e) => handleFieldChange('keywords', e.target.value)}
-                className="w-full" 
+                className="w-full"
                 error={formErrors.keywords}
+                helperText={!formErrors.keywords ? 'Tùy chọn · phục vụ tìm kiếm toàn văn.' : undefined}
                 placeholder="Phân tách bằng dấu phẩy..."
               />
             </div>
-            
+
             <div className="col-span-1 sm:col-span-2">
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mô tả</label>
-              <textarea 
+              <textarea
                 value={bookForm.description}
                 onChange={(e) => handleFieldChange('description', e.target.value)}
-                className={`w-full px-4 py-3 bg-white border ${formErrors.description ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl text-sm font-medium text-slate-700 focus:outline-none resize-none h-24 transition-all`}
+                className="w-full px-4 py-3 bg-white border border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20 rounded-xl text-sm font-medium text-slate-700 focus:outline-none resize-none h-24 transition-all"
                 placeholder="Nhập tóm tắt nội dung sách..."
               />
-              {formErrors.description && (
-                <p className="text-[14px] leading-[20px] font-normal text-[#BE123C] mt-1.5 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 inline-block shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>{formErrors.description}</span>
-                </p>
-              )}
             </div>
 
             {/* Khu vực tải tệp */}

@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Users, Search, Plus, Lock, Unlock, KeyRound, Pencil, Eye,
-  UserX, ShieldAlert, GraduationCap, Upload, Receipt,
+  UserX, ShieldAlert, GraduationCap, Upload,
 } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Table, StatusBadge } from '../../components/Table';
@@ -54,7 +53,6 @@ function mapApiUser(u) {
 }
 
 export default function UserManagement() {
-  const navigate = useNavigate();
   const { toast, showToast, hideToast } = useToast();
   const [apiError, setApiError] = useState('');
   const [totalCount, setTotalCount] = useState(0);
@@ -375,6 +373,7 @@ export default function UserManagement() {
     {
       key: 'user_code',
       header: 'MSSV / Mã',
+      width: '14%',
       render: (val) => (
         <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
           {val}
@@ -384,8 +383,9 @@ export default function UserManagement() {
     {
       key: 'full_name',
       header: 'Họ tên & Email',
+      width: '23%',
       render: (val, row) => (
-        <div className="min-w-[180px] max-w-xs">
+        <div className="min-w-0 w-full">
           <p className="font-bold text-slate-800 text-sm truncate" title={val}>{val}</p>
           <p className="text-[11px] text-slate-400 truncate">{row.email}</p>
         </div>
@@ -394,6 +394,7 @@ export default function UserManagement() {
     {
       key: 'role',
       header: 'Vai trò',
+      width: '12%',
       render: (val) => {
         const role = String(val || '').toUpperCase();
         return (
@@ -413,15 +414,13 @@ export default function UserManagement() {
     {
       key: 'department',
       header: 'Khoa / Ngành',
-      render: (val) => (
-        <span className="text-sm font-medium text-slate-600 block max-w-[160px] truncate" title={val || undefined}>
-          {val || '—'}
-        </span>
-      ),
+      width: '16%',
+      render: (val) => <span className="text-sm text-slate-700">{val || '—'}</span>,
     },
     {
       key: 'is_locked',
       header: 'Trạng thái',
+      width: '16%',
       render: (val, row) => (
         <div className="flex items-center gap-2 min-w-0 whitespace-nowrap">
           <StatusBadge status={val ? 'Đã khóa' : 'Hoạt động'} type={val ? 'danger' : 'success'} />
@@ -436,6 +435,7 @@ export default function UserManagement() {
     {
       key: 'actions',
       header: 'Thao tác',
+      width: '19%',
       align: 'right',
       render: (_, row) => (
         <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
@@ -493,13 +493,6 @@ export default function UserManagement() {
           </p>
         </div>
         <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-3 shrink-0 ml-auto">
-          <Button
-            variant="outline"
-            icon={<Receipt className="w-4 h-4" />}
-            onClick={() => navigate('/admin/fines')}
-          >
-            Thu phạt &amp; Công nợ
-          </Button>
           <Button
             variant="outline"
             icon={<Upload className="w-4 h-4" />}

@@ -105,6 +105,7 @@ export const Table = ({
 
   // Số lượng cột đang hiển thị
   const totalColumns = isCustomColumns ? columns.length : 7;
+  const hasFixedWidths = isCustomColumns && columns.some((col) => col.width);
 
   // Lấy key cho từng row
   const getRowKey = (row, index) => {
@@ -130,7 +131,14 @@ export const Table = ({
 
       {/* Table responsive container */}
       <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-        <table className="w-full text-left border-collapse">
+        <table className={`w-full text-left border-collapse ${hasFixedWidths ? 'table-fixed min-w-[60.5rem]' : ''}`}>
+          {hasFixedWidths && (
+            <colgroup>
+              {columns.map((col, idx) => (
+                <col key={col.key || idx} style={col.width ? { width: col.width } : undefined} />
+              ))}
+            </colgroup>
+          )}
           {/* Header Row */}
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
@@ -141,7 +149,7 @@ export const Table = ({
                     <th
                       key={col.key || idx}
                       scope="col"
-                      className={`py-3 px-4 text-xs font-medium text-slate-500 uppercase tracking-wider ${alignClass}`}
+                      className={`py-3 px-4 text-xs font-medium text-slate-500 uppercase tracking-wider ${alignClass} ${hasFixedWidths ? 'overflow-hidden' : ''}`}
                     >
                       {col.header}
                     </th>
@@ -201,7 +209,7 @@ export const Table = ({
                         const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
                         const cellValue = row[col.key];
                         return (
-                          <td key={col.key || colIdx} className={`py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle ${alignClass}`}>
+                          <td key={col.key || colIdx} className={`py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle ${alignClass} ${hasFixedWidths ? 'overflow-hidden' : ''}`}>
                             {col.render ? col.render(cellValue, row, rowIndex) : cellValue}
                           </td>
                         );
@@ -298,16 +306,13 @@ export const Table = ({
         </table>
       </div>
 
-      {/* Table Footer */}
+      {/* Table Footer — nằm ngoài vùng cuộn bảng để không bị cắt trên màn hẹp */}
       {pagination && totalPages > 1 ? (
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between bg-white rounded-b-2xl">
+        <div className="px-4 py-3 border-t border-slate-100 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-slate-500">
-            Trang <strong className="font-semibold text-slate-700">{currentPage}</strong> / {totalPages}
-            {isServerPaging && (
-              <span className="text-slate-400"> · {totalCount} bản ghi</span>
-            )}
+            Hiển thị <strong>{displayData.length}</strong> trên <strong>{totalCount}</strong> bản ghi
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <Button
               variant="outline"
               size="sm"
@@ -316,9 +321,8 @@ export const Table = ({
             >
               Trước
             </Button>
-            <div className="flex items-center px-2 gap-1">
+            <div className="flex flex-wrap items-center px-2 gap-1">
               {Array.from({ length: Math.min(totalPages, 7) }).map((_, idx) => {
-                // Hiển thị tối đa 7 nút trang quanh trang hiện tại khi totalPages lớn
                 let pageNum = idx + 1;
                 if (totalPages > 7) {
                   const start = Math.min(Math.max(1, currentPage - 3), totalPages - 6);
@@ -351,7 +355,7 @@ export const Table = ({
           </div>
         </div>
       ) : (
-        <div className="px-4 py-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
           <span>Hiển thị <strong>{displayData.length}</strong> trên <strong>{totalCount}</strong> bản ghi</span>
           {footerNote && <span className="font-medium text-slate-400">{footerNote}</span>}
         </div>
