@@ -25,6 +25,58 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
       });
     });
 
+    // Tránh 401 /api/auth/me → interceptor xóa token và đá về /login
+    await page.route('**/api/auth/me', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      return route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 101, username: 'admin', role: 'ADMIN' }),
+      });
+    });
+
+    await page.route('**/api/admin/loans/active-return**', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      return route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          loan_id: 101,
+          user_code: 'SV-DEMO-001',
+          full_name: 'Quý cô Phương Vũ',
+          book_id: 1,
+          book_title: 'Clean Code',
+          book_price: 150000,
+          copy_barcode: 'DEMO-BC-001-01',
+          loan_status: 'BORROWED',
+          due_date: '2026-11-11T17:00:00Z',
+          overdue: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/admin/loans/checkin', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      return route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: 'Check-in thành công',
+          loan_id: 101,
+          loan_status: 'RETURNED',
+        }),
+      });
+    });
+
     // Đăng nhập tài khoản thủ thư/admin
     await page.goto('/login');
     await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
@@ -39,7 +91,7 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
     await expect(page.getByRole('heading', { name: /Quản lý Mượn \/ Trả Sách/i })).toBeVisible({ timeout: 5000 });
 
     // 2. Nhập mã vạch sách trả tại quầy
-    const barcodeInput = page.getByPlaceholder(/DEMO-BC-100-02|Enter để nhận mã/i);
+    const barcodeInput = page.getByPlaceholder(/Quét mã vạch đang mượn/i);
     await expect(barcodeInput).toBeVisible();
     await barcodeInput.fill('DEMO-BC-001-01');
     await barcodeInput.press('Enter');
@@ -59,6 +111,6 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
     await finalConfirmBtn.click();
 
     // 6. Kiểm tra thông báo thành công xuất hiện
-    await expect(page.getByText(/Da nhan tra sach thanh cong|Check-in thành công/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Da nhan tra sach thanh cong|Check-in thành công|Trả sách thành công/i)).toBeVisible({ timeout: 5000 });
   });
 });

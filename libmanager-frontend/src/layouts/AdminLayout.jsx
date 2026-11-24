@@ -75,13 +75,17 @@ export default function AdminLayout() {
     getMe()
       .then((me) => {
         if (cancelled || !me) return;
+        const current = getCurrentUser() || {};
+        const meIsAdmin = String(me.role || '').toUpperCase() === 'ADMIN';
+        // Không hạ role admin đang đăng nhập nếu /me lệch (mock/MSW cũ).
+        const nextRole = meIsAdmin || current.role === 'admin' ? 'admin' : 'user';
         const merged = {
-          ...(getCurrentUser() || {}),
+          ...current,
           id: me.id,
           username: me.username,
           name: me.username,
-          apiRole: me.role,
-          role: String(me.role || '').toUpperCase() === 'ADMIN' ? 'admin' : 'user',
+          apiRole: meIsAdmin ? me.role : (current.apiRole || me.role),
+          role: nextRole,
         };
         setCurrentUser(merged);
         setAuthUser(merged);

@@ -9,7 +9,7 @@ const CORS_HEADERS = {
 test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy)', () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
-    await page.route(/\/api\/auth\/login/, async (route) => {
+    await page.route('**/api/auth/login', async (route) => {
       if (route.request().method() === 'OPTIONS') {
         return route.fulfill({ status: 204, headers: CORS_HEADERS });
       }
@@ -22,6 +22,18 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
           token_type: 'bearer',
           user: { id: 101, username: 'admin', role: 'ADMIN' },
         }),
+      });
+    });
+
+    await page.route('**/api/auth/me', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      await route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 101, username: 'admin', role: 'ADMIN' }),
       });
     });
 

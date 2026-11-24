@@ -9,6 +9,31 @@ test('homepage and catalog are available', async ({ page }) => {
 });
 
 test('mock login routes an admin account into the admin portal', async ({ page }) => {
+  await page.route('**/api/auth/login', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204 });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        access_token: 'mock-jwt-admin-token',
+        token_type: 'bearer',
+        user: { id: 101, username: 'admin', role: 'ADMIN' },
+      }),
+    });
+  });
+  await page.route('**/api/auth/me', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({ status: 204 });
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 101, username: 'admin', role: 'ADMIN' }),
+    });
+  });
+
   await page.goto('/login');
   await page.getByPlaceholder('Nhập tên đăng nhập').fill('admin');
   await page.getByPlaceholder('Nhập mật khẩu').fill('Admin@123');

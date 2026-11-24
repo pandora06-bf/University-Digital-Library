@@ -94,7 +94,10 @@ export default function InventoryManagement() {
 
   // Gợi ý gồm mọi đầu sách đang dùng, không dừng ở 50 cuốn đầu.
   useEffect(() => {
-    loadBookSuggestions('');
+    const timer = window.setTimeout(() => {
+      loadBookSuggestions('');
+    }, 0);
+    return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -180,81 +183,85 @@ export default function InventoryManagement() {
 
   // Nạp đúng đầu sách theo ID trên URL; reset lọc bảng mỗi lần đổi sách
   useEffect(() => {
-    if (!bookId) {
-      setBookInfo(null);
-      setTableData([]);
-      return;
-    }
-
-    setSearchTerm('');
-    setLocationFilter('ALL');
-    setStatusFilter('ALL');
-
     let isMounted = true;
-    axiosInstance
-      .get(`/api/books/${bookId}`)
-      .then((res) => {
-        if (!isMounted) return;
-        const found = res.data;
-        setBookInfo(found);
-        mergeBookIntoList(found);
-        // Đồng bộ field theo chế độ đang dùng — không trộn hai ô
-        if (bookPickMode === 'type') {
-          setBookPickerQuery(String(found.id));
-        } else {
-          setBookPickerQuery('');
-        }
-        fetchInventory(bookId, found);
-      })
-      .catch(async (error) => {
-        if (!isMounted) return;
-        // Chi tiết bạn đọc trả 404 khi mọi bản in đã ngừng lưu hành, dù đầu sách vẫn is_active.
-        // Không gọi API mới: tìm trong danh mục đang bật, rồi lấy bản sao ở endpoint kho sẵn có.
-        const status = error?.response?.status;
-        if (status === 404) {
-          let found = null;
-          try {
-            found = await findActiveCatalogBook(bookId);
-          } catch {
-            found = null;
-          }
-          if (!isMounted) return;
-          if (!found) {
-            try {
-              const copiesRes = await axiosInstance.get(`/api/admin/books/${bookId}/copies`);
-              const copies = Array.isArray(copiesRes.data)
-                ? copiesRes.data
-                : (copiesRes.data?.items || []);
-              if (copies.length) {
-                found = { id: Number(bookId), title: `Đầu sách #${bookId}`, author: '' };
-              }
-            } catch {
-              found = null;
-            }
-          }
-          if (!isMounted) return;
-          if (found) {
-            setBookInfo(found);
-            mergeBookIntoList(found);
-            if (bookPickMode === 'type') setBookPickerQuery(String(found.id));
-            fetchInventory(bookId, found);
-            showToast(
-              'Đầu sách vẫn đang dùng. Mọi bản in đã thanh lý hoặc hỏng nên cổng bạn đọc không mở sách này.',
-              'warning'
-            );
-            return;
-          }
-        }
+    const timer = window.setTimeout(() => {
+      if (!bookId) {
         if (!isMounted) return;
         setBookInfo(null);
         setTableData([]);
-        showToast(
-          getApiErrorMessage(error, `Không tìm thấy đầu sách #${bookId}.`),
-          'error'
-        );
-      });
+        return;
+      }
+
+      setSearchTerm('');
+      setLocationFilter('ALL');
+      setStatusFilter('ALL');
+
+      axiosInstance
+        .get(`/api/books/${bookId}`)
+        .then((res) => {
+          if (!isMounted) return;
+          const found = res.data;
+          setBookInfo(found);
+          mergeBookIntoList(found);
+          // Đồng bộ field theo chế độ đang dùng — không trộn hai ô
+          if (bookPickMode === 'type') {
+            setBookPickerQuery(String(found.id));
+          } else {
+            setBookPickerQuery('');
+          }
+          fetchInventory(bookId, found);
+        })
+        .catch(async (error) => {
+          if (!isMounted) return;
+          // Chi tiết bạn đọc trả 404 khi mọi bản in đã ngừng lưu hành, dù đầu sách vẫn is_active.
+          // Không gọi API mới: tìm trong danh mục đang bật, rồi lấy bản sao ở endpoint kho sẵn có.
+          const status = error?.response?.status;
+          if (status === 404) {
+            let found;
+            try {
+              found = await findActiveCatalogBook(bookId);
+            } catch {
+              found = undefined;
+            }
+            if (!isMounted) return;
+            if (!found) {
+              try {
+                const copiesRes = await axiosInstance.get(`/api/admin/books/${bookId}/copies`);
+                const copies = Array.isArray(copiesRes.data)
+                  ? copiesRes.data
+                  : (copiesRes.data?.items || []);
+                if (copies.length) {
+                  found = { id: Number(bookId), title: `Đầu sách #${bookId}`, author: '' };
+                }
+              } catch {
+                found = undefined;
+              }
+            }
+            if (!isMounted) return;
+            if (found) {
+              setBookInfo(found);
+              mergeBookIntoList(found);
+              if (bookPickMode === 'type') setBookPickerQuery(String(found.id));
+              fetchInventory(bookId, found);
+              showToast(
+                'Đầu sách vẫn đang dùng. Mọi bản in đã thanh lý hoặc hỏng nên cổng bạn đọc không mở sách này.',
+                'warning'
+              );
+              return;
+            }
+          }
+          if (!isMounted) return;
+          setBookInfo(null);
+          setTableData([]);
+          showToast(
+            getApiErrorMessage(error, `Không tìm thấy đầu sách #${bookId}.`),
+            'error'
+          );
+        });
+    }, 0);
 
     return () => {
+      window.clearTimeout(timer);
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

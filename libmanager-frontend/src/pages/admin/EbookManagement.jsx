@@ -12,7 +12,8 @@ import { useToast } from '../../hooks/useToast';
 import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
-import { BookTypeBadge, bookTypeLabelVi } from '../../components/BookTypeBadge';
+import { BookTypeBadge } from '../../components/BookTypeBadge';
+import { bookTypeLabelVi } from '../../utils/bookType';
 
 const SEARCH_PAGE_SIZE = 50;
 

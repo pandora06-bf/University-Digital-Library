@@ -51,6 +51,24 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
       });
     });
 
+    await page.route('**/api/auth/me', async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      const auth = route.request().headers()['authorization'] || '';
+      const isAdmin = /admin/i.test(auth);
+      return route.fulfill({
+        status: 200,
+        headers: CORS_HEADERS,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          isAdmin
+            ? { id: 101, username: 'admin', role: 'ADMIN' }
+            : { id: 1, username: 'demo_student_001', role: 'STUDENT' }
+        ),
+      });
+    });
+
     await page.goto('/login');
     await page.evaluate(() => {
       localStorage.clear();

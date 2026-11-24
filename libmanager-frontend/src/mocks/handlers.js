@@ -27,7 +27,7 @@ const API_BOOKS = INITIAL_BOOKS.map((book, index) => ({
 const PROFILE = {
   user_code: 'SV-DEMO-001',
   username: 'demo_student_001',
-  full_name: 'Nguyen Van Dat',
+  full_name: 'Quý cô Phương Vũ',
   email: 'demo.user.001@library.local',
   phone_number: '0900000001',
   department: 'Khoa Cong nghe thong tin',
@@ -41,6 +41,13 @@ const PROFILE = {
   is_active: true,
   total_fines: 0,
   service_balance: 150000,
+};
+
+/** Phiên đăng nhập mock — /api/auth/me phải khớp role vừa login (tránh AdminRoute bị đá về /login). */
+let sessionAuthUser = {
+  id: 1,
+  username: PROFILE.username,
+  role: 'STUDENT',
 };
 
 const ROOMS = [
@@ -87,13 +94,18 @@ export const handlers = [
       return HttpResponse.json({ detail: 'Sai tên đăng nhập hoặc mật khẩu' }, { status: 401 });
     }
     const isAdmin = /admin|thuthu/i.test(username);
+    sessionAuthUser = {
+      id: isAdmin ? 101 : 1,
+      username,
+      role: isAdmin ? 'ADMIN' : 'STUDENT',
+    };
     return HttpResponse.json({
-      access_token: 'mock-jwt-demo-token',
+      access_token: isAdmin ? 'mock-jwt-admin-token' : 'mock-jwt-demo-token',
       token_type: 'bearer',
-      user: { id: isAdmin ? 101 : 1, username, role: isAdmin ? 'ADMIN' : 'STUDENT' },
+      user: sessionAuthUser,
     });
   }),
-  http.get('*/api/auth/me', () => HttpResponse.json({ id: 1, username: PROFILE.username, role: 'STUDENT' })),
+  http.get('*/api/auth/me', () => HttpResponse.json(sessionAuthUser)),
   http.get('*/api/auth/test', () => HttpResponse.json({ message: 'Auth router is working' })),
   http.get('*/api/users/me', () => HttpResponse.json(PROFILE)),
   http.get('*/api/users/me/dashboard', () => HttpResponse.json({
@@ -190,14 +202,22 @@ export const handlers = [
   http.get('*/api/admin/loans/lookup', ({ request }) => {
     const q = new URL(request.url).searchParams.get('q') || 'SV-DEMO-001';
     return HttpResponse.json({
+      total: 1,
       user_code: q,
+      reader: {
+        user_code: q,
+        full_name: 'Quý cô Phương Vũ',
+        total_fines: 0,
+        is_borrowing_blocked: false,
+      },
       data: [
         {
           id: 101,
           loan_code: 'PM-2026-0101',
           user_code: q,
+          full_name: 'Quý cô Phương Vũ',
           book_id: 1,
-          book_title: 'Lap trinh Web hien dai voi React 19',
+          book_title: 'Lập Trình Web Hiện Đại với React 19',
           copy_barcode: 'DEMO-BC-001-01',
           loan_type: 'PHYSICAL',
           loan_status: 'PENDING_PICKUP',
@@ -207,7 +227,22 @@ export const handlers = [
       ],
     });
   }),
-  http.post('*/api/admin/loans/checkin', () => HttpResponse.json({ message: 'Da nhan tra sach thanh cong' })),
+  http.get('*/api/admin/loans/active-return', ({ request }) => {
+    const barcode = new URL(request.url).searchParams.get('barcode') || 'DEMO-BC-001-01';
+    return HttpResponse.json({
+      loan_id: 101,
+      user_code: 'SV-DEMO-001',
+      full_name: 'Quý cô Phương Vũ',
+      book_id: 1,
+      book_title: 'Lập Trình Web Hiện Đại với React 19',
+      book_price: 150000,
+      copy_barcode: barcode,
+      loan_status: 'BORROWED',
+      due_date: '2026-11-11T17:00:00Z',
+      overdue: false,
+    });
+  }),
+  http.post('*/api/admin/loans/checkin', () => HttpResponse.json({ message: 'Trả sách thành công' })),
   http.post('*/api/admin/loans/checkout', () => HttpResponse.json({ message: 'Da xuat phieu muon thanh cong' })),
   http.get('*/api/admin/fines/lookup', ({ request }) => {
     const userCode = new URL(request.url).searchParams.get('user_code') || 'SV-DEMO-001';
