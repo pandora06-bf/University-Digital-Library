@@ -40,8 +40,8 @@ html = environment.get_template("receipt.html").render(**context)
 ```
 
 Container `api` build từ `back_fast_api/` và mount thư mục này vào `/app`, nên
-template có sẵn tại `/app/templates/email/` mà không cần cấu hình thêm. SMTP,
-retry và BackgroundTasks thuộc 3-06; các mẫu này chưa gửi thư tự động.
+template có sẵn tại `/app/templates/email/` mà không cần cấu hình thêm. Backend
+gửi `top_up.html` sau khi webhook hoặc giả lập xác nhận nạp tiền thành công.
 
 ## Xem trước và kiểm tra Gmail
 

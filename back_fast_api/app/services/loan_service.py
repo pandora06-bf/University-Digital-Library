@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
@@ -20,6 +20,12 @@ from app.models.user import User
 # eBook đang mượn (loan_type không phân biệt ở đây).
 ACTIVE_LOAN_STATUSES = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
 PICKUP_HOLD_PERIOD = timedelta(hours=24)
+
+
+def _utcnow_naive() -> datetime:
+    """Return UTC for database TIMESTAMP columns that intentionally omit timezone."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 _STATUS_VI = {
     "AVAILABLE": "sẵn sàng",
@@ -70,28 +76,37 @@ def send_checkout_receipt_email(
     Chạy sau khi transaction check-out đã commit; lỗi SMTP không ảnh hưởng phiếu mượn.
     """
     import logging
-    from app.services.email_notifier import VN, send_receipt
-
-    def _as_vn(value: Optional[datetime]) -> Optional[datetime]:
-        # Checkout lưu datetime.now() (giờ local, naive) -> gắn múi giờ VN
-        # để local_date() không hiểu nhầm là UTC và cộng thêm 7 giờ.
-        if value is not None and value.tzinfo is None:
-            return value.replace(tzinfo=VN)
-        return value
+    from app.services.email_notifier import send_receipt
 
     try:
-        send_receipt(
+        sent = send_receipt(
             user_email,
             user_name,
             loan_id,
             title,
             author,
-            _as_vn(borrow_date or datetime.now()),
-            _as_vn(due_date),
+            borrow_date or datetime.now(timezone.utc),
+            due_date,
             loan_code=loan_code,
         )
     except Exception:
         logging.getLogger(__name__).exception("Gửi email biên lai thất bại loan_id=%s", loan_id)
+        return
+
+    if sent and user_email:
+        from app.models.notification import EmailNotice
+
+        db = SessionLocal()
+        try:
+            db.add(EmailNotice(event_key=f"receipt:{loan_id}", recipient=user_email))
+            db.commit()
+        except Exception:
+            db.rollback()
+            logging.getLogger(__name__).exception(
+                "Email biên lai đã gửi nhưng không lưu được lịch sử loan_id=%s", loan_id
+            )
+        finally:
+            db.close()
 
 
 def promote_waitlist_stub(db: Session, book_id: int):
@@ -239,7 +254,8 @@ def request_physical_loan_service(db: Session, user_code: str, book_id: int) -> 
             detail="Sách đã hết bản khả dụng, vui lòng Hẹn đặt trước",
         )
 
-    now = datetime.now()
+    # Loan timestamps are stored as naive UTC, consistent with scheduler and API consumers.
+    now = _utcnow_naive()
     loan = Loan(
         user_code=reader.user_code,
         book_id=book_id,
@@ -264,7 +280,7 @@ def run_pickup_expiry_job(session_factory=SessionLocal, now: Optional[datetime] 
     hạn trong scheduler_worker.py hiện tại nên được đăng ký dưới id khác
     (xem app/scheduler_worker.py). Mỗi phiếu xử lý trong transaction riêng,
     một lỗi không chặn các phiếu còn lại (cùng kiểu với run_fine_job/JOB-01)."""
-    now = now or datetime.now()
+    now = now or _utcnow_naive()
     db = session_factory()
     try:
         loan_ids = db.scalars(
@@ -356,7 +372,7 @@ def renew_loan_service(db: Session, user_code: str, loan_id: int) -> Loan:
         )
 
     # (4) Còn tối thiểu 6 giờ trước hạn trả
-    now = datetime.now()
+    now = _utcnow_naive()
     if loan.due_date - now < timedelta(hours=MIN_HOURS_BEFORE_DUE_TO_RENEW):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -542,7 +558,7 @@ def checkout_at_counter_service(
     # Hạn mức mượn tối đa cùng lúc: Sinh viên = 3 cuốn, Giảng viên/Viên chức = 5 cuốn (BR-01)
     max_limit = get_user_max_borrow_limit(user)
 
-    now = datetime.now()
+    now = _utcnow_naive()
     borrow_days = user.max_borrow_days if (user.max_borrow_days and user.max_borrow_days > 0) else 14
     due_date = now + timedelta(days=borrow_days)  # GĐ-04 / BR-17 (Mặc định 14 ngày)
 

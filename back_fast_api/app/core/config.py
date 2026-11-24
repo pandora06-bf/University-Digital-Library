@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     TOPUP_MIN_AMOUNT: int = 10_000
     TOPUP_MAX_AMOUNT: int = 500_000
     TOPUP_EXPIRE_MINUTES: int = 15
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_SSL: bool = False
+    SMTP_STARTTLS: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -46,6 +46,7 @@ class Loan(Base):
     loan_status: Mapped[str] = mapped_column(String(30), nullable=False, default="BORROWED")
     loan_code: Mapped[Optional[str]] = mapped_column(String(30), unique=True, nullable=True)
 
+    # Naive timestamps in this table represent UTC; clients convert them for display.
     borrow_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=False), nullable=False)
     due_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=False), nullable=False)
     pickup_deadline: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=False), nullable=True)

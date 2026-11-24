@@ -60,8 +60,16 @@ def bank_webhook(event: BankEvent, tasks: BackgroundTasks, db: Session = Depends
     if result.get('result') == 'MATCHED':
         credited = db.get(User, result['user_code'])
         if credited:
-            tasks.add_task(send_topup_confirmed, credited.email, credited.full_name,
-                           result['amount'], result['balance_after'])
+            tasks.add_task(
+                send_topup_confirmed,
+                credited.email,
+                credited.full_name,
+                transaction_id=event.id,
+                pay_code=result['pay_code'],
+                amount=result['amount'],
+                paid_at=ws.utcnow(),
+                balance_after=result['balance_after'],
+            )
     return {"success": True, **result}
 
 
@@ -75,6 +83,14 @@ def simulate_topup(pay_code: str, tasks: BackgroundTasks, user: User = Depends(g
         db, bank_tx_id=f"SIM-{topup.pay_code}", amount=topup.amount,
         content=f"CHUYEN TIEN {topup.pay_code}")
     if result.get('result') == 'MATCHED':
-        tasks.add_task(send_topup_confirmed, user.email, user.full_name,
-                       result['amount'], result['balance_after'])
+        tasks.add_task(
+            send_topup_confirmed,
+            user.email,
+            user.full_name,
+            transaction_id=f"SIM-{topup.pay_code}",
+            pay_code=result['pay_code'],
+            amount=result['amount'],
+            paid_at=ws.utcnow(),
+            balance_after=result['balance_after'],
+        )
     return {"success": True, **result}
