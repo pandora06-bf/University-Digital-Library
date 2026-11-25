@@ -24,9 +24,15 @@ export function AdminIconButton({
     const el = btnRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    // Giữ tooltip trong viewport — nút sát mép phải (vd. Xóa) vẫn hiện đủ chữ
+    const pad = 8;
+    const approxHalf = Math.max(48, label.length * 3.6);
+    const rawLeft = rect.left + rect.width / 2;
+    const minLeft = pad + approxHalf;
+    const maxLeft = window.innerWidth - pad - approxHalf;
     setCoords({
       top: rect.top - 8,
-      left: rect.left + rect.width / 2,
+      left: Math.min(maxLeft, Math.max(minLeft, rawLeft)),
     });
   };
 

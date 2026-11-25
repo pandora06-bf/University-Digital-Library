@@ -105,7 +105,7 @@ export default function IncidentPage() {
     return () => window.clearTimeout(timer);
   }, [loadIncidents]);
 
-  // Từ Thu phạt: /admin/incidents?mssv=… → lọc bảng theo MSSV
+  // Từ Thu phạt: /admin/incidents?mssv=… → lọc bảng theo mã bạn đọc
   useEffect(() => {
     const mssv = (searchParams.get('mssv') || '').trim();
     if (!mssv || autoFilterDone.current === mssv) return;
@@ -167,7 +167,7 @@ export default function IncidentPage() {
       return next;
     });
 
-    // UC15: lookup MSSV / mã phiếu / barcode; barcode ưu tiên phiếu đang mượn
+    // UC15: lookup mã bạn đọc / mã phiếu / barcode; barcode ưu tiên phiếu đang mượn
     try {
       const { data } = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: code } });
       const loans = Array.isArray(data?.data)
@@ -233,10 +233,14 @@ export default function IncidentPage() {
         borrower_code: '',
         borrower_class: '',
       }));
+      const statuses = loans.map((l) => String(l.loan_status || l.status || '').toUpperCase());
+      const alreadyLost = statuses.some((s) => s === 'LOST' || s === 'DAMAGED' || s === 'RETIRED');
       showToast(
         loans.length > 0
-          ? 'Tìm thấy phiếu nhưng không ở trạng thái đang mượn hoặc quá hạn.'
-          : `Không tìm thấy phiếu đang mượn cho «${code}». Kiểm tra mã vạch hoặc mã phiếu.`,
+          ? alreadyLost
+            ? `Mã «${code}» đã gắn phiếu mất/hỏng hoặc đã xử lý xong — không lập biên bản lần nữa. Chỉ tra phiếu đang mượn hoặc quá hạn.`
+            : `Có phiếu gắn «${code}» nhưng sách đã trả — không lập biên bản mất·hỏng. Cần phiếu đang mượn hoặc quá hạn.`
+          : `Không tìm thấy phiếu đang mượn cho «${code}». Thử mã vạch bản đang mượn, mã phiếu, hoặc mã bạn đọc (SV/GV) còn sách chưa trả.`,
         loans.length > 0 ? 'warning' : 'error'
       );
     } catch (error) {
@@ -338,66 +342,69 @@ export default function IncidentPage() {
     }
   };
 
-  // Cấu hình các cột cho bảng Table component
+  // Cột bảng — header ngắn + không min-w cứng (tránh đè cột khi table-fixed)
   const incidentColumns = [
     {
       key: 'incident_code',
-      header: 'Mã Biên Bản',
-      width: '12%',
+      header: 'Mã BB',
+      headerTitle: 'Mã biên bản',
+      width: '10%',
       render: (val, row) => (
-        <div className="min-w-[130px]">
-          <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
+        <div className="min-w-0">
+          <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit max-w-full truncate text-xs" title={val}>
             {val}
           </span>
-          <span className="text-[11px] text-slate-400 font-medium block mt-1">
-            Ngày: {row.created_at}
+          <span className="text-[11px] text-slate-400 font-medium block mt-1 truncate" title={row.created_at}>
+            {row.created_at}
           </span>
         </div>
       )
     },
     {
       key: 'book_title',
-      header: 'Tài Liệu & Mã Mượn',
-      width: '12%',
+      header: 'Tài liệu',
+      headerTitle: 'Tài liệu & mã mượn',
+      width: '18%',
       render: (val, row) => (
-        <div className="min-w-[220px] max-w-sm">
+        <div className="min-w-0">
           <p className="font-bold text-slate-800 text-sm truncate" title={val}>
             {val}
           </p>
-          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 font-mono">
-            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">MV: {row.barcode}</span>
-            <span>•</span>
-            <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[11px]">Phiếu: {row.loan_code}</span>
+          <div className="mt-1 flex min-w-0 flex-wrap gap-1 text-[11px] text-slate-500 font-mono">
+            <span className="max-w-full truncate rounded bg-slate-100 px-1.5 py-0.5" title={row.barcode}>MV: {row.barcode || '—'}</span>
+            <span className="max-w-full truncate rounded bg-slate-100 px-1.5 py-0.5" title={row.loan_code}>Phiếu: {row.loan_code || '—'}</span>
           </div>
         </div>
       )
     },
     {
       key: 'borrower',
-      header: 'Người Mượn',
+      header: 'Người mượn',
       width: '14%',
       render: (_, row) => (
-        <div className="min-w-0 max-w-[180px]">
+        <div className="min-w-0">
           <span className="font-semibold text-slate-800 block text-sm truncate" title={row.borrower_name}>{row.borrower_name}</span>
-          <span className="text-xs text-slate-500 font-mono block mt-0.5 truncate">
-            {row.borrower_code} ({row.borrower_class})
+          <span className="text-xs text-slate-500 font-mono block mt-0.5 truncate" title={`${row.borrower_code} (${row.borrower_class})`}>
+            {row.borrower_code}{row.borrower_class ? ` (${row.borrower_class})` : ''}
           </span>
         </div>
       )
     },
     {
       key: 'incident_type',
-      header: 'Loại Sự Cố',
+      header: 'Loại',
+      headerTitle: 'Loại sự cố',
       width: '11%',
+      noClip: true,
       render: (val) => {
         const isLost = val === 'LOST';
         return (
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
-            isLost 
-              ? 'bg-rose-50 text-rose-700 border-rose-200' 
+          <span className={`inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
+            isLost
+              ? 'bg-rose-50 text-rose-700 border-rose-200'
               : 'bg-amber-50 text-amber-700 border-amber-200'
           }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isLost ? 'bg-rose-500' : 'bg-amber-500'}`} />
+            <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${isLost ? 'bg-rose-500' : 'bg-amber-500'}`} />
             {isLost ? 'Mất sách' : 'Hỏng nặng'}
           </span>
         );
@@ -405,24 +412,24 @@ export default function IncidentPage() {
     },
     {
       key: 'description',
-      header: 'Mô Tả Tình Trạng',
+      header: 'Mô tả',
+      headerTitle: 'Mô tả tình trạng',
       width: '11%',
       render: (val) => (
-        <div className="min-w-0 max-w-xs">
-          <p className="text-xs text-slate-600 truncate" title={val}>
-            {val}
-          </p>
-        </div>
+        <p className="min-w-0 text-xs text-slate-600 truncate" title={val || undefined}>
+          {val || '—'}
+        </p>
       )
     },
     {
       key: 'compensation_amount',
-      header: 'Giá Bìa / Bồi Thường',
+      header: 'Bồi thường',
+      headerTitle: 'Giá bìa / bồi thường',
       width: '11%',
       align: 'right',
       render: (val) => (
-        <div className="min-w-[120px] text-right">
-          <span className="font-bold text-slate-800 block text-sm">
+        <div className="min-w-0 text-right">
+          <span className="font-bold text-slate-800 block text-sm truncate" title={formatVND(val)}>
             {formatVND(val)}
           </span>
           <span className="text-[10px] text-slate-400 block mt-0.5">Theo giá bìa</span>
@@ -431,8 +438,9 @@ export default function IncidentPage() {
     },
     {
       key: 'status',
-      header: 'Trạng Thái',
-      width: '13%',
+      header: 'Trạng thái',
+      width: '12%',
+      noClip: true,
       render: (val) => {
         let style = 'bg-slate-100 text-slate-600 border-slate-200';
         let label = 'Chờ xử lý';
@@ -444,7 +452,7 @@ export default function IncidentPage() {
           label = 'Đã ghi nhận';
         }
         return (
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${style}`}>
+          <span className={`inline-flex max-w-full items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${style}`}>
             {label}
           </span>
         );
@@ -452,11 +460,15 @@ export default function IncidentPage() {
     },
     {
       key: 'actions',
-      header: 'Thao Tác',
-      width: '16%',
+      header: 'Thao tác',
+      width: '13%',
       align: 'right',
+      noClip: true,
+      // Mép phải rõ (~24–32px) — tránh icon mắt / Thu phạt sát viền
+      cellClassName: '!pr-8 sm:!pr-10',
+      headerClassName: '!pr-8 sm:!pr-10',
       render: (_, row) => (
-        <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
+        <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap pr-1">
           <AdminIconButton
             onClick={() => setDetailRow(row)}
             className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors cursor-pointer"
@@ -468,7 +480,7 @@ export default function IncidentPage() {
             type="button"
             variant="outline"
             size="sm"
-            className="!h-8 !px-2 !text-[11px]"
+            className="!h-8 !px-2 !text-[11px] shrink-0"
             icon={<Receipt className="w-3.5 h-3.5" />}
             onClick={() => {
               const mssv = (row.borrower_code || '').trim();
@@ -480,7 +492,7 @@ export default function IncidentPage() {
           </Button>
         </div>
       )
-    }
+    },
   ];
 
   return (
@@ -658,6 +670,7 @@ export default function IncidentPage() {
           data={filteredData}
           pagination
           itemsPerPage={10}
+          minTableWidth="72rem"
           className="border-0 shadow-none rounded-none rounded-b-2xl"
           emptyMessage={
             <div className="py-8 text-center space-y-2">
@@ -790,12 +803,12 @@ export default function IncidentPage() {
           {/* Ô quét mã */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Mã vạch hoặc mã phiếu mượn <span className="text-rose-500">*</span>
+              Mã vạch, mã phiếu hoặc mã bạn đọc (SV/GV) <span className="text-rose-500">*</span>
             </label>
             <div className="flex items-stretch gap-2 min-w-0">
               <div className="min-w-0 flex-1">
                 <Input
-                  placeholder="VD: mã vạch hoặc mã phiếu"
+                  placeholder="VD: DEMO-BC-005-02 · 15 · SV-DEMO-009 · GV-DEMO-002"
                   leftIcon={<ScanLine className="w-4 h-4" />}
                   className="!h-11 font-mono text-sm"
                   value={createForm.code}
@@ -825,7 +838,7 @@ export default function IncidentPage() {
               </Button>
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Tra cứu phiếu đang mượn theo mã vạch hoặc mã phiếu.
+              UC15: người mượn là <strong>sinh viên hoặc giảng viên</strong>. Chỉ lập biên bản khi phiếu còn <strong>đang mượn</strong> hoặc <strong>quá hạn</strong>.
             </p>
           </div>
 

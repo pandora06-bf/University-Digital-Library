@@ -20,7 +20,7 @@ export default function FineManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const autoLookupDone = useRef('');
   const { toast, showToast, hideToast } = useToast();
-  // UC10: bảng trống đến khi tra cứu MSSV qua /api/admin/fines/lookup
+  // UC10: bảng trống đến khi tra cứu mã bạn đọc qua /api/admin/fines/lookup
   const [finesData, setFinesData] = useState([]);
   const [lookedUpName, setLookedUpName] = useState('');
   const [collectingRow, setCollectingRow] = useState(null);
@@ -44,7 +44,7 @@ export default function FineManagement() {
     const userCode = row.mssv;
     const amount = lookupTotal != null ? Number(lookupTotal) : row.amountNum;
     if (!userCode || !amount || amount <= 0) {
-      showToast('Thiếu MSSV hoặc số tiền thu (chỉ thu đủ toàn bộ nợ).', 'error');
+      showToast('Thiếu mã bạn đọc hoặc số tiền thu (chỉ thu đủ toàn bộ nợ).', 'error');
       return;
     }
     setIsProcessing(true);
@@ -81,7 +81,7 @@ export default function FineManagement() {
     const fromArg = typeof presetMssv === 'string' ? presetMssv : '';
     const q = (fromArg || searchTerm).trim();
     if (!q) {
-      showToast('Nhập MSSV rồi bấm Tra cứu (không để trống).', 'warning');
+      showToast('Nhập mã bạn đọc rồi bấm Tra cứu (không để trống).', 'warning');
       return;
     }
     setSearchTerm(q);
@@ -178,17 +178,17 @@ export default function FineManagement() {
       header: 'Mã Phiếu & Ngày',
       width: '14%',
       render: (value, row) => (
-        <div className="min-w-[120px]">
-          <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
+        <div className="min-w-0">
+          <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit max-w-full truncate text-xs" title={row.id}>
             {row.id}
           </span>
-          <span className="text-[11px] text-slate-400 font-medium block mt-1">{row.date}</span>
+          <span className="text-[11px] text-slate-400 font-medium block mt-1 truncate">{row.date}</span>
         </div>
       )
     },
     {
       key: 'user',
-      header: 'Độc Giả (MSSV)',
+      header: 'Bạn đọc (mã)',
       width: '16%',
       render: (value, row) => (
         <div className="min-w-0 max-w-[180px]">
@@ -216,10 +216,10 @@ export default function FineManagement() {
       width: '12%',
       align: 'right',
       render: (value, row) => (
-        <div className="min-w-[120px]">
-          <span className="font-bold text-slate-800 block text-base">{row.amount}</span>
+        <div className="min-w-0 text-right">
+          <span className="font-bold text-slate-800 block text-base truncate" title={row.amount}>{row.amount}</span>
           {row.paid && (
-            <span className="text-[11px] text-emerald-600 font-medium block mt-0.5">Đã thu: {row.paid}</span>
+            <span className="text-[11px] text-emerald-600 font-medium block mt-0.5 truncate">Đã thu: {row.paid}</span>
           )}
         </div>
       )
@@ -228,8 +228,9 @@ export default function FineManagement() {
       key: 'status',
       header: 'Trạng Thái',
       width: '12%',
+      noClip: true,
       render: (value, row) => (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
+        <span className={`inline-flex max-w-full items-center px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
           row.statusColor === 'rose' ? 'bg-rose-50 text-rose-600 border-rose-200' :
           row.statusColor === 'amber' ? 'bg-amber-50 text-amber-600 border-amber-200' :
           'bg-emerald-50 text-emerald-600 border-emerald-200'
@@ -243,8 +244,9 @@ export default function FineManagement() {
       header: 'Thao Tác',
       width: '30%',
       align: 'right',
+      noClip: true,
       render: (value, row) => (
-        <div className="min-w-[150px] inline-flex items-center justify-end gap-2 whitespace-nowrap">
+        <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
           {row.statusColor !== 'emerald' ? (
             <>
               <button
@@ -286,7 +288,7 @@ export default function FineManagement() {
     }
   ];
 
-  // Ô MSSV là khóa tra cứu API, không lọc lại bảng (dễ loại mất đúng dòng vừa tìm).
+  // Ô mã bạn đọc là khóa tra cứu API, không lọc lại bảng (dễ loại mất đúng dòng vừa tìm).
   const filteredData = finesData.filter((item) => {
     const matchType = typeFilter === 'Loại vi phạm (Tất cả)'
       || (typeFilter === 'Trễ hạn trả sách' && item.fineType === 'OVERDUE')
@@ -305,7 +307,7 @@ export default function FineManagement() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Thu phạt &amp; Công nợ</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Tra cứu công nợ theo MSSV và xác nhận thu phạt tại quầy cho bạn đọc.
+            Tra cứu công nợ theo mã bạn đọc (SV/GV) và xác nhận thu phạt tại quầy.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
@@ -346,7 +348,7 @@ export default function FineManagement() {
           <p className="mt-3 text-[11px] font-medium text-slate-500 line-clamp-2" title={lookedUpName || undefined}>
             {lookedUpName
               ? <>Độc giả <span className="text-slate-700 font-bold">{lookedUpName}</span></>
-              : 'Nhập MSSV rồi bấm Tra cứu'}
+              : 'Nhập mã bạn đọc rồi bấm Tra cứu'}
           </p>
         </div>
 
@@ -395,7 +397,7 @@ export default function FineManagement() {
             <div className="min-w-0 flex-1">
               <Input
                 type="text"
-                placeholder="Nhập MSSV…"
+                placeholder="Nhập mã bạn đọc (SV/GV)…"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg font-mono placeholder:font-sans"
                 value={searchTerm}
@@ -439,6 +441,7 @@ export default function FineManagement() {
         {/* Table */}
         <Table
           columns={fineColumns}
+          minTableWidth="64rem"
           data={filteredData}
           pagination
           itemsPerPage={10}
@@ -446,7 +449,7 @@ export default function FineManagement() {
             finesData.length === 0
               ? (lookedUpName
                 ? `${lookedUpName}: không có khoản phạt.`
-                : 'Nhập MSSV rồi bấm Tra cứu (không để trống).')
+                : 'Nhập mã bạn đọc rồi bấm Tra cứu (không để trống).')
               : 'Không có phiếu khớp bộ lọc này.'
           }
           className="border-0 shadow-none rounded-none rounded-b-2xl"

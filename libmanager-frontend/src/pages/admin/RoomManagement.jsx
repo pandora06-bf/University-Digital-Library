@@ -188,6 +188,7 @@ export default function RoomManagement() {
       key: 'is_active',
       header: 'Trạng thái',
       width: '16%',
+      noClip: true,
       render: (val) => (
         <StatusBadge status={val ? 'Hoạt động' : 'Ngừng dùng'} type={val ? 'success' : 'neutral'} />
       ),
@@ -196,6 +197,7 @@ export default function RoomManagement() {
       key: 'actions',
       header: 'Thao tác',
       width: '20%',
+      noClip: true,
       align: 'right',
       render: (_, row) => (
         <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
@@ -327,18 +329,20 @@ export default function RoomManagement() {
         <div className="space-y-4">
           <Input
             label="Tên phòng"
+            required
             value={form.name}
             error={errors.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
           <Input
-            label="Tầng / khu"
+            label="Tầng"
             value={form.floor}
             onChange={(e) => setForm((f) => ({ ...f, floor: e.target.value }))}
           />
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Sức chứa"
+              required
               type="number"
               min={1}
               value={form.capacity}
@@ -347,6 +351,7 @@ export default function RoomManagement() {
             />
             <Input
               label="Giá / khung 2 giờ (₫)"
+              required
               type="number"
               min={1}
               value={form.slot_price}

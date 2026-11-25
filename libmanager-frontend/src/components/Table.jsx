@@ -6,7 +6,7 @@ import { AdminIconButton } from './AdminIconButton';
 /**
  * Component hiển thị Status Badge theo chuẩn thiết kế LibManager
  */
-export const StatusBadge = ({ status, type = 'neutral' }) => {
+export const StatusBadge = ({ status, type = 'neutral', truncate = true }) => {
   const styles = {
     success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     warning: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -25,9 +25,9 @@ export const StatusBadge = ({ status, type = 'neutral' }) => {
   const currentDot = dotStyles[type] || dotStyles.neutral;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border select-none ${currentStyle}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${currentDot}`} />
-      {status}
+    <span className={`inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border select-none whitespace-nowrap ${currentStyle}`}>
+      <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${currentDot}`} />
+      <span className={truncate ? 'truncate' : 'shrink-0'}>{status}</span>
     </span>
   );
 };
@@ -65,6 +65,8 @@ export const Table = ({
   totalPages: controlledTotalPages,
   totalItems,
   onPageChange,
+  /** min-width bảng khi dùng width % (table-fixed); tăng nếu cột nhiều/header dài */
+  minTableWidth = '60.5rem',
 }) => {
   const isServerPaging = typeof onPageChange === 'function'
     && controlledTotalPages !== undefined
@@ -131,7 +133,10 @@ export const Table = ({
 
       {/* Table responsive container */}
       <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
-        <table className={`w-full text-left border-collapse ${hasFixedWidths ? 'table-fixed min-w-[60.5rem]' : ''}`}>
+        <table
+          className={`w-full text-left border-collapse ${hasFixedWidths ? 'table-fixed' : ''}`}
+          style={hasFixedWidths ? { minWidth: minTableWidth } : undefined}
+        >
           {hasFixedWidths && (
             <colgroup>
               {columns.map((col, idx) => (
@@ -149,7 +154,8 @@ export const Table = ({
                     <th
                       key={col.key || idx}
                       scope="col"
-                      className={`py-3 px-4 text-xs font-medium text-slate-500 uppercase tracking-wider ${alignClass} ${hasFixedWidths ? 'overflow-hidden' : ''}`}
+                      title={col.headerTitle || (typeof col.header === 'string' ? col.header : undefined)}
+                      className={`min-w-0 py-3 pl-3 pr-3 sm:pl-4 sm:pr-4 text-[11px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide leading-snug break-words ${alignClass} ${col.headerClassName || ''}`}
                     >
                       {col.header}
                     </th>
@@ -209,7 +215,12 @@ export const Table = ({
                         const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
                         const cellValue = row[col.key];
                         return (
-                          <td key={col.key || colIdx} className={`py-3 px-4 text-sm text-slate-700 border-b border-slate-100 align-middle ${alignClass} ${hasFixedWidths ? 'overflow-hidden' : ''}`}>
+                          <td
+                            key={col.key || colIdx}
+                            className={`min-w-0 py-3 pl-3 pr-3 sm:pl-4 sm:pr-4 text-sm text-slate-700 border-b border-slate-100 align-middle ${alignClass} ${
+                              hasFixedWidths && !col.noClip ? 'overflow-hidden' : 'overflow-visible'
+                            } ${col.cellClassName || ''}`}
+                          >
                             {col.render ? col.render(cellValue, row, rowIndex) : cellValue}
                           </td>
                         );

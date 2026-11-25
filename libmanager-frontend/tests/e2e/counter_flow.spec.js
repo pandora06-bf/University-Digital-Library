@@ -115,7 +115,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
 
     // 1. Kiểm tra quầy trả sách
     await expect(page.getByRole('heading', { name: 'Quầy Nhận Trả Sách' })).toBeVisible();
-    const returnInput = page.getByPlaceholder(/Quét mã vạch đang mượn/i);
+    const returnInput = page.getByPlaceholder(/Quét mã vạch/i);
     await expect(returnInput).toBeVisible();
 
     // Thử nhập mã vạch sách trả

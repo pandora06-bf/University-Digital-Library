@@ -22,15 +22,15 @@ import {
 // Icon outline stroke giống Users (multi-shape Lucide)
 const SEARCH_SUGGESTIONS = [
   { label: 'Quản lý Danh mục Sách', desc: 'Quản lý đầu sách và thể loại', path: '/admin/catalog', icon: <Library className="w-4 h-4" strokeWidth={2} /> },
-  { label: 'Quản lý eBook / PDF', desc: 'Tài liệu số, PDF và xem trước', path: '/admin/ebooks', icon: <Files className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Quản lý Tồn kho', desc: 'Bản sao vật lý, vị trí kệ', path: '/admin/inventory', icon: <Archive className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Quản lý Mượn / Trả', desc: 'Quầy giao dịch thủ thư', path: '/admin/loans', icon: <ArrowLeftRight className="w-4 h-4" strokeWidth={2} /> },
+  { label: 'Quản lý eBook / PDF', desc: 'Tài liệu số, PDF và xem trước', path: '/admin/ebooks', icon: <Files className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Thu phạt & Công nợ', desc: 'Phiếu phạt, dư nợ độc giả', path: '/admin/fines', icon: <FileWarning className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Báo mất / Hỏng sách', desc: 'Biên bản sự cố và bồi thường', path: '/admin/incidents', icon: <AlertOctagon className="w-4 h-4" strokeWidth={2} /> },
-  { label: 'Quản lý Người dùng', desc: 'Tạo/sửa, khóa, đặt lại mật khẩu', path: '/admin/users', icon: <Users className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Phòng học nhóm', desc: 'Danh mục phòng & check-in mã đặt', path: '/admin/rooms', icon: <DoorOpen className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Check-in phòng', desc: 'Quầy nhập mã đặt trong ngày', path: '/admin/rooms/checkin', icon: <DoorOpen className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền chưa khớp cho người dùng', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" strokeWidth={2} /> },
+  { label: 'Quản lý Người dùng', desc: 'Tạo/sửa, khóa, đặt lại mật khẩu', path: '/admin/users', icon: <Users className="w-4 h-4" strokeWidth={2} /> },
 ];
 
 import { logout, getMe } from '../services/authService';
@@ -163,12 +163,12 @@ export default function AdminLayout() {
       ];
     }
 
-    // Dynamic routes: /admin/books/:bookId (điều hướng từ Danh mục Sách)
+    // Dynamic routes: /admin/books/:bookId (điều hướng từ Quản lý Danh mục Sách)
     if (pathname.startsWith('/admin/books/')) {
       const bookId = pathname.replace('/admin/books/', '').split('/')[0];
       return [
         root,
-        { label: 'Danh mục Sách', path: '/admin/catalog' },
+        { label: 'Quản lý Danh mục Sách', path: '/admin/catalog' },
         { label: bookId ? `Tồn kho đầu sách #${bookId}` : 'Chi tiết bản sao' }
       ];
     }
@@ -177,7 +177,7 @@ export default function AdminLayout() {
     const STATIC_CRUMBS = {
       '/admin/catalog': [
         root,
-        { label: 'Danh mục Sách' }
+        { label: 'Quản lý Danh mục Sách' }
       ],
       '/admin/ebooks': [
         root,
@@ -248,14 +248,14 @@ export default function AdminLayout() {
   // 2B-17: khung menu đủ các mục chức năng Admin
   const navItems = [
     { path: '/admin/catalog', icon: <Library size={20} strokeWidth={2} />, label: 'Quản lý Danh mục Sách' },
-    { path: '/admin/ebooks', icon: <Files size={20} strokeWidth={2} />, label: 'Quản lý eBook / PDF' },
     { path: '/admin/inventory', icon: <Archive size={20} strokeWidth={2} />, label: 'Quản lý Tồn kho' },
     { path: '/admin/loans', icon: <ArrowLeftRight size={20} strokeWidth={2} />, label: 'Quản lý Mượn / Trả' },
+    { path: '/admin/ebooks', icon: <Files size={20} strokeWidth={2} />, label: 'Quản lý eBook / PDF' },
     { path: '/admin/fines', icon: <FileWarning size={20} strokeWidth={2} />, label: 'Thu phạt & Công nợ' },
     { path: '/admin/incidents', icon: <AlertOctagon size={20} strokeWidth={2} />, label: 'Báo mất / Hỏng sách' },
-    { path: '/admin/users', icon: <Users size={20} strokeWidth={2} />, label: 'Người dùng' },
     { path: '/admin/rooms', icon: <DoorOpen size={20} strokeWidth={2} />, label: 'Phòng học nhóm' },
     { path: '/admin/unmatched', icon: <WalletCards size={20} strokeWidth={2} />, label: 'Giao dịch chưa khớp' },
+    { path: '/admin/users', icon: <Users size={20} strokeWidth={2} />, label: 'Người dùng' },
   ];
 
   return (

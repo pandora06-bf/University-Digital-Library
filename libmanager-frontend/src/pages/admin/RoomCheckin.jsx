@@ -163,7 +163,7 @@ export default function RoomCheckin() {
     },
     {
       key: 'user_code',
-      header: 'Bạn đọc',
+      header: 'Mã bạn đọc',
       width: '16%',
       render: (val) => <span className="font-mono text-sm text-slate-700">{val}</span>,
     },

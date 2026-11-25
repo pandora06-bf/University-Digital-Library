@@ -17,6 +17,8 @@ export default function LoanManagement() {
   const { toast, showToast, hideToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoLookupDone = useRef('');
+  const autoBarcodeDone = useRef('');
+  const autoBookHintDone = useRef('');
   const [returnBarcode, setReturnBarcode] = useState('');
   const [borrowUserId, setBorrowUserId] = useState('');
 
@@ -120,7 +122,7 @@ export default function LoanManagement() {
           setReturnBookScanned(false);
           setReturnSlip(null);
           setReturnHint('');
-          showToast('Không có MSSV này trong hệ thống.', 'error');
+          showToast('Không có mã bạn đọc này trong hệ thống.', 'error');
           return;
         }
         if (!active.length) {
@@ -150,7 +152,7 @@ export default function LoanManagement() {
         setReturnBookScanned(false);
         setReturnHint('');
         showToast(
-          getApiErrorMessage(error, 'Không có MSSV này trong hệ thống.'),
+          getApiErrorMessage(error, 'Không có mã bạn đọc này trong hệ thống.'),
           'error'
         );
       } finally {
@@ -166,7 +168,7 @@ export default function LoanManagement() {
     const fromArg = typeof presetMssv === 'string' ? presetMssv : '';
     const mssv = (fromArg || borrowUserId).trim();
     if (!mssv) {
-      showToast('Nhập MSSV rồi bấm Tra cứu (không để trống).', 'warning');
+      showToast('Nhập mã bạn đọc rồi bấm Tra cứu (không để trống).', 'warning');
       return;
     }
     setBorrowUserId(mssv);
@@ -178,7 +180,7 @@ export default function LoanManagement() {
       const res = await axiosInstance.get('/api/admin/loans/lookup', { params: { q: mssv } });
       const reader = res.data?.reader;
       if (!reader?.user_code) {
-        showToast('Không có MSSV này trong hệ thống. Chỉ tra được mã bạn đọc đã có.', 'error');
+        showToast('Không có mã bạn đọc này trong hệ thống. Chỉ tra được mã đã có (SV/GV).', 'error');
         return;
       }
       const loans = (res.data?.data || []).filter(
@@ -217,6 +219,34 @@ export default function LoanManagement() {
     next.delete('mssv');
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query mssv đổi
+  }, [searchParams]);
+
+  // Từ Tồn kho: /admin/loans?barcode=DEMO-BC-006-02 → tự mở phiếu đang mượn (cột Nhận trả)
+  useEffect(() => {
+    const barcode = (searchParams.get('barcode') || '').trim();
+    if (!barcode || autoBarcodeDone.current === barcode) return;
+    autoBarcodeDone.current = barcode;
+    loadReturnSlip(barcode);
+    const next = new URLSearchParams(searchParams);
+    next.delete('barcode');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query barcode đổi
+  }, [searchParams]);
+
+  // Từ Tồn kho khi chưa có bản đang mượn: /admin/loans?book_id=211
+  useEffect(() => {
+    const bookId = (searchParams.get('book_id') || '').trim();
+    const barcode = (searchParams.get('barcode') || '').trim();
+    if (!bookId || barcode || autoBookHintDone.current === bookId) return;
+    autoBookHintDone.current = bookId;
+    showToast(
+      `Đầu sách #${bookId}: chưa có bản đang mượn. Quầy thao tác theo mã vạch bản sao.`,
+      'warning'
+    );
+    const next = new URLSearchParams(searchParams);
+    next.delete('book_id');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query book_id đổi
   }, [searchParams]);
 
   const copyStatusVi = {
@@ -337,7 +367,7 @@ export default function LoanManagement() {
       return;
     }
     if (!mssv || borrowBooks.length === 0) {
-      showToast('Cần MSSV và ít nhất một mã vạch bản Sẵn sàng.', 'warning');
+      showToast('Cần mã bạn đọc và ít nhất một mã vạch bản Sẵn sàng.', 'warning');
       return;
     }
     setIsConfirming(true);
@@ -386,7 +416,7 @@ export default function LoanManagement() {
           Quản lý Mượn / Trả Sách
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl">
-          Nhận trả: quét mã vạch trên sách đang mượn.<br />Xuất mượn: tra MSSV rồi quét bản sẵn sàng, gồm phiếu đã đặt hoặc mượn thẳng tại quầy.
+          Nhận trả: quét mã vạch trên sách đang mượn.<br />Xuất mượn: tra mã bạn đọc (SV/GV) rồi quét bản sẵn sàng, gồm phiếu đã đặt hoặc mượn thẳng tại quầy.
         </p>
       </header>
 
@@ -410,7 +440,7 @@ export default function LoanManagement() {
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 sm:gap-5">
             <FastBarcodeScanner
               label="Quét mã vạch sách trả"
-              placeholder="Quét mã vạch đang mượn - Enter"
+              placeholder="Quét mã vạch - Enter"
               value={returnBarcode}
               onChange={(e) => {
                 const next = e.target.value;
@@ -430,7 +460,7 @@ export default function LoanManagement() {
               autoFocus
               autoClear={false}
               autoRefocus
-              helperText="Quét mã vạch trên sách, hoặc nhập MSSV để lấy cuốn đang mượn."
+              helperText="Quét mã vạch trên sách, hoặc nhập mã bạn đọc để lấy cuốn đang mượn."
             />
 
             {returnBookScanned ? (
@@ -469,7 +499,7 @@ export default function LoanManagement() {
                   {returnHint || 'Chưa có mã trả'}
                 </p>
                 {!returnHint && (
-                  <p className="text-xs text-slate-400 mt-1">Quét mã vạch hoặc nhập MSSV để hiện thẻ xác nhận.</p>
+                  <p className="text-xs text-slate-400 mt-1">Quét mã vạch hoặc nhập mã bạn đọc để hiện thẻ xác nhận.</p>
                 )}
               </div>
             )}
@@ -557,7 +587,7 @@ export default function LoanManagement() {
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tra MSSV → quét mã vạch sẵn sàng → xuất mượn
+                Tra mã bạn đọc → quét mã vạch sẵn sàng → xuất mượn
               </p>
             </div>
           </div>
@@ -565,13 +595,13 @@ export default function LoanManagement() {
           <div className="p-4 sm:p-5 flex-1 flex flex-col gap-4 sm:gap-5">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                MSSV / mã bạn đọc
+                Mã bạn đọc
               </label>
               <div className="flex items-stretch gap-2 min-w-0">
                 <div className="relative min-w-0 flex-1">
                   <Input
                     type="text"
-                    placeholder="Nhập mã bạn đọc / MSSV - Enter"
+                    placeholder="Nhập mã bạn đọc - Enter"
                     leftIcon={<User className="w-5 h-5" />}
                     className="!h-11 font-mono text-sm"
                     value={borrowUserId}
@@ -612,7 +642,7 @@ export default function LoanManagement() {
                 </div>
                 <p className="text-sm font-semibold text-slate-700">Chưa tra cứu bạn đọc</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-[16rem] leading-relaxed">
-                  Nhập MSSV rồi bấm Tra cứu (không để trống). Sau đó mới quét sách vào phiếu.
+                  Nhập mã bạn đọc rồi bấm Tra cứu (không để trống). Sau đó mới quét sách vào phiếu.
                 </p>
               </div>
             ) : (
@@ -779,7 +809,7 @@ export default function LoanManagement() {
               {returnSlip?.overdue ? ' · Quá hạn' : ''}
             </h4>
             <div className="text-xs text-slate-500 space-y-1 font-medium">
-              <p>MSSV: <span className="text-slate-700 font-mono">{returnSlip?.user_code || '—'}</span></p>
+              <p>Mã bạn đọc: <span className="text-slate-700 font-mono">{returnSlip?.user_code || '—'}</span></p>
               <p>Sách: <span className="text-slate-700">{returnSlip?.book_title || '—'}</span></p>
               <p>Mã vạch: <span className="text-slate-700 font-mono">{returnSlip?.copy_barcode || returnBarcode}</span></p>
               <p>Hạn trả: <span className={returnSlip?.overdue ? 'text-rose-700 font-semibold' : 'text-slate-700'}>{formatLoanDate(returnSlip?.due_date)}</span></p>
@@ -864,7 +894,7 @@ export default function LoanManagement() {
             {(borrowUserId || 'U').slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-800">MSSV / mã độc giả</p>
+            <p className="text-sm font-bold text-slate-800">Mã bạn đọc</p>
             <p className="text-xs font-mono text-slate-500">{borrowUserId}</p>
           </div>
         </div>

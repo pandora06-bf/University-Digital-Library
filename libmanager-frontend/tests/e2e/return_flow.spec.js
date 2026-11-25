@@ -91,7 +91,7 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
     await expect(page.getByRole('heading', { name: /Quản lý Mượn \/ Trả Sách/i })).toBeVisible({ timeout: 5000 });
 
     // 2. Nhập mã vạch sách trả tại quầy
-    const barcodeInput = page.getByPlaceholder(/Quét mã vạch đang mượn/i);
+    const barcodeInput = page.getByPlaceholder(/Quét mã vạch/i);
     await expect(barcodeInput).toBeVisible();
     await barcodeInput.fill('DEMO-BC-001-01');
     await barcodeInput.press('Enter');

@@ -125,13 +125,10 @@ export default function InventoryManagement() {
   // Đang mượn / đã ngừng: không đổi status tay trên form sửa.
   const isStatusLocked = (status) => isLiquidatedStatus(status) || status === 'BORROWED';
 
-  // Ưu tiên status lưu thông: ghi chú [Thanh lý]/mất không được đè thành "Hư hỏng".
-  const mapConditionLabel = (status, damageNotes) => {
-    if (status === 'LOST') return 'Báo mất';
-    if (status === 'RETIRED') return 'Đã thanh lý';
-    if (status === 'DAMAGED') return 'Hư hỏng';
-    if (damageNotes) return 'Hư hỏng';
-    return 'Nguyên vẹn';
+  // SRS UC09: tình trạng vật lý = damage_notes (ghi chú); không mirror status lưu thông.
+  const mapConditionLabel = (damageNotes) => {
+    const note = typeof damageNotes === 'string' ? damageNotes.trim() : '';
+    return note || 'Nguyên vẹn';
   };
 
   const mapCopyRow = (c, targetBook) => ({
@@ -140,7 +137,7 @@ export default function InventoryManagement() {
     location: `${c.zone} - ${c.floor} - ${c.shelf}`,
     status: mapCopyStatusLabel(c.status),
     statusType: mapCopyStatusType(c.status),
-    condition: mapConditionLabel(c.status, c.damage_notes),
+    condition: mapConditionLabel(c.damage_notes),
     title: targetBook?.title || '...',
     author: targetBook?.author || '',
     rawZone: c.zone,
@@ -551,10 +548,42 @@ export default function InventoryManagement() {
     }
   };
 
-  // Tạo danh sách vị trí duy nhất từ dữ liệu thực tế đã tải về
+  // Tạo danh sách vị trí / trạng thái duy nhất từ dữ liệu thật (không hiện option dư)
   const availableLocations = Array.from(
     new Set(tableData.map(item => item.location).filter(Boolean))
   ).sort();
+
+  const STATUS_FILTER_META = [
+    { value: 'AVAILABLE', label: 'Sẵn sàng' },
+    { value: 'BORROWED', label: 'Đang cho mượn' },
+    { value: 'DAMAGED', label: 'Hư hỏng' },
+    { value: 'LOST', label: 'Báo mất' },
+    { value: 'RETIRED', label: 'Đã thanh lý' },
+  ];
+  const presentRawStatuses = new Set(
+    tableData.map((item) => item.rawStatus).filter(Boolean)
+  );
+  const availableStatusFilters = STATUS_FILTER_META.filter((opt) =>
+    presentRawStatuses.has(opt.value)
+  );
+  // Nhóm "Đã loại / Bảo quản" (mất/hỏng/thanh lý) — chỉ hiện option khi thật sự có bản
+  const hasIssueCopies = ['DAMAGED', 'LOST', 'RETIRED'].some((s) => presentRawStatuses.has(s));
+
+  useEffect(() => {
+    if (statusFilter === 'ALL') return;
+    const statuses = new Set(tableData.map((item) => item.rawStatus).filter(Boolean));
+    let next = null;
+    if (statusFilter === 'ISSUE') {
+      const stillHasIssue = ['DAMAGED', 'LOST', 'RETIRED'].some((s) => statuses.has(s));
+      if (!stillHasIssue) next = 'ALL';
+    } else if (!statuses.has(statusFilter)) {
+      next = 'ALL';
+    }
+    if (!next) return undefined;
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    const timer = window.setTimeout(() => setStatusFilter(next), 0);
+    return () => window.clearTimeout(timer);
+  }, [statusFilter, tableData]);
 
   // Filter Data
   const filteredData = tableData.filter(item => {
@@ -611,14 +640,20 @@ export default function InventoryManagement() {
     },
     {
       key: 'condition',
-      header: 'Tình Trạng',
+      header: 'Tình trạng',
+      headerTitle: 'Tình trạng vật lý (ghi chú damage_notes)',
       render: (val, row) => {
-        const label = val || mapConditionLabel(row.rawStatus, row.rawCondition);
-        const isIssue = ['Hư hỏng', 'Báo mất', 'Đã thanh lý'].includes(label);
+        const label = val || mapConditionLabel(row.rawCondition);
+        const isPristine = label === 'Nguyên vẹn';
         return (
-          <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border whitespace-nowrap ${
-            isIssue ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-slate-50 text-slate-700 border-slate-200'
-          }`}>
+          <span
+            className={`inline-flex max-w-[11rem] items-center px-2.5 py-1 rounded-md text-xs font-semibold border leading-snug break-words whitespace-normal text-left ${
+              isPristine
+                ? 'bg-slate-50 text-slate-700 border-slate-200'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}
+            title={label}
+          >
             {label}
           </span>
         );
@@ -626,7 +661,8 @@ export default function InventoryManagement() {
     },
     {
       key: 'status',
-      header: 'Trạng Thái',
+      header: 'Trạng thái',
+      headerTitle: 'Trạng thái lưu thông (AVAILABLE / BORROWED / …)',
       render: (val, row) => {
         let colors = '';
         if (row.statusType === 'success') colors = 'bg-emerald-50 text-emerald-600 border-emerald-200';
@@ -635,7 +671,9 @@ export default function InventoryManagement() {
         else if (row.statusType === 'retired') colors = 'bg-slate-100 text-slate-600 border-slate-300';
         
         let navAction = null;
-        if (val === 'Đang mượn' || val === 'Đang cho mượn') navAction = () => navigate('/admin/loans');
+        if (val === 'Đang mượn' || val === 'Đang cho mượn') {
+          navAction = () => navigate(`/admin/loans?barcode=${encodeURIComponent(row.barcode || '')}`);
+        }
         if (val === 'Báo mất') navAction = () => navigate('/admin/incidents');
         
         return (
@@ -688,7 +726,7 @@ export default function InventoryManagement() {
               onClick={() => {
                 if (row.rawStatus !== 'AVAILABLE') {
                   showToast(
-                    'Chỉ xóa cứng bản Sẵn sàng (chưa từng lưu thông). Bản đã mượn/mất/hỏng hãy dùng Thanh lý.',
+                    'Chỉ xóa bản Sẵn sàng (chưa từng lưu thông). Bản đã mượn/mất/hỏng hãy dùng Thanh lý.',
                     'warning'
                   );
                   return;
@@ -702,8 +740,8 @@ export default function InventoryManagement() {
               }`}
               title={
                 row.rawStatus === 'AVAILABLE'
-                  ? 'Xóa cứng bản sao (chỉ khi chưa từng mượn)'
-                  : 'Không xóa cứng — dùng Thanh lý để ngừng lưu thông'
+                  ? 'Xóa bản sao'
+                  : 'Không xóa được — dùng Thanh lý để ngừng lưu thông'
               }
             >
               <Trash2 className="w-4 h-4" />
@@ -857,7 +895,16 @@ export default function InventoryManagement() {
               <Button
                 variant="outline"
                 icon={<Filter className="w-4 h-4" />}
-                onClick={() => navigate('/admin/loans')}
+                onClick={() => {
+                  const borrowed = tableData.find((c) => c.rawStatus === 'BORROWED');
+                  if (borrowed?.barcode) {
+                    navigate(`/admin/loans?barcode=${encodeURIComponent(borrowed.barcode)}`);
+                    return;
+                  }
+                  // Không có bản đang mượn → vẫn vào quầy, kèm book_id để FE gợi ý
+                  const id = bookInfo?.id || bookId;
+                  navigate(id ? `/admin/loans?book_id=${encodeURIComponent(id)}` : '/admin/loans');
+                }}
               >
                 Xem Phiếu Mượn
               </Button>
@@ -937,11 +984,11 @@ export default function InventoryManagement() {
           <div className="absolute top-4 right-4">
             <AlertOctagon className="w-6 h-6 text-rose-500 opacity-20" />
           </div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cần xử lý & Bảo quản</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Đã loại / Bảo quản</p>
           <h3 className="text-3xl font-extrabold text-rose-600 leading-none">
             {brokenCopies} <span className="text-sm font-medium text-rose-400">cuốn</span>
           </h3>
-          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc hư hỏng, thanh lý, mất · {brokenPercent}%</p>
+          <p className="mt-3 text-[11px] font-medium text-rose-600">Bấm để lọc mất, hỏng, đã thanh lý · {brokenPercent}%</p>
         </button>
       </div>
 
@@ -983,27 +1030,29 @@ export default function InventoryManagement() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <select
+              aria-label="Lọc theo vị trí kệ"
               className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={locationFilter}
               onChange={(e) => setLocationFilter(e.target.value)}
             >
-              <option value="ALL">Vị trí kho / Tầng (Tất cả)</option>
+              <option value="ALL">Vị trí kệ (khu/tầng/dãy)</option>
               {availableLocations.map((loc) => (
                 <option key={loc} value={loc}>{loc}</option>
               ))}
             </select>
             <select
+              aria-label="Lọc theo trạng thái lưu thông"
               className="h-10 w-full min-w-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option value="ALL">Tất cả</option>
-              <option value="AVAILABLE">Sẵn sàng</option>
-              <option value="BORROWED">Đang cho mượn</option>
-              <option value="ISSUE">Cần xử lý</option>
-              <option value="RETIRED">Đã thanh lý</option>
-              <option value="DAMAGED">Hư hỏng</option>
-              <option value="LOST">Báo mất</option>
+              <option value="ALL">Trạng thái lưu thông (tất cả)</option>
+              {availableStatusFilters.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+              {hasIssueCopies && (
+                <option value="ISSUE">Đã loại / Bảo quản</option>
+              )}
             </select>
           </div>
         </div>
@@ -1050,62 +1099,71 @@ export default function InventoryManagement() {
             <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên đầu sách</label>
             <Input value={bookInfo?.title || ''} disabled className="w-full bg-slate-50 text-slate-500" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ <span className="text-rose-500">*</span></label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                 <div>
-                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
-                   <Input 
-                     placeholder="VD: Khu A" 
-                     className="text-sm" 
-                     value={addForm.zone} 
-                     error={addFormErrors.zone}
-                     onChange={e => {
-                       setAddForm({...addForm, zone: e.target.value});
-                       if (addFormErrors.zone) setAddFormErrors(prev => ({...prev, zone: ''}));
-                     }} 
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
-                   <Input 
-                     placeholder="VD: Tầng 1" 
-                     className="text-sm" 
-                     value={addForm.floor} 
-                     error={addFormErrors.floor}
-                     onChange={e => {
-                       setAddForm({...addForm, floor: e.target.value});
-                       if (addFormErrors.floor) setAddFormErrors(prev => ({...prev, floor: ''}));
-                     }} 
-                   />
-                 </div>
-                 <div>
-                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
-                   <Input 
-                     placeholder="VD: Dãy 1 / Kệ 1" 
-                     className="text-sm" 
-                     value={addForm.shelf} 
-                     error={addFormErrors.shelf}
-                     onChange={e => {
-                       setAddForm({...addForm, shelf: e.target.value});
-                       if (addFormErrors.shelf) setAddFormErrors(prev => ({...prev, shelf: ''}));
-                     }} 
-                   />
-                 </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase leading-snug mb-1.5">
+              Vị trí kệ <span className="text-rose-500">*</span>
+            </label>
+            <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3">
+              <div className="min-w-0">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
+                <Input
+                  placeholder="VD: Khu A"
+                  className="text-sm"
+                  value={addForm.zone}
+                  error={addFormErrors.zone}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, zone: e.target.value });
+                    if (addFormErrors.zone) setAddFormErrors((prev) => ({ ...prev, zone: '' }));
+                  }}
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
+                <Input
+                  placeholder="VD: Tầng 1"
+                  className="text-sm"
+                  value={addForm.floor}
+                  error={addFormErrors.floor}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, floor: e.target.value });
+                    if (addFormErrors.floor) setAddFormErrors((prev) => ({ ...prev, floor: '' }));
+                  }}
+                />
+              </div>
+              <div className="min-w-0">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
+                <Input
+                  placeholder="VD: Dãy 1 / Kệ 1"
+                  className="text-sm"
+                  value={addForm.shelf}
+                  error={addFormErrors.shelf}
+                  onChange={(e) => {
+                    setAddForm({ ...addForm, shelf: e.target.value });
+                    if (addFormErrors.shelf) setAddFormErrors((prev) => ({ ...prev, shelf: '' }));
+                  }}
+                />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tình trạng vật lý</label>
-              <Input placeholder="Nguyên vẹn, Rách bìa..." className="w-full text-sm" value={addForm.condition} onChange={e => setAddForm({...addForm, condition: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-              <Input defaultValue="Sẵn sàng" disabled className="w-full bg-slate-50 text-slate-500" />
-              <p className="mt-1.5 text-[11px] text-slate-500">
-                Bản sao mới luôn vào kho ở trạng thái Sẵn sàng. Mượn / mất / hỏng do nghiệp vụ quầy, không chọn tay.
-              </p>
-            </div>
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs font-bold text-slate-700 uppercase leading-snug mb-1.5">
+              Tình trạng vật lý
+            </label>
+            <Input
+              placeholder="Nguyên vẹn, Rách bìa..."
+              className="w-full text-sm"
+              value={addForm.condition}
+              onChange={(e) => setAddForm({ ...addForm, condition: e.target.value })}
+            />
+          </div>
+          <div className="min-w-0">
+            <label className="block text-xs font-bold text-slate-700 uppercase leading-snug mb-1.5">
+              Trạng thái lưu thông
+            </label>
+            <Input defaultValue="Sẵn sàng" disabled className="w-full bg-slate-50 text-slate-500" />
+            <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+              Bản sao mới luôn vào kho ở trạng thái Sẵn sàng. Mượn / mất / hỏng do nghiệp vụ quầy, không chọn tay.
+            </p>
           </div>
         </div>
       </Modal>
@@ -1134,96 +1192,108 @@ export default function InventoryManagement() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tên đầu sách</label>
               <Input defaultValue={editingRow.title} disabled className="w-full bg-slate-50 text-slate-500" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Vị trí kệ <span className="text-rose-500">*</span></label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                   <div>
-                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
-                     <Input 
-                       placeholder="VD: Khu A" 
-                       className="text-sm" 
-                       value={editForm.zone} 
-                       error={editFormErrors.zone}
-                       onChange={e => {
-                         setEditForm({...editForm, zone: e.target.value});
-                         if (editFormErrors.zone) setEditFormErrors(prev => ({...prev, zone: ''}));
-                       }} 
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
-                     <Input 
-                       placeholder="VD: Tầng 1" 
-                       className="text-sm" 
-                       value={editForm.floor} 
-                       error={editFormErrors.floor}
-                       onChange={e => {
-                         setEditForm({...editForm, floor: e.target.value});
-                         if (editFormErrors.floor) setEditFormErrors(prev => ({...prev, floor: ''}));
-                       }} 
-                     />
-                   </div>
-                   <div>
-                     <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
-                     <Input 
-                       placeholder="VD: Dãy 1 / Kệ 1" 
-                       className="text-sm" 
-                       value={editForm.shelf} 
-                       error={editFormErrors.shelf}
-                       onChange={e => {
-                         setEditForm({...editForm, shelf: e.target.value});
-                         if (editFormErrors.shelf) setEditFormErrors(prev => ({...prev, shelf: ''}));
-                       }} 
-                     />
-                   </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                Vị trí kệ <span className="text-rose-500">*</span>
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Khu</label>
+                  <Input
+                    placeholder="VD: Khu A"
+                    className="text-sm"
+                    value={editForm.zone}
+                    error={editFormErrors.zone}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, zone: e.target.value });
+                      if (editFormErrors.zone) setEditFormErrors((prev) => ({ ...prev, zone: '' }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tầng</label>
+                  <Input
+                    placeholder="VD: Tầng 1"
+                    className="text-sm"
+                    value={editForm.floor}
+                    error={editFormErrors.floor}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, floor: e.target.value });
+                      if (editFormErrors.floor) setEditFormErrors((prev) => ({ ...prev, floor: '' }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dãy</label>
+                  <Input
+                    placeholder="VD: Dãy 1 / Kệ 1"
+                    className="text-sm"
+                    value={editForm.shelf}
+                    error={editFormErrors.shelf}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, shelf: e.target.value });
+                      if (editFormErrors.shelf) setEditFormErrors((prev) => ({ ...prev, shelf: '' }));
+                    }}
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Tình trạng vật lý</label>
-                <Input placeholder="Ghi chú hỏng hóc..." className="w-full text-sm" value={editForm.condition} onChange={e => setEditForm({...editForm, condition: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Trạng thái lưu thông</label>
-                {isStatusLocked(editingRow.rawStatus) ? (
-                  <>
-                    <Input
-                      defaultValue={mapCopyStatusLabel(editingRow.rawStatus)}
-                      disabled
-                      className="w-full bg-slate-50 text-slate-500"
-                    />
-                    <p className="mt-1.5 text-[11px] text-slate-500">
-                      {editingRow.rawStatus === 'BORROWED'
-                        ? 'Bản đang cho mượn — trạng thái do quầy trả/sự cố cập nhật, không sửa tay.'
-                        : 'Bản đã ngừng lưu thông (mất / hỏng / thanh lý). Không đưa lại Sẵn sàng.'}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <select
-                      className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
-                      value={editForm.status}
-                      onChange={e => setEditForm({...editForm, status: e.target.value})}
-                    >
-                      <option value="AVAILABLE">Sẵn sàng</option>
-                      <option value="RETIRED">Đã thanh lý</option>
-                    </select>
-                    <p className="mt-1.5 text-[11px] text-slate-500">
-                      Mất / hỏng khi đang mượn lập ở quầy Sự cố hoặc Trả sách. Tại đây chỉ giữ Sẵn sàng hoặc Thanh lý kho.
-                    </p>
-                  </>
-                )}
-              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase leading-snug mb-1.5">
+                Tình trạng vật lý
+              </label>
+              <Input
+                placeholder="Ghi chú hỏng hóc..."
+                className="w-full text-sm"
+                value={editForm.condition}
+                onChange={(e) => setEditForm({ ...editForm, condition: e.target.value })}
+              />
+              <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+                Ghi chú vật lý (rách bìa, ướt…) — không đổi quyền cho mượn.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase leading-snug mb-1.5">
+                Trạng thái lưu thông
+              </label>
+              {isStatusLocked(editingRow.rawStatus) ? (
+                <>
+                  <Input
+                    defaultValue={mapCopyStatusLabel(editingRow.rawStatus)}
+                    disabled
+                    className="w-full bg-slate-50 text-slate-500"
+                  />
+                  <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+                    {editingRow.rawStatus === 'BORROWED'
+                      ? 'Bản đang cho mượn — trạng thái do quầy trả/sự cố cập nhật, không sửa tay.'
+                      : 'Bản đã ngừng lưu thông (mất / hỏng / thanh lý). Không đưa lại Sẵn sàng.'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <select
+                    className="w-full h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm"
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  >
+                    <option value="AVAILABLE">Sẵn sàng</option>
+                    <option value="RETIRED">Đã thanh lý</option>
+                  </select>
+                  <p className="mt-1.5 text-[11px] leading-snug text-slate-500">
+                    Chỉ Sẵn sàng hoặc Thanh lý kho. Mất/hỏng khi đang mượn → quầy Sự cố / Trả sách.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Modal Xác nhận Xóa */}
+      {/* Modal Xác nhận Xóa bản sao */}
       <Modal
         isOpen={!!deletingRow}
         onClose={() => setDeletingRow(null)}
-        title="Xóa cứng bản sao"
+        title="Xóa bản sao"
         footer={
           <>
             <Button variant="outline" onClick={() => setDeletingRow(null)}>Hủy bỏ</Button>
@@ -1232,7 +1302,7 @@ export default function InventoryManagement() {
               className="!bg-rose-600 hover:!bg-rose-700 !border-rose-600"
               onClick={handleConfirmDelete}
             >
-              Xác nhận xóa cứng
+              Xóa bản sao
             </Button>
           </>
         }
@@ -1242,20 +1312,12 @@ export default function InventoryManagement() {
             <Trash2 className="w-6 h-6 text-rose-600" />
           </div>
           <div className="flex-1">
-            <h3 className="text-sm font-bold text-slate-800">Xóa hẳn bản sao khỏi kho?</h3>
+            <h3 className="text-sm font-bold text-slate-800">Xóa bản sao này?</h3>
             <div className="mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
               <p className="font-bold text-slate-800 text-sm">{deletingRow?.title}</p>
               <p className="text-xs font-mono text-slate-500">Mã vạch: {deletingRow?.barcode}</p>
               <p className="text-xs text-slate-500">Vị trí: {deletingRow?.location}</p>
             </div>
-            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-              Khác <strong>Thanh lý</strong> (giữ barcode, đánh dấu ngừng lưu thông): xóa cứng chỉ dành cho bản
-              <strong> Sẵn sàng</strong> chưa từng có lịch sử mượn. BE sẽ từ chối nếu bản đã từng mượn.
-            </p>
-            <p className="text-xs font-medium text-rose-600 mt-2 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-600 shrink-0"></span>
-              Không hoàn tác sau khi xác nhận.
-            </p>
           </div>
         </div>
       </Modal>

@@ -427,6 +427,7 @@ export default function EbookManagement() {
       key: 'status',
       header: 'Trạng Thái',
       width: '16%',
+      noClip: true,
       render: (val) => (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
           val === 'Sẵn sàng'
@@ -442,6 +443,7 @@ export default function EbookManagement() {
       key: 'actions',
       header: 'Thao Tác',
       width: '14%',
+      noClip: true,
       align: 'right',
       render: (_val, row) => (
         <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import axiosInstance from '../../services/axios_instance';
 import { 
   Plus, Search, BookType, LayoutGrid, Edit2, Trash2,
-  Circle, LayoutList, BookCopy, Upload, Library
+  Circle, LayoutList, BookCopy, Upload, Library, Eye, FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/Button';
@@ -34,7 +34,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   {
     key: 'cover',
     header: 'Bìa',
-    width: '7%',
+    width: '5%',
     align: 'center',
     render: (value, row) => {
       const coverSrc = resolveMediaUrl(value || row.cover || row.cover_image_path);
@@ -79,7 +79,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
       const realBarcode = row.copy_barcode || (row.barcode && !String(row.barcode).startsWith('BC-') ? row.barcode : null);
 
       return (
-        <div className="min-w-0 max-w-sm">
+        <div className="min-w-0">
           <div className="flex items-center gap-1.5 min-w-0 mb-1">
             <button
               type="button"
@@ -101,7 +101,7 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
               </span>
             ) : (
               <span className="shrink-0 text-slate-500 font-sans font-medium bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
-                Chưa có giá bìa
+                Chưa có giá
               </span>
             )}
           </div>
@@ -111,24 +111,29 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   },
   {
     key: 'author',
-    header: 'Tác Giả & Nhà Xuất Bản',
-    width: '15%',
+    header: 'Tác giả / NXB',
+    headerTitle: 'Tác giả & Nhà xuất bản',
+    width: '14%',
     render: (value, row) => (
-      <div className="min-w-[150px]">
-        <span className="font-bold text-slate-700 block truncate">{row.author}</span>
-        <span className="text-[11px] text-slate-500 block mt-1 truncate">{row.publisher}</span>
+      <div className="min-w-0">
+        <span className="font-bold text-slate-700 block truncate" title={row.author}>{row.author}</span>
+        <span className="text-[11px] text-slate-500 block mt-1 truncate" title={row.publisher}>{row.publisher}</span>
       </div>
     )
   },
   {
     key: 'category',
-    header: 'Thể Loại',
-    width: '12%',
+    header: 'Thể loại',
+    width: '14%',
+    noClip: true,
     render: (value, row) => {
-      const cat = categories.find(c => c.id === row.category_id);
-      const catName = cat ? cat.category_name : (row.category || 'Chưa phân loại');
+      const cat = categories.find((c) => Number(c.id) === Number(row.category_id));
+      const catName = cat?.category_name || row.category || 'Chưa phân loại';
       return (
-        <span className="inline-flex items-center max-w-[140px] px-2 py-1 rounded text-[10px] font-bold leading-tight bg-blue-50 text-blue-600 truncate" title={catName}>
+        <span
+          className="inline-flex max-w-full px-2 py-1 rounded text-[10px] font-bold leading-snug bg-blue-50 text-blue-600 break-words whitespace-normal text-left"
+          title={catName}
+        >
           {catName}
         </span>
       );
@@ -136,8 +141,9 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   },
   {
     key: 'year',
-    header: 'Năm Xuất Bản',
-    width: '8%',
+    header: 'Năm',
+    headerTitle: 'Năm xuất bản',
+    width: '6%',
     align: 'center',
     render: (value, row) => (
       <span className="font-mono text-slate-600">{row.year || row.publication_year}</span>
@@ -145,26 +151,27 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   },
   {
     key: 'copies',
-    header: 'Số Bản Sao (Sẵn Sàng)',
-    width: '13%',
+    header: 'Bản sao',
+    headerTitle: 'Số bản sao sẵn sàng / tổng',
+    width: '12%',
     render: (value, row) => {
       const totalCopies = row.copies ?? (row.available_stock || 0);
       const availableCopies = row.available ?? (row.available_stock || 0);
       const percent = totalCopies > 0 ? Math.round((availableCopies / totalCopies) * 100) : 0;
 
       return (
-        <div className="min-w-[140px] group cursor-pointer" onClick={() => navigate(`/admin/books/${row.id}`)} title="Xem chi tiết tồn kho và bản sao">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="font-bold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors">
-              {availableCopies} / {totalCopies} <span className="font-normal text-slate-500">cuốn</span>
+        <div className="min-w-0 group cursor-pointer" onClick={() => navigate(`/admin/books/${row.id}`)} title="Xem chi tiết tồn kho và bản sao">
+          <div className="flex items-center justify-between gap-1 mb-1.5">
+            <span className="font-bold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors whitespace-nowrap">
+              {availableCopies}/{totalCopies}
             </span>
             <span className="text-[10px] font-bold text-indigo-600 group-hover:text-indigo-700 transition-colors">
               {percent}%
             </span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-            <div 
-              className={`h-1.5 rounded-full transition-colors ${availableCopies === 0 ? 'bg-rose-500 group-hover:bg-rose-600' : 'bg-indigo-500 group-hover:bg-indigo-600'}`} 
+            <div
+              className={`h-1.5 rounded-full transition-colors ${availableCopies === 0 ? 'bg-rose-500 group-hover:bg-rose-600' : 'bg-indigo-500 group-hover:bg-indigo-600'}`}
               style={{ width: `${percent}%` }}
             ></div>
           </div>
@@ -174,21 +181,21 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   },
   {
     key: 'status',
-    header: 'Trạng Thái',
-    width: '12%',
+    header: 'Trạng thái',
+    width: '10%',
     render: (value, row) => {
       if (row.status === 'Hết bản hiện' || row.status === 'Hết bản in') {
         return (
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 whitespace-nowrap">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 whitespace-nowrap">
             {row.status}
           </span>
         );
       }
       return (
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">
           <Circle className={`w-1.5 h-1.5 fill-current ${
-            row.statusColor === 'indigo' ? 'text-indigo-600' : 
-            row.statusColor === 'emerald' ? 'text-emerald-500' : 
+            row.statusColor === 'indigo' ? 'text-indigo-600' :
+            row.statusColor === 'emerald' ? 'text-emerald-500' :
             'text-blue-500'
           }`} />
           {row.status}
@@ -198,27 +205,28 @@ const getCatalogColumns = (onEdit, onDelete, navigate, categories = []) => [
   },
   {
     key: 'actions',
-    header: 'Thao Tác',
-    width: '15%',
+    header: 'Thao tác',
+    width: '14%',
     align: 'right',
+    noClip: true,
     render: (value, row) => (
       <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
         <AdminIconButton
-          title="Xem chi tiết tồn kho"
+          title="Tồn kho"
           onClick={() => navigate(`/admin/books/${row.id}`)}
           className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
         >
           <BookCopy className="w-4 h-4" />
         </AdminIconButton>
         <AdminIconButton
-          title="Chỉnh sửa"
+          title="Sửa"
           onClick={() => onEdit(row)}
           className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
         >
           <Edit2 className="w-4 h-4" />
         </AdminIconButton>
         <AdminIconButton
-          title="Vô hiệu hóa đầu sách"
+          title="Vô hiệu hóa"
           onClick={() => onDelete(row)}
           className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
         >
@@ -251,8 +259,10 @@ export default function CatalogManagement() {
   const [formErrors, setFormErrors] = useState({});
   const [coverFile, setCoverFile] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState(null);
   const [booksData, setBooksData] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [isLoadingBooks, setIsLoadingBooks] = useState(false);
 
   // 4-17.a: phân trang server + debounce tìm kiếm
@@ -372,6 +382,27 @@ export default function CatalogManagement() {
     });
   };
 
+  /** Mã học phần phải khớp bảng subjects (IT, MATH, …) — lấy từ cây catalog. */
+  const fetchSubjects = () => {
+    axiosInstance.get('/api/books/categories').then((res) => {
+      const list = Array.isArray(res.data?.subjects) ? res.data.subjects : [];
+      setSubjects(
+        list
+          .map((s) => ({
+            code: String(s.subject_code || '').trim().toUpperCase(),
+            name: s.name || s.subject_name || s.subject_code,
+          }))
+          .filter((s) => s.code)
+      );
+    }).catch((error) => {
+      setSubjects([]);
+      showToast(
+        getApiErrorMessage(error, 'Không tải được danh sách mã học phần.'),
+        'warning'
+      );
+    });
+  };
+
   /** Nạp NXB chỉ từ API search (không seed cứng). */
   const fetchPublisherOptions = useCallback(async () => {
     const pubs = new Set();
@@ -409,6 +440,7 @@ export default function CatalogManagement() {
     // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
     const timer = window.setTimeout(() => {
       fetchCategories();
+      fetchSubjects();
       fetchPublisherOptions();
     }, 0);
     return () => window.clearTimeout(timer);
@@ -448,7 +480,7 @@ export default function CatalogManagement() {
             ? 'eBook'
             : 'Vật lý',
       categoryId: book.category_id !== undefined && book.category_id !== null ? book.category_id.toString() : '',
-      courseCode: book.subject_code || book.courseCode || '',
+      courseCode: String(book.subject_code || book.courseCode || '').trim().toUpperCase(),
       description: book.description || '',
       keywords: book.keywords || '',
       price: (() => {
@@ -480,7 +512,77 @@ export default function CatalogManagement() {
     setEditingBook(null);
     setCoverFile(null);
     setPdfFile(null);
+    setCoverPreviewUrl(null);
     setFormErrors({});
+  };
+
+  // Xem trước ảnh bìa vừa chọn (blob URL)
+  useEffect(() => {
+    // Defer để tránh setState đồng bộ trong body effect (react-hooks/set-state-in-effect)
+    if (!coverFile) {
+      const timer = window.setTimeout(() => setCoverPreviewUrl(null), 0);
+      return () => window.clearTimeout(timer);
+    }
+    const url = URL.createObjectURL(coverFile);
+    const timer = window.setTimeout(() => setCoverPreviewUrl(url), 0);
+    return () => {
+      window.clearTimeout(timer);
+      URL.revokeObjectURL(url);
+    };
+  }, [coverFile]);
+
+  const existingCoverSrc = resolveMediaUrl(
+    editingBook?.cover
+      || editingBook?.cover_image_path
+      || editingBook?.cover_image_url
+  );
+  const coverDisplaySrc = coverPreviewUrl || existingCoverSrc;
+  const hasExistingPdf = Boolean(
+    editingBook?.has_ebook
+      || editingBook?.has_pdf
+      || editingBook?.ebook
+      || editingBook?.ebook?.file_path
+  );
+
+  const handlePreviewExistingPdf = async () => {
+    if (!editingBook?.id || !hasExistingPdf) {
+      showToast('Đầu sách này chưa có tệp PDF để xem trước.', 'warning');
+      return;
+    }
+    const previewTab = window.open('about:blank', '_blank');
+    if (previewTab) {
+      try {
+        previewTab.document.title = `Xem trước · ${editingBook.title || ''}`;
+        previewTab.document.body.innerHTML =
+          '<p style="font-family:sans-serif;padding:24px;color:#475569">Đang tải bản xem trước…</p>';
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      const { data } = await axiosInstance.get(`/api/ebooks/${editingBook.id}/preview`, {
+        responseType: 'blob',
+      });
+      if (data?.type && data.type.includes('json')) {
+        previewTab?.close();
+        showToast('Không tải được PDF xem trước cho đầu sách này.', 'error');
+        return;
+      }
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
+      if (previewTab && !previewTab.closed) {
+        previewTab.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.click();
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
+    } catch (error) {
+      previewTab?.close();
+      showToast(getApiErrorMessage(error, 'Không xem trước được PDF hiện tại.'), 'error');
+    }
   };
 
   const handleFieldChange = (field, value) => {
@@ -628,10 +730,13 @@ export default function CatalogManagement() {
       }
     }
 
-    // 8. subject_code — API books, max 50
-    const trimmedSubject = bookForm.courseCode?.trim() || '';
-    if (trimmedSubject.length > 50) {
-      errors.courseCode = 'Mã học phần không được vượt quá 50 ký tự';
+    // 8. subject_code — phải tồn tại trong bảng subjects (so khớp không phân biệt hoa thường)
+    const trimmedSubject = (bookForm.courseCode?.trim() || '').toUpperCase();
+    if (trimmedSubject) {
+      const knownCodes = subjects.map((s) => s.code);
+      if (knownCodes.length > 0 && !knownCodes.includes(trimmedSubject)) {
+        errors.courseCode = 'Mã học phần không hợp lệ. Vui lòng chọn trong danh sách.';
+      }
     }
 
     // Giá bìa — tùy chọn, trống = 0
@@ -884,17 +989,17 @@ export default function CatalogManagement() {
       {/* Main Content Area */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
         
-        {/* Filters Bar */}
-        <div className="p-4 border-b border-slate-100 flex flex-col 2xl:flex-row gap-4 items-start 2xl:items-center justify-between bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-col xl:flex-row xl:items-center gap-3 w-full 2xl:flex-1">
-            {/* Search + Tra cứu ngay (không chờ debounce) */}
-            <div className="w-full xl:min-w-[28rem] xl:flex-[2] flex items-stretch gap-2">
+        {/* Filters Bar — cỡ chữ/chiều cao cố định, không bị cắt trên desktop hẹp */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
+          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+            {/* Search + Tra cứu */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 lg:min-w-[18rem] lg:max-w-xl">
               <div className="min-w-0 flex-1">
                 <Input
                   type="text"
                   placeholder="Tìm tên sách, tác giả…"
                   leftIcon={<Search className="w-4 h-4" />}
-                  className="!h-10 !rounded-lg"
+                  className="!h-10 !rounded-lg !text-sm !leading-5 !py-2"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyDown={(e) => {
@@ -916,7 +1021,7 @@ export default function CatalogManagement() {
               <Button
                 type="button"
                 variant="primary"
-                className="!h-10 shrink-0 px-3"
+                className="!h-10 shrink-0 !px-3 sm:!px-4 !text-sm !leading-5 !font-semibold"
                 icon={<Search className="w-4 h-4" />}
                 onClick={() => {
                   const q = searchTerm.trim();
@@ -934,69 +1039,81 @@ export default function CatalogManagement() {
               </Button>
             </div>
 
-            <div className="flex flex-col xl:flex-row gap-3 w-full xl:w-auto xl:ml-auto">
-            <select
-              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              value={formatFilter}
-              onChange={(e) => {
-                setFormatFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">Tất cả định dạng</option>
-              <option value="PRINTED">Vật lý</option>
-              <option value="EBOOK">eBook</option>
-              <option value="BOTH">Cả hai</option>
-            </select>
-            
-            {/* Category Dropdown */}
-            <select 
-              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="">Tất cả thể loại</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id.toString()}>{c.category_name}</option>
-              ))}
-            </select>
+            {/* Filters */}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 min-w-0 flex-1 lg:max-w-3xl">
+              <select
+                aria-label="Lọc định dạng"
+                title={formatFilter || 'Tất cả định dạng'}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                value={formatFilter}
+                onChange={(e) => {
+                  setFormatFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Tất cả định dạng</option>
+                <option value="PRINTED">Vật lý</option>
+                <option value="EBOOK">eBook</option>
+                <option value="BOTH">Cả hai</option>
+              </select>
 
-            {/* Publisher Dropdown */}
-            <select 
-              className="w-full xl:w-[14.5rem] xl:shrink-0 h-10 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              value={publisherFilter}
-              onChange={(e) => {
-                setPublisherFilter(e.target.value);
-                setPage(1);
-              }}
-            >
-              <option value="Tất cả nhà xuất bản">Tất cả nhà xuất bản</option>
-              {publisherOptions.map((pub) => (
-                <option key={pub} value={pub}>{pub}</option>
-              ))}
-            </select>
+              <select
+                aria-label="Lọc thể loại"
+                title={
+                  categoryFilter
+                    ? (categories.find((c) => String(c.id) === String(categoryFilter))?.category_name || 'Thể loại')
+                    : 'Tất cả thể loại'
+                }
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Tất cả thể loại</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id.toString()}>{c.category_name}</option>
+                ))}
+              </select>
+
+              <select
+                aria-label="Lọc nhà xuất bản"
+                title={publisherFilter}
+                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                value={publisherFilter}
+                onChange={(e) => {
+                  setPublisherFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="Tất cả nhà xuất bản">Tất cả nhà xuất bản</option>
+                {publisherOptions.map((pub) => (
+                  <option key={pub} value={pub}>{pub}</option>
+                ))}
+              </select>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3 justify-end w-full 2xl:w-auto shrink-0 border-t 2xl:border-0 border-slate-200 pt-3 2xl:pt-0">
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-              <Button 
-                variant="ghost" size="sm"
-                onClick={() => setViewMode('list')}
-                className={`!h-7 !w-7 !p-0 !rounded-md ${viewMode === 'list' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
-              >
-                <LayoutList className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="ghost" size="sm"
-                onClick={() => setViewMode('grid')}
-                className={`!h-7 !w-7 !p-0 !rounded-md ${viewMode === 'grid' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </Button>
+
+            {/* View mode */}
+            <div className="flex shrink-0 items-center justify-end lg:ml-auto">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'list' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
+                >
+                  <LayoutList className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'grid' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1066,7 +1183,7 @@ export default function CatalogManagement() {
                       <AdminIconButton
                         className="bg-white/90 backdrop-blur-sm text-slate-500 hover:text-indigo-600 p-2 rounded-full shadow-md hover:bg-indigo-50 transition-colors"
                         title="Chỉnh sửa"
-                        onClick={() => setEditingBook(row)}
+                        onClick={() => handleOpenEdit(row)}
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </AdminIconButton>
@@ -1083,11 +1200,20 @@ export default function CatalogManagement() {
                 {/* Info */}
                 <div className="p-5 flex-1 flex flex-col">
                   <div className="mb-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold text-center leading-tight mb-2 ${
-                        row.categoryColor === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'
-                      }`}>
-                        {row.category}
-                    </span>
+                    {(() => {
+                      const cat = categories.find((c) => Number(c.id) === Number(row.category_id));
+                      const catName = cat?.category_name || row.category || 'Chưa phân loại';
+                      return (
+                        <span
+                          className={`inline-flex max-w-full px-2 py-0.5 rounded text-[10px] font-bold leading-snug mb-2 break-words whitespace-normal ${
+                            row.categoryColor === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-blue-50 text-blue-600'
+                          }`}
+                          title={catName}
+                        >
+                          {catName}
+                        </span>
+                      );
+                    })()}
                     <h4 className="font-bold text-slate-800 text-sm leading-snug line-clamp-2 mb-1" title={row.title}>{row.title}</h4>
                     <p className="text-xs font-semibold text-slate-600 truncate mb-2">{row.author}</p>
                   </div>
@@ -1343,7 +1469,7 @@ export default function CatalogManagement() {
             {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-                  Số trang xem trước (Preview Pages)
+                  Số trang xem trước
                 </label>
                 <Input 
                   type="number"
@@ -1425,14 +1551,26 @@ export default function CatalogManagement() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Mã học phần</label>
-              <Input
+              <select
+                className={`w-full min-h-12 h-12 px-4 py-0 text-sm font-medium leading-[3rem] text-slate-700 bg-white border ${formErrors.courseCode ? 'border-[#BE123C] focus:border-[#BE123C] focus:ring-2 focus:ring-[#BE123C]/20' : 'border-[#D9E2EE] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/20'} rounded-xl focus:outline-none cursor-pointer transition-all`}
                 value={bookForm.courseCode}
                 onChange={(e) => handleFieldChange('courseCode', e.target.value)}
-                className="w-full"
-                error={formErrors.courseCode}
-                
-                placeholder="VD: IT, ECO, ENG, MATH..."
-              />
+              >
+                <option value="">Không chọn</option>
+                {subjects.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.code}
+                  </option>
+                ))}
+              </select>
+              {formErrors.courseCode && (
+                <p className="text-[14px] leading-[20px] font-normal text-[#BE123C] mt-1.5 flex items-center gap-1.5">
+                  <svg className="w-4 h-4 inline-block shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>{formErrors.courseCode}</span>
+                </p>
+              )}
             </div>
 
             <div className="col-span-1 sm:col-span-2">
@@ -1463,9 +1601,40 @@ export default function CatalogManagement() {
                 <Upload className="w-3.5 h-3.5" />
                 Tải lên ảnh bìa
               </label>
+              {coverDisplaySrc && (
+                <div className="mb-3 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                  <img
+                    src={coverDisplaySrc}
+                    alt={editingBook?.title ? `Bìa: ${editingBook.title}` : 'Ảnh bìa sách'}
+                    className="h-28 w-20 shrink-0 rounded-lg border border-slate-200 object-cover bg-slate-100"
+                    onError={(e) => {
+                      e.currentTarget.classList.add('hidden');
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-slate-800">
+                      {coverFile ? 'Ảnh bìa mới (chưa lưu)' : 'Ảnh bìa hiện tại'}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                      {coverFile
+                        ? coverFile.name
+                        : 'Đang dùng ảnh đã tải lên. Chọn ảnh mới bên dưới nếu muốn thay.'}
+                    </p>
+                    {coverFile && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs font-semibold text-rose-600 hover:underline"
+                        onClick={() => setCoverFile(null)}
+                      >
+                        Hủy ảnh mới — giữ ảnh hiện tại
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <label className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-indigo-400 transition-colors">
                 <span className="text-sm font-medium text-slate-700 truncate">
-                  {coverFile ? coverFile.name : 'Chọn ảnh bìa từ máy tính'}
+                  {coverFile ? coverFile.name : (existingCoverSrc ? 'Chọn ảnh khác để thay bìa' : 'Chọn ảnh bìa từ máy tính')}
                 </span>
                 <span className="shrink-0 text-xs font-semibold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg">
                   Chọn ảnh
@@ -1477,20 +1646,55 @@ export default function CatalogManagement() {
                   onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
                 />
               </label>
-              {editingBook && editingBook.cover_image_path && !coverFile && (
-                <p className="text-[11px] text-slate-500 mt-2">Đang dùng ảnh bìa hiện tại. Chọn ảnh mới để thay đổi.</p>
-              )}
             </div>
 
             {(bookForm.bookType === 'eBook' || bookForm.bookType === 'BOTH') && (
               <div className="col-span-1 sm:col-span-2 border-t border-slate-100 pt-4">
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center gap-2">
                   <Upload className="w-3.5 h-3.5 text-rose-500" />
-                  Tải lên tệp PDF (eBook / Cả hai)
+                  Tải lên tệp PDF
                 </label>
+                {editingBook && hasExistingPdf && !pdfFile && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="h-5 w-5 shrink-0 text-emerald-600" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-emerald-800">Đã có PDF trên hệ thống</p>
+                        <p className="text-[11px] text-emerald-700/80">
+                          Có thể xem trước hoặc chọn tệp mới để thay thế.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePreviewExistingPdf}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Xem PDF
+                    </button>
+                  </div>
+                )}
+                {pdfFile && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-rose-800">PDF mới (chưa lưu)</p>
+                      <p className="truncate text-[11px] text-rose-700/80">{pdfFile.name}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs font-semibold text-rose-600 hover:underline"
+                      onClick={() => setPdfFile(null)}
+                    >
+                      Hủy tệp mới
+                    </button>
+                  </div>
+                )}
                 <label className="flex items-center justify-between gap-3 w-full px-4 py-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 cursor-pointer hover:bg-slate-100 hover:border-rose-400 transition-colors">
                   <span className="text-sm font-medium text-slate-700 truncate">
-                    {pdfFile ? pdfFile.name : 'Chọn tệp PDF từ máy tính'}
+                    {pdfFile
+                      ? pdfFile.name
+                      : (hasExistingPdf ? 'Chọn PDF khác để thay thế' : 'Chọn tệp PDF từ máy tính')}
                   </span>
                   <span className="shrink-0 text-xs font-semibold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg">
                     Chọn tệp
@@ -1532,7 +1736,11 @@ export default function CatalogManagement() {
             </h3>
             <p className="text-sm text-slate-600 mt-2 bg-slate-50 p-3 rounded-lg border border-slate-100">
               <span className="font-bold block">{deletingBook?.title}</span>
-              <span className="text-xs font-mono text-slate-500 mt-1 block">Barcode: {deletingBook?.barcode}</span>
+              {deletingBook?.id != null && (
+                <span className="text-xs font-mono text-slate-500 mt-1 block">
+                  Mã đầu sách #{deletingBook.id}
+                </span>
+              )}
             </p>
           </div>
         </div>

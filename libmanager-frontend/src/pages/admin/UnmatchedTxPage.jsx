@@ -178,7 +178,7 @@ export default function UnmatchedTxPage() {
   const confirmAssign = async () => {
     const code = userCode.trim();
     if (!assignTarget || !code) {
-      showToast('Nhập hoặc chọn mã bạn đọc (MSSV) trước khi gán.', 'warning');
+      showToast('Nhập hoặc chọn mã bạn đọc trước khi gán.', 'warning');
       return;
     }
     setAssigning(true);
@@ -312,14 +312,20 @@ export default function UnmatchedTxPage() {
           </p>
           <p className="mt-3 text-[11px] font-medium text-emerald-700">Bấm để lọc đã gán ví</p>
         </button>
-        <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm min-w-0 relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40">
+        <button
+          type="button"
+          onClick={() => setMatchFilter('ALL')}
+          className={`text-left bg-white p-5 rounded-2xl border shadow-sm min-w-0 relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40 transition-colors ${
+            matchFilter === 'ALL' ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-indigo-100 hover:border-indigo-300'
+          }`}
+        >
           <div className="absolute top-4 right-4">
             <WalletCards className="w-6 h-6 text-indigo-500 opacity-20" />
           </div>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Số tiền chưa khớp</p>
           <p className="text-2xl font-extrabold text-indigo-600 leading-none">{formatVND(openAmount)}</p>
-          <p className="mt-3 text-[11px] font-medium text-indigo-600">Tổng tiền đang chờ gán</p>
-        </div>
+          <p className="mt-3 text-[11px] font-medium text-indigo-600">Bấm để xem tất cả giao dịch</p>
+        </button>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-4">
@@ -337,6 +343,7 @@ export default function UnmatchedTxPage() {
             className="h-10 w-full sm:w-44 shrink-0 px-3 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
             value={matchFilter}
             onChange={(e) => setMatchFilter(e.target.value)}
+            aria-label="Lọc trạng thái khớp"
           >
             <option value="ALL">Tất cả</option>
             <option value="UNRESOLVED">Chưa khớp</option>
@@ -405,7 +412,7 @@ export default function UnmatchedTxPage() {
                   label="Tìm bạn đọc"
                   value={userQuery}
                   onChange={(e) => setUserQuery(e.target.value)}
-                  placeholder="Tên hoặc MSSV…"
+                  placeholder="Tên hoặc mã bạn đọc…"
                   leftIcon={<Search className="w-4 h-4" />}
                 />
                 <label className="block text-sm font-medium text-slate-700">
@@ -440,7 +447,7 @@ export default function UnmatchedTxPage() {
             ) : (
               <div className="space-y-2">
                 <Input
-                  label="Mã bạn đọc (MSSV)"
+                  label="Mã bạn đọc"
                   value={userCode}
                   onChange={(e) => setUserCode(e.target.value.toUpperCase())}
                   placeholder="VD: SV20210001"

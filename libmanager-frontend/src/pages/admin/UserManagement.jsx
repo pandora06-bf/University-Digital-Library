@@ -188,7 +188,7 @@ export default function UserManagement() {
     const dept = form.department.trim();
 
     // Khớp BE: user_code 3–50; username tùy chọn [A-Za-z0-9_.-]
-    if (!code) err.user_code = 'MSSV / mã bắt buộc';
+    if (!code) err.user_code = 'Mã bạn đọc bắt buộc';
     else if (!/^[A-Za-z0-9_-]{3,50}$/.test(code)) {
       err.user_code = 'Mã 3–50 ký tự (chữ/số/_/-), không khoảng trắng.';
     }
@@ -371,7 +371,7 @@ export default function UserManagement() {
   const columns = [
     {
       key: 'user_code',
-      header: 'MSSV / Mã',
+      header: 'Mã bạn đọc',
       width: '14%',
       render: (val) => (
         <span className="font-mono font-bold text-indigo-600 block bg-indigo-50/70 px-2 py-1 rounded w-fit text-xs">
@@ -382,7 +382,7 @@ export default function UserManagement() {
     {
       key: 'full_name',
       header: 'Họ tên & Email',
-      width: '23%',
+      width: '21%',
       render: (val, row) => (
         <div className="min-w-0 w-full">
           <p className="font-bold text-slate-800 text-sm truncate" title={val}>{val}</p>
@@ -393,12 +393,14 @@ export default function UserManagement() {
     {
       key: 'role',
       header: 'Vai trò',
-      width: '12%',
+      width: '14%',
+      noClip: true,
       render: (val) => {
         const role = String(val || '').toUpperCase();
         return (
           <StatusBadge
             status={roleLabelVi(role)}
+            truncate={false}
             type={
               role === 'ADMIN' || role === 'LIBRARIAN'
                 ? 'warning'
@@ -414,12 +416,17 @@ export default function UserManagement() {
       key: 'department',
       header: 'Khoa / Ngành',
       width: '16%',
-      render: (val) => <span className="text-sm text-slate-700">{val || '—'}</span>,
+      render: (val) => (
+        <span className="text-sm text-slate-700 block min-w-0 truncate" title={val || undefined}>
+          {val || '—'}
+        </span>
+      ),
     },
     {
       key: 'is_locked',
       header: 'Trạng thái',
       width: '16%',
+      noClip: true,
       render: (val, row) => (
         <div className="flex items-center gap-2 min-w-0 whitespace-nowrap">
           <StatusBadge status={val ? 'Đã khóa' : 'Hoạt động'} type={val ? 'danger' : 'success'} />
@@ -435,9 +442,12 @@ export default function UserManagement() {
       key: 'actions',
       header: 'Thao tác',
       width: '19%',
+      noClip: true,
       align: 'right',
+      cellClassName: '!pr-5 sm:!pr-6',
+      headerClassName: '!pr-5 sm:!pr-6',
       render: (_, row) => (
-        <div className="inline-flex items-center justify-end gap-1.5 min-w-[140px] whitespace-nowrap">
+        <div className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
           <AdminIconButton
             onClick={() => setDetailRow(row)}
             className={`${iconBtn} bg-indigo-50 text-indigo-600 hover:bg-indigo-100`}
@@ -615,7 +625,7 @@ export default function UserManagement() {
             <div className="min-w-0 flex-1">
               <Input
                 type="text"
-                placeholder="Tìm MSSV, họ tên, email…"
+                placeholder="Tìm mã, họ tên, email…"
                 leftIcon={<Search className="w-4 h-4" />}
                 className="!h-10 !rounded-lg placeholder:font-sans"
                 value={searchTerm}
@@ -629,7 +639,7 @@ export default function UserManagement() {
                     showToast(
                       q
                         ? `Đang tra cứu «${q}».`
-                        : 'Nhập MSSV/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                        : 'Nhập mã/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
                       q ? 'success' : 'warning'
                     );
                   }
@@ -648,7 +658,7 @@ export default function UserManagement() {
                 showToast(
                   q
                     ? `Đang tra cứu «${q}».`
-                    : 'Nhập MSSV/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                    : 'Nhập mã/họ tên rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
                   q ? 'success' : 'warning'
                 );
               }}
@@ -719,11 +729,16 @@ export default function UserManagement() {
       >
         <div className="space-y-3">
           <Input
-            label="MSSV / Mã"
+            label="Mã bạn đọc"
+            required
             value={form.user_code}
             disabled={Boolean(editing)}
             error={formErrors.user_code}
-            helperText={!editing && !formErrors.user_code ? '3–50 ký tự (chữ/số/_/-)' : undefined}
+            helperText={
+              !editing && !formErrors.user_code
+                ? 'MSSV / mã GV / mã thủ thư — 3–50 ký tự (chữ/số/_/-)'
+                : undefined
+            }
             onChange={(e) => setForm((f) => ({ ...f, user_code: e.target.value }))}
           />
           {!editing && (
@@ -737,12 +752,14 @@ export default function UserManagement() {
           )}
           <Input
             label="Họ tên"
+            required
             value={form.full_name}
             error={formErrors.full_name}
             onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
           />
           <Input
             label="Email"
+            required
             value={form.email}
             error={formErrors.email}
             onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -756,17 +773,20 @@ export default function UserManagement() {
             />
             <Input
               label="Khoa / ngành"
+              required
               value={form.department}
               error={formErrors.department}
               onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}
             />
           </div>
           <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-            Vai trò
+            <span>Vai trò</span>
+            <span className="text-rose-500 ml-1" aria-hidden="true">*</span>
             <select
               className="mt-1 w-full h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+              required
             >
               <option value="STUDENT">Sinh viên</option>
               <option value="LECTURER">Giảng viên</option>
@@ -944,7 +964,7 @@ export default function UserManagement() {
           <>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {[
-                ['MSSV / Mã', detailRow.user_code],
+                ['Mã bạn đọc', detailRow.user_code],
                 ['Họ tên', detailRow.full_name],
                 ['Email', detailRow.email],
                 ['SĐT', detailRow.phone_number || '—'],

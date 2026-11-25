@@ -43,8 +43,10 @@ function softenApiDetail(text) {
     [/\bDAMAGED\b/g, 'hư hỏng'],
     [/\bcheck-?in\b/gi, 'trả sách / vào phòng'],
     [/\bcheck-?out\b/gi, 'xuất mượn'],
-    [/\buser_code\b/g, 'MSSV'],
+    [/\buser_code\b/g, 'mã bạn đọc'],
     [/\bbook_id\b/g, 'mã đầu sách'],
+    [/\bsubject_code\b/g, 'Mã học phần'],
+    [/\bcategory_id\b/g, 'Thể loại'],
   ];
   for (const [re, label] of statusMap) out = out.replace(re, label);
   return out.replace(/\s{2,}/g, ' ').trim();
