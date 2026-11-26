@@ -43,7 +43,9 @@ export function mapRoomApiError(error, action = 'book') {
   const make = (code, fallback) => Object.assign(new Error(text || fallback), { code, status });
   if (!status) return make('NETWORK', 'Không kết nối được máy chủ. Vui lòng thử lại.');
   if (status === 402) {
-    const shortfall = Number(detail?.shortfall ?? detail?.missing_amount);
+    // Backend trả câu "…cần nạp thêm 20,000đ" (detail dạng chuỗi), bản cũ trả { shortfall }.
+    const fromText = /([\d.,]+)\s*đ/i.exec(text)?.[1]?.replace(/[.,]/g, '');
+    const shortfall = Number(detail?.shortfall ?? detail?.missing_amount ?? fromText);
     return Number.isFinite(shortfall) && shortfall > 0
       ? Object.assign(new Error(`Số dư không đủ. Bạn còn thiếu ${formatMoney(shortfall)} để đặt phòng.`), { code: 'INSUFFICIENT_BALANCE', status })
       : make('INSUFFICIENT_BALANCE', 'Số dư không đủ để đặt phòng.');
@@ -64,9 +66,9 @@ export function mapRoomApiError(error, action = 'book') {
 }
 
 const hhmm = (value) => String(value ?? '').slice(0, 5);
-// Model Room chưa có cột giá (phí làm ở 3-10); thiếu giá thì trả null để hiện "Phí theo quy định".
+// Giá một khung giờ: API thật trả price_per_slot (3-10); thiếu giá thì trả null để hiện "Phí theo quy định".
 const priceOf = (item) => {
-  for (const key of ['slot_price', 'price', 'amount', 'fee']) {
+  for (const key of ['price_per_slot', 'slot_price', 'price', 'amount', 'fee']) {
     const value = item?.[key];
     if (value !== undefined && value !== null && Number.isFinite(Number(value))) return Number(value);
   }
@@ -76,12 +78,15 @@ const priceOf = (item) => {
 // Ghép dữ liệu API thành snapshot mà RoomBookingPage đang dùng (giống bản mock).
 export function toRoomSnapshot({ date, rooms, availability, bookings, wallet, now = Date.now() }) {
   const nameById = new Map(rooms.map((room) => [String(room.id), room.room_name]));
+  // API lượt đặt không trả giá: lấy giá hiện tại của phòng để hiện số tiền hoàn khi hủy.
+  const priceById = new Map(rooms.map((room) => [String(room.id), priceOf(room)]));
   return {
     balance: Number(wallet?.service_balance ?? wallet?.balance ?? 0),
     bookings: bookings.map((item) => ({
       id: item.id, roomId: item.room_id, roomName: item.room_name ?? nameById.get(String(item.room_id)) ?? `Phòng ${item.room_id}`,
       date: item.booking_date, slotId: hhmm(item.slot_start), start: hhmm(item.slot_start), end: hhmm(item.slot_end),
-      price: priceOf(item), status: item.status,
+      price: priceOf(item) ?? priceById.get(String(item.room_id)) ?? null, status: item.status,
+      attendees: item.attendee_count ?? null,
     })),
     rooms: rooms.filter((room) => room.is_active !== false).map((room) => ({
       id: room.id, name: room.room_name, floor: room.floor ? `Tầng ${room.floor}` : 'Thư viện', capacity: room.capacity,
