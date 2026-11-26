@@ -27,6 +27,7 @@ export default function RoomBookingPage() {
   const [loadError, setLoadError] = useState('');
   const [revision, setRevision] = useState(0);
   const [selection, setSelection] = useState(null);
+  const [attendees, setAttendees] = useState(1); // 2B-22: số người tham dự, không vượt sức chứa phòng
   const [confirm, setConfirm] = useState(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -59,7 +60,7 @@ export default function RoomBookingPage() {
     setBusy(true); closeToast();
     try {
       if (confirm.type === 'book') {
-        await roomBookingService.book({ roomId: selection.room.id, date, slotId: selection.slot.id });
+        await roomBookingService.book({ roomId: selection.room.id, date, slotId: selection.slot.id, slotEnd: selection.slot.end, attendees });
         setToast({ message: 'Đặt phòng thành công. Bạn có thể xem lượt đặt ở bên dưới.' });
       } else {
         await roomBookingService.cancel(confirm.booking.id);
@@ -73,6 +74,13 @@ export default function RoomBookingPage() {
       setBusy(false); setConfirm(null); setRevision((value) => value + 1);
     }
   };
+  const choose = (room, slot) => {
+    setSelection({ room, slot });
+    setAttendees((value) => Math.min(Math.max(1, value), room.capacity || 1));
+  };
+  // Giờ mở cửa lấy theo khung giờ API trả về, không ghi cứng.
+  const daySlots = snapshot?.rooms.find((room) => room.slots.length)?.slots ?? [];
+  const hours = daySlots.length ? `Giờ mở cửa: ${daySlots[0].start}–${daySlots.at(-1).end} · ` : '';
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 space-y-8">
       <ToastAlertComponent error={failure} notice={toast} onClose={closeToast} />
@@ -94,7 +102,7 @@ export default function RoomBookingPage() {
           <span className="flex items-center gap-2 mb-2"><CalendarDays className="w-4 h-4" />Ngày sử dụng phòng</span>
           <input type="date" min={libraryToday()} value={date} onChange={(event) => changeDate(event.target.value)} className="block h-12 rounded-xl border border-slate-300 bg-white px-4 focus:ring-2 focus:ring-indigo-500" />
         </label>
-        <p className="text-sm text-slate-500">Giờ mở cửa: 08:00–18:00 · Mỗi khung giờ 2 tiếng</p>
+        <p className="text-sm text-slate-500">{hours}Mỗi khung giờ 2 tiếng</p>
       </div>
       {loadError ? <div role="alert" className="p-6 bg-white rounded-2xl border border-rose-200 space-y-3"><p>{loadError}</p><Button size="sm" onClick={() => setRevision((value) => value + 1)}>Thử lại</Button></div> : !snapshot ? <p role="status" className="py-12 text-center text-slate-500">Đang tìm khung giờ trống…</p> : (
         <div className="grid lg:grid-cols-3 gap-5">
@@ -112,7 +120,7 @@ export default function RoomBookingPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {room.slots.map((slot) => {
                     const selected = selection?.room.id === room.id && selection?.slot.id === slot.id;
-                    return <button key={slot.id} type="button" disabled={!slot.available || busy} aria-pressed={selected} aria-label={`${room.name}, ${slot.start} đến ${slot.end}, ${slot.reason}`} onClick={() => setSelection({ room, slot })} className={`rounded-xl border px-2 py-3 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 ${selected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 hover:border-indigo-400 text-slate-700'} disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed`}><span className="block font-semibold">{slot.start}–{slot.end}</span><span className="text-[11px]">{selected ? 'Đã chọn' : slot.reason}</span></button>;
+                    return <button key={slot.id} type="button" disabled={!slot.available || busy} aria-pressed={selected} aria-label={`${room.name}, ${slot.start} đến ${slot.end}, ${slot.reason}`} onClick={() => choose(room, slot)} className={`rounded-xl border px-2 py-3 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 ${selected ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 hover:border-indigo-400 text-slate-700'} disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:border-slate-200 disabled:cursor-not-allowed`}><span className="block font-semibold">{slot.start}–{slot.end}</span><span className="text-[11px]">{selected ? 'Đã chọn' : slot.reason}</span></button>;
                   })}
                 </div>
                 {!room.slots.some((slot) => slot.available) && <p className="text-sm text-amber-700 mt-3">Không còn giờ trống. Hãy chọn ngày khác.</p>}
@@ -123,7 +131,16 @@ export default function RoomBookingPage() {
       )}
       {selection && <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div><p className="font-semibold text-indigo-900">{selection.room.name}</p><p className="text-sm text-indigo-700 mt-1">{formatLibraryDate(date)} · {selection.slot.start}–{selection.slot.end} · {formatPrice(selection.room.slotPrice)}</p></div>
-        <Button onClick={() => setConfirm({ type: 'book' })} icon={<CalendarDays className="w-4 h-4" />}>Đặt khung giờ này</Button>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-3 w-full sm:w-auto">
+          <label className="text-sm font-semibold text-indigo-900">
+            <span className="flex items-center gap-1.5 mb-1"><Users className="w-4 h-4" />Số người</span>
+            <input type="number" inputMode="numeric" min={1} max={selection.room.capacity} value={attendees}
+              onChange={(event) => setAttendees(Math.min(Math.max(1, Number(event.target.value) || 1), selection.room.capacity))}
+              aria-describedby="attendee-hint" className="block h-11 w-full sm:w-24 rounded-xl border border-indigo-200 bg-white px-3 text-base focus:ring-2 focus:ring-indigo-500" />
+            <span id="attendee-hint" className="block mt-1 text-xs font-normal text-indigo-700">Tối đa {selection.room.capacity} người</span>
+          </label>
+          <Button onClick={() => setConfirm({ type: 'book' })} icon={<CalendarDays className="w-4 h-4" />} className="w-full sm:w-auto">Đặt khung giờ này</Button>
+        </div>
       </div>}
       <section className="space-y-4">
         <h2 className="text-xl font-semibold flex items-center gap-2"><Clock3 className="w-5 h-5 text-indigo-600" />Lượt đặt của tôi</h2>
@@ -141,7 +158,7 @@ export default function RoomBookingPage() {
         })}
       </section>
       {confirm && <ConfirmDialog title={confirm.type === 'book' ? 'Xác nhận đặt phòng' : 'Hủy lượt đặt?'} confirmLabel={confirm.type === 'book' ? 'Xác nhận đặt' : 'Hủy và hoàn tiền'} danger={confirm.type === 'cancel'} loading={busy} onClose={() => setConfirm(null)} onConfirm={performAction}>
-        {confirm.type === 'book' ? <><p>{selection.room.name} · {formatLibraryDate(date)}</p><p>{selection.slot.start}–{selection.slot.end}. {Number.isFinite(selection.room.slotPrice) ? `Phí ${formatMoney(selection.room.slotPrice)} được trừ từ số dư khi đặt thành công.` : 'Phí được trừ từ số dư theo quy định của thư viện khi đặt thành công.'}</p></> : <p>Hủy {confirm.booking.roomName} lúc {confirm.booking.start} ngày {formatLibraryDate(confirm.booking.date)}? {Number.isFinite(confirm.booking.price) ? `Khoản ${formatMoney(confirm.booking.price)} sẽ được hoàn 100% vào số dư.` : 'Phí đã trả sẽ được hoàn 100% vào số dư.'}</p>}
+        {confirm.type === 'book' ? <><p>{selection.room.name} · {formatLibraryDate(date)} · {attendees} người</p><p>{selection.slot.start}–{selection.slot.end}. {Number.isFinite(selection.room.slotPrice) ? `Phí ${formatMoney(selection.room.slotPrice)} được trừ từ số dư khi đặt thành công.` : 'Phí được trừ từ số dư theo quy định của thư viện khi đặt thành công.'}</p></> : <p>Hủy {confirm.booking.roomName} lúc {confirm.booking.start} ngày {formatLibraryDate(confirm.booking.date)}? {Number.isFinite(confirm.booking.price) ? `Khoản ${formatMoney(confirm.booking.price)} sẽ được hoàn 100% vào số dư.` : 'Phí đã trả sẽ được hoàn 100% vào số dư.'}</p>}
       </ConfirmDialog>}
     </div>
   );
