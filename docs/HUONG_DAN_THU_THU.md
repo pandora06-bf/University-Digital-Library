@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Cập nhật** | 25/11/2026 — nghiệp vụ Admin (tồn kho / sự cố / catalog / quầy) + seed |
+| **Cập nhật** | 26/11/2026 — Users: xác nhận trước khi cấp mật khẩu tạm + email |
 | **Người biên soạn** | Vân (FE Admin) |
 | **Ứng dụng** | Cổng Quản trị LibManager |
 | **FE local** | http://127.0.0.1:5173 |
@@ -217,10 +217,14 @@ Seed ngày **24/11/2026** (đã qua cửa sổ buổi tối): đã vào `SV-DEMO
 
 ### `/admin/users`
 
-Thêm / sửa / khóa–mở (có lý do khóa) / reset mật khẩu / import CSV·XLSX.  
+Thêm / sửa / khóa–mở (có lý do khóa) / đặt lại mật khẩu / import CSV·XLSX.  
 - Mã bạn đọc (MSSV / mã GV / mã thủ thư): **3–50** ký tự.  
 - **Username** đăng nhập (tuỳ chọn) khi tạo; để trống → hệ thống tạo `sv{mã}`.  
-- Reset mật khẩu theo **Account**, không theo mã bạn đọc. Mật khẩu tạm chỉ hiện **một lần**.
+- **Đặt lại mật khẩu** (icon chìa khóa):
+  1. Bấm icon → modal **Cấp mật khẩu tạm mới?** (cảnh báo: mật khẩu cũ **không đăng nhập được ngay**; gửi email mật khẩu mới cho người dùng).
+  2. **Hủy** = không đổi gì. **Xác nhận cấp mật khẩu tạm** = hệ thống ghi đè mật khẩu.
+  3. Modal **Mật khẩu tạm thời** hiện chuỗi mới **một lần** trên màn hình (Copy & đóng). Cùng chuỗi đó được gửi email cho user.
+  4. API reset theo **Account.id**, không theo mã bạn đọc.
 
 ### `/admin/unmatched`
 

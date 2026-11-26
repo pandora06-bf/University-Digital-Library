@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { BookOpen, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { CursorRipple } from '../../components/motion/CursorRipple';
@@ -73,14 +73,19 @@ export default function LoginPage({ onLogin }) {
         <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-cyan-500/20 blur-3xl pointer-events-none" />
         <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-indigo-400/20 blur-2xl pointer-events-none" />
 
-        {/* Brand Header */}
+        {/* Brand Header — bấm logo về trang chủ (khách duyệt danh mục) */}
         <div className="relative z-10">
-          <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15">
+          <Link
+            to="/"
+            aria-label="Về trang chủ thư viện LibManager"
+            title="Về trang chủ"
+            className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors"
+          >
             <div className="w-8 h-8 rounded-xl bg-white text-indigo-600 flex items-center justify-center font-bold">
               <BookOpen className="w-5 h-5" />
             </div>
             <span className="font-semibold tracking-wide text-sm sm:text-base">LibManager Portal</span>
-          </div>
+          </Link>
         </div>
 
         {/* Brand Hero Slogan */}

@@ -142,9 +142,10 @@ def delete_category(
 ) -> None:
     category = _get_category_or_404(db, category_id)
 
+    # Chỉ chặn khi còn đầu sách đang hoạt động. Sách đã vô hiệu hóa không giữ thể loại.
     book_in_use = (
         db.query(Book.id)
-        .filter(Book.category_id == category_id)
+        .filter(Book.category_id == category_id, Book.is_active.is_(True))
         .first()
     )
     if book_in_use is not None:
@@ -152,7 +153,7 @@ def delete_category(
         # quản trị yêu cầu không cho xóa danh mục khi vẫn còn sách sử dụng.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Không thể xóa danh mục vì đang được sách sử dụng",
+            detail=f"Không thể xóa danh mục vì đang được sách sử dụng (vd. đầu sách #{book_in_use[0]})",
         )
 
     db.delete(category)

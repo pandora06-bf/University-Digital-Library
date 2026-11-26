@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { 
-  Book, User, CheckCircle2, X, Search
+  Book, User, CheckCircle2, X, Search, Warehouse
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Modal } from '../../components/Modal';
@@ -13,14 +13,72 @@ import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
 
+/** Giữ nháp quầy khi sang Tồn kho tìm mã vạch rồi quay lại. */
+const LOANS_DRAFT_KEY = 'admin_loans_counter_draft_v1';
+
+function readLoansDraft() {
+  try {
+    const raw = sessionStorage.getItem(LOANS_DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLoansDraft(payload) {
+  try {
+    sessionStorage.setItem(LOANS_DRAFT_KEY, JSON.stringify(payload));
+  } catch {
+    /* private mode / quota — bỏ qua */
+  }
+}
+
+function clearLoansDraft() {
+  try {
+    sessionStorage.removeItem(LOANS_DRAFT_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Hiện mã đầu sách (#id) + tên; bấm id mở Tồn kho đúng đầu sách. */
+function BookTitleWithId({ bookId, title, className = '', titleClassName = 'font-semibold text-slate-800' }) {
+  const id = bookId != null && bookId !== '' ? Number(bookId) : null;
+  const hasId = Number.isFinite(id) && id > 0;
+  const label = title || (hasId ? `Đầu sách #${id}` : '—');
+
+  return (
+    <span className={`inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 min-w-0 ${className}`}>
+      {hasId && (
+        <Link
+          to={`/admin/inventory/${id}`}
+          className="shrink-0 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-indigo-700 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200"
+          title={`Mở tồn kho đầu sách #${id}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          #{id}
+        </Link>
+      )}
+      <span className={`min-w-0 break-words leading-snug ${titleClassName}`}>{label}</span>
+    </span>
+  );
+}
+
 export default function LoanManagement() {
   const { toast, showToast, hideToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [draft] = useState(readLoansDraft);
   const autoLookupDone = useRef('');
   const autoBarcodeDone = useRef('');
   const autoBookHintDone = useRef('');
-  const [returnBarcode, setReturnBarcode] = useState('');
-  const [borrowUserId, setBorrowUserId] = useState('');
+  const autoCheckoutBarcodeDone = useRef('');
+  const [pendingCheckoutBarcode, setPendingCheckoutBarcode] = useState(
+    () => draft?.pendingCheckoutBarcode || ''
+  );
+  const [returnBarcode, setReturnBarcode] = useState(() => draft?.returnBarcode || '');
+  const [borrowUserId, setBorrowUserId] = useState(() => draft?.borrowUserId || '');
 
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showBorrowModal, setShowBorrowModal] = useState(false);
@@ -28,20 +86,57 @@ export default function LoanManagement() {
   const [isUserLoading, setIsUserLoading] = useState(false);
   const [isBorrowLoading, setIsBorrowLoading] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
-  const [userValidated, setUserValidated] = useState(false);
-  const [readerProfile, setReaderProfile] = useState(null);
-  const [pendingLoans, setPendingLoans] = useState([]);
+  const [userValidated, setUserValidated] = useState(() => Boolean(draft?.userValidated));
+  const [readerProfile, setReaderProfile] = useState(() => draft?.readerProfile || null);
+  const [pendingLoans, setPendingLoans] = useState(() => draft?.pendingLoans || []);
 
-  const [returnCondition, setReturnCondition] = useState('Nguyên vẹn');
-  const [returnIssue, setReturnIssue] = useState('Rách bìa');
-  const [returnNote, setReturnNote] = useState('');
-  const [checkoutConditionNotes, setCheckoutConditionNotes] = useState('');
+  const [returnCondition, setReturnCondition] = useState(() => draft?.returnCondition || 'Nguyên vẹn');
+  const [returnIssue, setReturnIssue] = useState(() => draft?.returnIssue || 'Rách bìa');
+  const [returnNote, setReturnNote] = useState(() => draft?.returnNote || '');
+  const [checkoutConditionNotes, setCheckoutConditionNotes] = useState(
+    () => draft?.checkoutConditionNotes || ''
+  );
 
-  const [returnBookScanned, setReturnBookScanned] = useState(false);
-  const [returnSlip, setReturnSlip] = useState(null);
-  const [returnHint, setReturnHint] = useState('');
+  const [returnBookScanned, setReturnBookScanned] = useState(() => Boolean(draft?.returnBookScanned));
+  const [returnSlip, setReturnSlip] = useState(() => draft?.returnSlip || null);
+  const [returnHint, setReturnHint] = useState(() => draft?.returnHint || '');
   const [isReturnLoading, setIsReturnLoading] = useState(false);
-  const [borrowBooks, setBorrowBooks] = useState([]);
+  const [borrowBooks, setBorrowBooks] = useState(() => draft?.borrowBooks || []);
+
+  // Lưu nháp mỗi khi đổi form — sang Tồn kho rồi về không mất mã bạn đọc / sách đã quét
+  useEffect(() => {
+    writeLoansDraft({
+      returnBarcode,
+      borrowUserId,
+      userValidated,
+      readerProfile,
+      pendingLoans,
+      returnCondition,
+      returnIssue,
+      returnNote,
+      checkoutConditionNotes,
+      returnBookScanned,
+      returnSlip,
+      returnHint,
+      borrowBooks,
+      pendingCheckoutBarcode,
+    });
+  }, [
+    returnBarcode,
+    borrowUserId,
+    userValidated,
+    readerProfile,
+    pendingLoans,
+    returnCondition,
+    returnIssue,
+    returnNote,
+    checkoutConditionNotes,
+    returnBookScanned,
+    returnSlip,
+    returnHint,
+    borrowBooks,
+    pendingCheckoutBarcode,
+  ]);
 
   const formatLoanDate = (value) => {
     if (!value) return '—';
@@ -237,7 +332,8 @@ export default function LoanManagement() {
   useEffect(() => {
     const bookId = (searchParams.get('book_id') || '').trim();
     const barcode = (searchParams.get('barcode') || '').trim();
-    if (!bookId || barcode || autoBookHintDone.current === bookId) return;
+    const checkoutBarcode = (searchParams.get('checkout_barcode') || '').trim();
+    if (!bookId || barcode || checkoutBarcode || autoBookHintDone.current === bookId) return;
     autoBookHintDone.current = bookId;
     showToast(
       `Đầu sách #${bookId}: chưa có bản đang mượn. Quầy thao tác theo mã vạch bản sao.`,
@@ -247,6 +343,19 @@ export default function LoanManagement() {
     next.delete('book_id');
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query book_id đổi
+  }, [searchParams]);
+
+  // Từ Tồn kho chọn bản Sẵn sàng: /admin/loans?checkout_barcode=DEMO-BC-…
+  useEffect(() => {
+    const checkoutBarcode = (searchParams.get('checkout_barcode') || '').trim();
+    if (!checkoutBarcode || autoCheckoutBarcodeDone.current === checkoutBarcode) return;
+    autoCheckoutBarcodeDone.current = checkoutBarcode;
+    const next = new URLSearchParams(searchParams);
+    next.delete('checkout_barcode');
+    next.delete('book_id');
+    setSearchParams(next, { replace: true });
+    setPendingCheckoutBarcode(checkoutBarcode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nhận mã từ Tồn kho
   }, [searchParams]);
 
   const copyStatusVi = {
@@ -266,12 +375,21 @@ export default function LoanManagement() {
       showToast('Vui lòng quét mã vạch sách mượn rồi nhấn phím Enter.', 'warning');
       return;
     }
+    if (!userValidated) {
+      setPendingCheckoutBarcode(targetCode);
+      showToast(
+        `Đã giữ mã ${targetCode}. Tra mã bạn đọc trước rồi hệ thống sẽ gắn vào phiếu.`,
+        'warning'
+      );
+      return;
+    }
     if (readerBlocked) {
       showToast('Bạn đọc đang nợ hoặc bị khóa mượn. Thu đủ phạt trước khi xuất phiếu.', 'error');
       return;
     }
     if (borrowBooks.some((b) => b.barcode === targetCode)) {
       showToast(`Mã vạch ${targetCode} đã có trong phiếu.`, 'warning');
+      setPendingCheckoutBarcode('');
       return;
     }
     setIsBorrowLoading(true);
@@ -280,6 +398,7 @@ export default function LoanManagement() {
         params: { barcode: targetCode },
       });
       if (data.status !== 'AVAILABLE') {
+        setPendingCheckoutBarcode('');
         showToast(
           `${data.copy_barcode} đang ${copyStatusVi[data.status] || data.status}. Chỉ xuất được bản Sẵn sàng.`,
           'error'
@@ -294,11 +413,13 @@ export default function LoanManagement() {
         ...prev,
         {
           id: Date.now(),
+          bookId: data.book_id,
           title: data.book_title || `Sách ${data.copy_barcode}`,
           barcode: data.copy_barcode,
           loanId: match?.id,
         },
       ]);
+      setPendingCheckoutBarcode('');
       showToast(
         match
           ? `Đã gắn ${data.copy_barcode} vào phiếu chờ #${match.id}.`
@@ -306,11 +427,24 @@ export default function LoanManagement() {
         'success'
       );
     } catch (error) {
+      setPendingCheckoutBarcode('');
       showToast(getApiErrorMessage(error, 'Không tìm thấy bản sao sách.'), 'error');
     } finally {
       setIsBorrowLoading(false);
     }
   };
+
+  // Sau khi tra bạn đọc OK — gắn mã đã chọn từ Tồn kho (nếu có)
+  useEffect(() => {
+    if (!userValidated || readerBlocked || !pendingCheckoutBarcode || isBorrowLoading) return;
+    const code = pendingCheckoutBarcode;
+    const timer = window.setTimeout(() => {
+      setPendingCheckoutBarcode('');
+      handleBorrowScan(code);
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ khi sẵn sàng gắn mã pending
+  }, [userValidated, readerBlocked, pendingCheckoutBarcode]);
 
   const confirmCheckin = async () => {
     const barcode = returnBarcode.trim();
@@ -345,6 +479,8 @@ export default function LoanManagement() {
       setReturnCondition('Nguyên vẹn');
       setReturnNote('');
       showToast(data.message || 'Trả sách thành công.', 'success');
+      // Nháp còn phần xuất mượn (nếu có) — effect sẽ ghi lại; xóa nháp trả
+      if (!borrowUserId && borrowBooks.length === 0) clearLoansDraft();
     } catch (error) {
       const msg = getApiErrorMessage(error, 'Trả sách thất bại.');
       const alreadyReturned =
@@ -398,6 +534,7 @@ export default function LoanManagement() {
       setPendingLoans([]);
       setCheckoutConditionNotes('');
       showToast(`Xuất mượn thành công ${ok}/${totalTried} cuốn.`, 'success');
+      if (!returnSlip && !returnBarcode) clearLoansDraft();
     }
     if (errors.length) {
       showToast(errors.slice(0, 2).join(' | '), 'error');
@@ -417,6 +554,13 @@ export default function LoanManagement() {
         </h1>
         <p className="text-sm text-slate-500 max-w-2xl">
           Nhận trả: quét mã vạch trên sách đang mượn.<br />Xuất mượn: tra mã bạn đọc (SV/GV) rồi quét bản sẵn sàng, gồm phiếu đã đặt hoặc mượn thẳng tại quầy.
+        </p>
+        <p className="text-xs text-slate-400 pt-1">
+          Sang{' '}
+          <Link to="/admin/inventory" className="text-indigo-600 font-semibold hover:underline">
+            Tồn kho
+          </Link>{' '}
+          tìm mã vạch rồi quay lại — thông tin đã nhập trên quầy vẫn được giữ.
         </p>
       </header>
 
@@ -483,7 +627,13 @@ export default function LoanManagement() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-600 font-mono mt-1">{returnSlip?.user_code || '—'}</p>
-                    <p className="text-xs text-slate-700 mt-1.5 leading-snug">{returnSlip?.book_title || '—'}</p>
+                    <div className="mt-1.5 text-xs text-slate-700">
+                      <BookTitleWithId
+                        bookId={returnSlip?.book_id}
+                        title={returnSlip?.book_title}
+                        titleClassName="font-medium text-slate-800"
+                      />
+                    </div>
                     <p className="text-xs text-slate-500 mt-1 font-mono break-all">
                       Mã vạch: {returnSlip?.copy_barcode || returnBarcode}
                     </p>
@@ -675,9 +825,11 @@ export default function LoanManagement() {
                           className="bg-white/90 rounded-lg border border-indigo-100 px-3 py-2 text-xs"
                         >
                           <div className="flex justify-between gap-2 items-start">
-                            <p className="font-semibold text-slate-800 leading-snug break-words min-w-0">
-                              {loan.book_title || `Book #${loan.book_id || '—'}`}
-                            </p>
+                            <BookTitleWithId
+                              bookId={loan.book_id}
+                              title={loan.book_title}
+                              className="min-w-0"
+                            />
                             <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                               {loanStatusLabel(loan.loan_status)}
                             </span>
@@ -705,17 +857,26 @@ export default function LoanManagement() {
                     Bạn đọc này còn nợ hoặc bị khóa mượn. Không được xuất phiếu. Hãy sang trang Thu phạt để thu đủ rồi tra lại.
                   </p>
                 ) : (
-                <FastBarcodeScanner
-                  label="Quét mã vạch sách mượn"
-                  placeholder="Enter để thêm vào phiếu"
-                  onScan={(scannedCode) => handleBorrowScan(scannedCode)}
-                  loading={isBorrowLoading}
-                  autoFocus
-                  autoClear
-                  autoRefocus
-                  buttonText="Thêm"
-                  helperText="Chỉ mã vạch bản Sẵn sàng, không nhập mã phiếu. Mã lạ hoặc bản đã thanh lý không vào phiếu."
-                />
+                  <div className="space-y-2">
+                    <FastBarcodeScanner
+                      label="Quét mã vạch sách mượn"
+                      placeholder="Enter để thêm vào phiếu"
+                      onScan={(scannedCode) => handleBorrowScan(scannedCode)}
+                      loading={isBorrowLoading}
+                      autoFocus
+                      autoClear
+                      autoRefocus
+                      buttonText="Thêm"
+                      helperText="Chỉ mã vạch bản Sẵn sàng, không nhập mã phiếu. Mã lạ hoặc bản đã thanh lý không vào phiếu."
+                    />
+                    <Link
+                      to="/admin/inventory"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      <Warehouse className="w-3.5 h-3.5" />
+                      Tìm bản sẵn sàng ở Tồn kho (giữ nguyên phiếu đang làm)
+                    </Link>
+                  </div>
                 )}
 
                 <div>
@@ -741,8 +902,12 @@ export default function LoanManagement() {
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-800 truncate">{book.title}</p>
-                        <p className="text-xs text-slate-500 font-mono break-all">
+                        <BookTitleWithId
+                          bookId={book.bookId}
+                          title={book.title}
+                          titleClassName="text-sm font-bold text-slate-800"
+                        />
+                        <p className="text-xs text-slate-500 font-mono break-all mt-0.5">
                           {book.barcode}
                           {book.loanId ? ` · phiếu #${book.loanId}` : ''}
                         </p>
@@ -810,7 +975,14 @@ export default function LoanManagement() {
             </h4>
             <div className="text-xs text-slate-500 space-y-1 font-medium">
               <p>Mã bạn đọc: <span className="text-slate-700 font-mono">{returnSlip?.user_code || '—'}</span></p>
-              <p>Sách: <span className="text-slate-700">{returnSlip?.book_title || '—'}</span></p>
+              <p className="flex flex-wrap items-baseline gap-1.5">
+                <span>Sách:</span>
+                <BookTitleWithId
+                  bookId={returnSlip?.book_id}
+                  title={returnSlip?.book_title}
+                  titleClassName="text-slate-700 font-medium"
+                />
+              </p>
               <p>Mã vạch: <span className="text-slate-700 font-mono">{returnSlip?.copy_barcode || returnBarcode}</span></p>
               <p>Hạn trả: <span className={returnSlip?.overdue ? 'text-rose-700 font-semibold' : 'text-slate-700'}>{formatLoanDate(returnSlip?.due_date)}</span></p>
             </div>
@@ -907,8 +1079,13 @@ export default function LoanManagement() {
         <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
           {borrowBooks.map((b, i) => (
             <div key={b.id || i} className="text-xs text-slate-600 font-medium pb-2 border-b border-slate-100 last:border-0 last:pb-0">
-              {i + 1}. {b.title}{' '}
-              <span className="text-slate-400 font-normal">
+              <span className="text-slate-400 mr-1">{i + 1}.</span>
+              <BookTitleWithId
+                bookId={b.bookId}
+                title={b.title}
+                titleClassName="text-slate-700 font-medium"
+              />
+              <span className="text-slate-400 font-normal ml-1">
                 ({b.barcode}{b.loanId ? ` · phiếu #${b.loanId}` : ''})
               </span>
             </div>

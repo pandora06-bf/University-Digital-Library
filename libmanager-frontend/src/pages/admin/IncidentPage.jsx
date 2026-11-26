@@ -15,6 +15,43 @@ import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
 
+/** Giữ bộ lọc + form lập biên bản khi sang Thu phạt rồi quay lại. */
+const INCIDENTS_DRAFT_KEY = 'admin_incidents_counter_draft_v1';
+
+function readIncidentsDraft() {
+  try {
+    const raw = sessionStorage.getItem(INCIDENTS_DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeIncidentsDraft(payload) {
+  try {
+    sessionStorage.setItem(INCIDENTS_DRAFT_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearIncidentsDraftForm() {
+  try {
+    const cur = readIncidentsDraft() || {};
+    writeIncidentsDraft({
+      ...cur,
+      showCreateModal: false,
+      loanLookedUp: false,
+      createForm: null,
+      formErrors: {},
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
 const EMPTY_CREATE_FORM = {
   code: '',
   incident_type: 'LOST',
@@ -64,12 +101,13 @@ export default function IncidentPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoFilterDone = useRef('');
+  const [draft] = useState(readIncidentsDraft);
   const { toast, showToast, hideToast } = useToast();
 
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [searchTerm, setSearchTerm] = useState(() => draft?.searchTerm || '');
+  const [typeFilter, setTypeFilter] = useState(() => draft?.typeFilter || 'ALL');
 
   const loadIncidents = useCallback(async () => {
     setLoading(true);
@@ -118,13 +156,28 @@ export default function IncidentPage() {
 
   // Modal states
   const [detailRow, setDetailRow] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(() => Boolean(draft?.showCreateModal));
 
   // Form tạo biên bản mới — trống đến khi Tra cứu thành công
-  const [createForm, setCreateForm] = useState({ ...EMPTY_CREATE_FORM });
-  const [loanLookedUp, setLoanLookedUp] = useState(false);
+  const [createForm, setCreateForm] = useState(() => (
+    draft?.createForm && typeof draft.createForm === 'object'
+      ? { ...EMPTY_CREATE_FORM, ...draft.createForm }
+      : { ...EMPTY_CREATE_FORM }
+  ));
+  const [loanLookedUp, setLoanLookedUp] = useState(() => Boolean(draft?.loanLookedUp));
   const [isSearchingBook, setIsSearchingBook] = useState(false);
-  const [formErrors, setFormErrors] = useState({});
+  const [formErrors, setFormErrors] = useState(() => draft?.formErrors || {});
+
+  useEffect(() => {
+    writeIncidentsDraft({
+      searchTerm,
+      typeFilter,
+      showCreateModal,
+      createForm,
+      loanLookedUp,
+      formErrors,
+    });
+  }, [searchTerm, typeFilter, showCreateModal, createForm, loanLookedUp, formErrors]);
 
   // Format tiền tệ VNĐ
   const formatVND = (num) => {
@@ -329,6 +382,8 @@ export default function IncidentPage() {
       setShowCreateModal(false);
       setLoanLookedUp(false);
       setCreateForm({ ...EMPTY_CREATE_FORM });
+      setFormErrors({});
+      clearIncidentsDraftForm();
       await loadIncidents();
       showToast(
         `Đã lập biên bản${apiIncidentId ? ` BB-${apiIncidentId}` : ''}.`,
@@ -508,6 +563,9 @@ export default function IncidentPage() {
               ? 'Đang tải danh sách biên bản…'
               : 'Lập biên bản mất / hỏng sách, ghi nhận bồi thường và theo dõi trạng thái xử lý.'}
           </p>
+          <p className="text-xs text-slate-400 mt-1">
+            Sang Thu phạt rồi quay lại — bộ lọc và form lập biên bản đang mở vẫn được giữ.
+          </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Button 
@@ -624,13 +682,15 @@ export default function IncidentPage() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
+                    if (!searchTerm.trim()) {
+                      autoFilterDone.current = '';
+                      loadIncidents().then((ok) => {
+                        if (ok) showToast('Đã tải lại toàn bộ biên bản.', 'success');
+                      });
+                      return;
+                    }
                     const n = filteredData.length;
-                    showToast(
-                      searchTerm.trim()
-                        ? `Hiển thị ${n} biên bản khớp bộ lọc.`
-                        : 'Nhập từ khóa rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
-                      searchTerm.trim() ? 'success' : 'warning'
-                    );
+                    showToast(`Hiển thị ${n} biên bản khớp bộ lọc.`, 'success');
                   }
                 }}
               />
@@ -641,13 +701,15 @@ export default function IncidentPage() {
               className="!h-10 shrink-0 px-3 sm:px-4"
               icon={<Search className="w-4 h-4" />}
               onClick={() => {
+                if (!searchTerm.trim()) {
+                  autoFilterDone.current = '';
+                  loadIncidents().then((ok) => {
+                    if (ok) showToast('Đã tải lại toàn bộ biên bản.', 'success');
+                  });
+                  return;
+                }
                 const n = filteredData.length;
-                showToast(
-                  searchTerm.trim()
-                    ? `Hiển thị ${n} biên bản khớp bộ lọc.`
-                    : 'Nhập từ khóa rồi bấm Tra cứu (lọc theo bảng bên dưới).',
-                  searchTerm.trim() ? 'success' : 'warning'
-                );
+                showToast(`Hiển thị ${n} biên bản khớp bộ lọc.`, 'success');
               }}
             >
               Tra cứu

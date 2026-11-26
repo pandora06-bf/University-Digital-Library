@@ -165,6 +165,7 @@ def delete_inventory_copy(
         )
 
     if _is_available(copy):
-        book.available_stock -= 1
+        # Tránh âm stock khi đầu sách đã bị vô hiệu hóa (available_stock = 0) nhưng bản vẫn AVAILABLE.
+        book.available_stock = max(0, int(book.available_stock or 0) - 1)
     db.delete(copy)
     db.commit()

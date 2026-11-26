@@ -15,21 +15,57 @@ import axiosInstance from '../../services/axios_instance';
 import { getApiErrorMessage } from '../../services/errorHandler';
 import { AdminIconButton } from '../../components/AdminIconButton';
 
+/** Giữ kết quả tra cứu khi sang Báo mất/hỏng hoặc Mượn/Trả rồi quay lại. */
+const FINES_DRAFT_KEY = 'admin_fines_counter_draft_v1';
+
+function readFinesDraft() {
+  try {
+    const raw = sessionStorage.getItem(FINES_DRAFT_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeFinesDraft(payload) {
+  try {
+    sessionStorage.setItem(FINES_DRAFT_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function FineManagement() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const autoLookupDone = useRef('');
+  const [draft] = useState(readFinesDraft);
   const { toast, showToast, hideToast } = useToast();
   // UC10: bảng trống đến khi tra cứu mã bạn đọc qua /api/admin/fines/lookup
-  const [finesData, setFinesData] = useState([]);
-  const [lookedUpName, setLookedUpName] = useState('');
+  const [finesData, setFinesData] = useState(() => draft?.finesData || []);
+  const [lookedUpName, setLookedUpName] = useState(() => draft?.lookedUpName || '');
   const [collectingRow, setCollectingRow] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('Loại vi phạm (Tất cả)');
-  const [statusFilter, setStatusFilter] = useState('Trạng thái (Tất cả)');
+  const [searchTerm, setSearchTerm] = useState(() => draft?.searchTerm || '');
+  const [typeFilter, setTypeFilter] = useState(() => draft?.typeFilter || 'Loại vi phạm (Tất cả)');
+  const [statusFilter, setStatusFilter] = useState(() => draft?.statusFilter || 'Trạng thái (Tất cả)');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [lookupTotal, setLookupTotal] = useState(null);
+  const [lookupTotal, setLookupTotal] = useState(() => (
+    draft?.lookupTotal != null ? Number(draft.lookupTotal) : null
+  ));
+
+  useEffect(() => {
+    writeFinesDraft({
+      searchTerm,
+      lookedUpName,
+      finesData,
+      lookupTotal,
+      typeFilter,
+      statusFilter,
+    });
+  }, [searchTerm, lookedUpName, finesData, lookupTotal, typeFilter, statusFilter]);
 
   const unpaidRows = finesData.filter((r) => r.status === 'Chưa thu');
   const unpaidSum = unpaidRows.reduce((s, r) => s + (Number(r.amountNum) || 0), 0);
@@ -81,7 +117,15 @@ export default function FineManagement() {
     const fromArg = typeof presetMssv === 'string' ? presetMssv : '';
     const q = (fromArg || searchTerm).trim();
     if (!q) {
-      showToast('Nhập mã bạn đọc rồi bấm Tra cứu (không để trống).', 'warning');
+      // Xóa ô tìm + Tra cứu → reset bảng (không giữ kết quả tra cứu trước)
+      setSearchTerm('');
+      setFinesData([]);
+      setLookedUpName('');
+      setLookupTotal(null);
+      setCollectingRow(null);
+      setDetailRow(null);
+      autoLookupDone.current = '';
+      showToast('Đã xóa bộ lọc. Nhập mã bạn đọc rồi Tra cứu lại.', 'warning');
       return;
     }
     setSearchTerm(q);
@@ -309,6 +353,9 @@ export default function FineManagement() {
           <p className="text-sm text-slate-500 mt-1">
             Tra cứu công nợ theo mã bạn đọc (SV/GV) và xác nhận thu phạt tại quầy.
           </p>
+          <p className="text-xs text-slate-400 mt-1">
+            Sang Biên bản / Phiếu mượn rồi quay lại — mã bạn đọc và bảng công nợ vẫn được giữ.
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
@@ -449,7 +496,7 @@ export default function FineManagement() {
             finesData.length === 0
               ? (lookedUpName
                 ? `${lookedUpName}: không có khoản phạt.`
-                : 'Nhập mã bạn đọc rồi bấm Tra cứu (không để trống).')
+                : 'Nhập mã bạn đọc rồi bấm Tra cứu. Xóa ô tìm rồi Tra cứu để làm mới bảng.')
               : 'Không có phiếu khớp bộ lọc này.'
           }
           className="border-0 shadow-none rounded-none rounded-b-2xl"

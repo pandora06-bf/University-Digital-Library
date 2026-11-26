@@ -76,6 +76,8 @@ export default function UserManagement() {
   const [lockTarget, setLockTarget] = useState(null);
   const [lockReason, setLockReason] = useState('');
   const [lockReasonError, setLockReasonError] = useState('');
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetting, setResetting] = useState(false);
   const [tempPassword, setTempPassword] = useState(null);
   const [detailRow, setDetailRow] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -312,19 +314,27 @@ export default function UserManagement() {
     }
   };
 
-  const handleResetPassword = async (row) => {
+  const confirmResetPassword = async () => {
+    if (!resetTarget || resetting) return;
+    const row = resetTarget;
+    const accountId = row.account_id;
+    if (accountId == null) {
+      showToast('Thiếu Account.id, không thể reset mật khẩu.', 'error');
+      setResetTarget(null);
+      return;
+    }
+    setResetting(true);
     try {
-      const accountId = row.account_id;
-      if (accountId == null) {
-        showToast('Thiếu Account.id, không thể reset mật khẩu.', 'error');
-        return;
-      }
       const { data } = await axiosInstance.post(`/api/admin/users/${accountId}/reset-password`);
       const temp = data?.temporary_password;
+      setResetTarget(null);
       if (temp) setTempPassword({ user_code: row.user_code, password: temp });
       showToast('Đã cấp mật khẩu tạm.', 'success');
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không đặt lại mật khẩu.'), 'error');
+      setResetTarget(null);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -478,7 +488,7 @@ export default function UserManagement() {
             {row.is_locked ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
           </AdminIconButton>
           <AdminIconButton
-            onClick={() => handleResetPassword(row)}
+            onClick={() => setResetTarget(row)}
             className={`${iconBtn} bg-amber-50 text-amber-600 hover:bg-amber-100`}
             title="Đặt lại mật khẩu"
           >
@@ -498,7 +508,7 @@ export default function UserManagement() {
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-slate-800">Quản lý Người dùng</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Danh sách, thêm, sửa, khóa và đặt lại mật khẩu tài khoản bạn đọc / thủ thư.
+            Thêm từng tài khoản hoặc Import CSV/XLSX; sửa, khóa và đặt lại mật khẩu.
           </p>
         </div>
         <div className="flex flex-wrap sm:flex-nowrap items-center justify-end gap-3 shrink-0 ml-auto">
@@ -863,6 +873,38 @@ export default function UserManagement() {
             Hủy
           </Button>
           <Button variant="primary" onClick={confirmLockToggle}>Xác nhận</Button>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(resetTarget)}
+        onClose={() => {
+          if (resetting) return;
+          setResetTarget(null);
+        }}
+        title="Cấp mật khẩu tạm mới?"
+      >
+        <p className="text-sm text-slate-600">
+          Tài khoản{' '}
+          <span className="font-semibold text-slate-800">{resetTarget?.full_name}</span>{' '}
+          <span className="font-mono text-xs text-indigo-600">({resetTarget?.user_code})</span>
+          .
+        </p>
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-3">
+          Mật khẩu hiện tại sẽ <strong>không đăng nhập được ngay</strong>. Mật khẩu tạm mới chỉ hiện
+          một lần trên màn hình và gửi email (mật khẩu mới) cho người dùng.
+        </p>
+        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-100">
+          <Button
+            variant="outline"
+            disabled={resetting}
+            onClick={() => setResetTarget(null)}
+          >
+            Hủy
+          </Button>
+          <Button variant="primary" disabled={resetting} onClick={confirmResetPassword}>
+            {resetting ? 'Đang cấp…' : 'Xác nhận cấp mật khẩu tạm'}
+          </Button>
         </div>
       </Modal>
 

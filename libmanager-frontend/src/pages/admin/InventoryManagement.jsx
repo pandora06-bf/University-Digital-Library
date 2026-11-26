@@ -225,6 +225,8 @@ export default function InventoryManagement() {
           // Không gọi API mới: tìm trong danh mục đang bật, rồi lấy bản sao ở endpoint kho sẵn có.
           const status = error?.response?.status;
           if (status === 404) {
+            const apiMsg = getApiErrorMessage(error, '');
+            const inactiveHint = /vô hiệu|ngừng lưu hành/i.test(apiMsg);
             let found;
             try {
               found = await findActiveCatalogBook(bookId);
@@ -252,7 +254,9 @@ export default function InventoryManagement() {
               if (bookPickMode === 'type') setBookPickerQuery(String(found.id));
               fetchInventory(bookId, found);
               showToast(
-                'Đầu sách vẫn đang dùng. Mọi bản in đã thanh lý hoặc hỏng nên cổng bạn đọc không mở sách này.',
+                inactiveHint
+                  ? 'Đầu sách đã vô hiệu hóa nhưng vẫn còn bản sao. Thanh lý/xóa bản trên Tồn kho trước khi xóa thể loại.'
+                  : 'Đầu sách vẫn đang dùng. Mọi bản in đã thanh lý hoặc hỏng nên cổng bạn đọc không mở sách này.',
                 'warning'
               );
               return;
@@ -671,16 +675,27 @@ export default function InventoryManagement() {
         else if (row.statusType === 'retired') colors = 'bg-slate-100 text-slate-600 border-slate-300';
         
         let navAction = null;
+        let navTitle = '';
         if (val === 'Đang mượn' || val === 'Đang cho mượn') {
           navAction = () => navigate(`/admin/loans?barcode=${encodeURIComponent(row.barcode || '')}`);
+          navTitle = 'Mở quầy nhận trả với mã này';
+        } else if (val === 'Sẵn sàng' || row.rawStatus === 'AVAILABLE') {
+          navAction = () => navigate(
+            `/admin/loans?checkout_barcode=${encodeURIComponent(row.barcode || '')}`
+          );
+          navTitle = 'Đưa mã này sang quầy xuất mượn (giữ phiếu đang làm)';
         }
-        if (val === 'Báo mất') navAction = () => navigate('/admin/incidents');
+        if (val === 'Báo mất') {
+          navAction = () => navigate('/admin/incidents');
+          navTitle = 'Sang Báo mất / Hỏng';
+        }
         
         return (
           <button 
-            onClick={navAction}
+            type="button"
+            onClick={navAction || undefined}
             className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${colors} ${navAction ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
-            title={navAction ? 'Xem chi tiết giao dịch' : ''}
+            title={navTitle || undefined}
           >
             {val}
           </button>

@@ -989,132 +989,128 @@ export default function CatalogManagement() {
       {/* Main Content Area */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
         
-        {/* Filters Bar — cỡ chữ/chiều cao cố định, không bị cắt trên desktop hẹp */}
-        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl">
-          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
-            {/* Search + Tra cứu */}
-            <div className="flex min-w-0 flex-1 items-center gap-2 lg:min-w-[18rem] lg:max-w-xl">
-              <div className="min-w-0 flex-1">
-                <Input
-                  type="text"
-                  placeholder="Tìm tên sách, tác giả…"
-                  leftIcon={<Search className="w-4 h-4" />}
-                  className="!h-10 !rounded-lg !text-sm !leading-5 !py-2"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const q = searchTerm.trim();
-                      setDebouncedSearch(q);
-                      setPage(1);
-                      showToast(
-                        q
-                          ? `Đang tra cứu «${q}».`
-                          : 'Nhập tên sách/tác giả rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
-                        q ? 'success' : 'warning'
-                      );
-                    }
-                  }}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="primary"
-                className="!h-10 shrink-0 !px-3 sm:!px-4 !text-sm !leading-5 !font-semibold"
-                icon={<Search className="w-4 h-4" />}
-                onClick={() => {
-                  const q = searchTerm.trim();
-                  setDebouncedSearch(q);
-                  setPage(1);
-                  showToast(
-                    q
-                      ? `Đang tra cứu «${q}».`
-                      : 'Nhập tên sách/tác giả rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
-                    q ? 'success' : 'warning'
-                  );
+        {/* Filters Bar — 2 hàng full-width để không bị cắt bởi overflow-x-hidden của layout */}
+        <div className="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/50 rounded-t-2xl space-y-3">
+          {/* Hàng 1: tìm + tra cứu + chế độ xem */}
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <Input
+                type="text"
+                placeholder="Tìm tên sách, tác giả…"
+                leftIcon={<Search className="w-4 h-4" />}
+                className="!h-10 !rounded-lg !text-sm !leading-5 !py-2"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const q = searchTerm.trim();
+                    setDebouncedSearch(q);
+                    setPage(1);
+                    showToast(
+                      q
+                        ? `Đang tra cứu «${q}».`
+                        : 'Nhập tên sách/tác giả rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                      q ? 'success' : 'warning'
+                    );
+                  }
                 }}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="!h-10 shrink-0 !px-3 sm:!px-4 !text-sm !leading-5 !font-semibold"
+              icon={<Search className="w-4 h-4" />}
+              onClick={() => {
+                const q = searchTerm.trim();
+                setDebouncedSearch(q);
+                setPage(1);
+                showToast(
+                  q
+                    ? `Đang tra cứu «${q}».`
+                    : 'Nhập tên sách/tác giả rồi bấm Tra cứu (hoặc để trống để xem tất cả).',
+                  q ? 'success' : 'warning'
+                );
+              }}
+            >
+              Tra cứu
+            </Button>
+            <div className="flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'list' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
+                aria-label="Xem dạng danh sách"
               >
-                Tra cứu
+                <LayoutList className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'grid' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
+                aria-label="Xem dạng lưới"
+              >
+                <LayoutGrid className="w-4 h-4" />
               </Button>
             </div>
+          </div>
 
-            {/* Filters */}
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 min-w-0 flex-1 lg:max-w-3xl">
-              <select
-                aria-label="Lọc định dạng"
-                title={formatFilter || 'Tất cả định dạng'}
-                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                value={formatFilter}
-                onChange={(e) => {
-                  setFormatFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Tất cả định dạng</option>
-                <option value="PRINTED">Vật lý</option>
-                <option value="EBOOK">eBook</option>
-                <option value="BOTH">Cả hai</option>
-              </select>
+          {/* Hàng 2: 3 bộ lọc full-width — không bị ép/cắt cuối hàng */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3 w-full min-w-0">
+            <select
+              aria-label="Lọc định dạng"
+              title={formatFilter || 'Tất cả định dạng'}
+              className="h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              value={formatFilter}
+              onChange={(e) => {
+                setFormatFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả định dạng</option>
+              <option value="PRINTED">Vật lý</option>
+              <option value="EBOOK">eBook</option>
+              <option value="BOTH">Cả hai</option>
+            </select>
 
-              <select
-                aria-label="Lọc thể loại"
-                title={
-                  categoryFilter
-                    ? (categories.find((c) => String(c.id) === String(categoryFilter))?.category_name || 'Thể loại')
-                    : 'Tất cả thể loại'
-                }
-                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Tất cả thể loại</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id.toString()}>{c.category_name}</option>
-                ))}
-              </select>
+            <select
+              aria-label="Lọc thể loại"
+              title={
+                categoryFilter
+                  ? (categories.find((c) => String(c.id) === String(categoryFilter))?.category_name || 'Thể loại')
+                  : 'Tất cả thể loại'
+              }
+              className="h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Tất cả thể loại</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id.toString()}>{c.category_name}</option>
+              ))}
+            </select>
 
-              <select
-                aria-label="Lọc nhà xuất bản"
-                title={publisherFilter}
-                className="h-10 w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                value={publisherFilter}
-                onChange={(e) => {
-                  setPublisherFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="Tất cả nhà xuất bản">Tất cả nhà xuất bản</option>
-                {publisherOptions.map((pub) => (
-                  <option key={pub} value={pub}>{pub}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* View mode */}
-            <div className="flex shrink-0 items-center justify-end lg:ml-auto">
-              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'list' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
-                >
-                  <LayoutList className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className={`!h-8 !w-8 !p-0 !rounded-md ${viewMode === 'grid' ? '!bg-white !text-indigo-600 shadow-sm hover:!bg-white' : '!text-slate-400 hover:!text-slate-600 hover:!bg-transparent'}`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            <select
+              aria-label="Lọc nhà xuất bản"
+              title={publisherFilter}
+              className="h-10 w-full min-w-0 max-w-full rounded-lg border border-slate-200 bg-white px-3 pr-8 text-sm font-medium leading-5 text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+              value={publisherFilter}
+              onChange={(e) => {
+                setPublisherFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="Tất cả nhà xuất bản">Tất cả nhà xuất bản</option>
+              {publisherOptions.map((pub) => (
+                <option key={pub} value={pub}>{pub}</option>
+              ))}
+            </select>
           </div>
         </div>
 

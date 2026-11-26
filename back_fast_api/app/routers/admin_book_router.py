@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_roles
-from app.models.book import Book, Category, Ebook, Subject
+from app.models.book import Book, BookCopy, Category, Ebook, Subject
 from app.models.user import Account
 from app.schemas.book import (
     BookCreate,
@@ -116,6 +117,23 @@ def delete_book(
     book = _get_book_or_404(db, book_id)
     if not book.is_active:
         return
+    # Không vô hiệu hóa khi còn bản đang lưu hành — tránh lệch available_stock / kẹt thể loại.
+    circulating = db.scalar(
+        select(BookCopy.copy_barcode)
+        .where(
+            BookCopy.book_id == book_id,
+            BookCopy.status.in_(("AVAILABLE", "BORROWED")),
+        )
+        .limit(1)
+    )
+    if circulating is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Không thể vô hiệu hóa đầu sách khi còn bản sẵn sàng hoặc đang mượn. "
+                "Hãy thanh lý / xử lý bản sao trên Tồn kho trước."
+            ),
+        )
     book.is_active = False
     book.available_stock = 0
     db.commit()
