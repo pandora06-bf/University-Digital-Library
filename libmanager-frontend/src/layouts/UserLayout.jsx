@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BookOpen, Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
+import { Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
 import { getCurrentUser } from '../mocks/auth';
+import BrandMark from '../components/BrandMark';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
 import { Button } from '../components/Button';
@@ -53,12 +54,11 @@ export default function UserLayout() {
             title="Về trang chủ Thư viện"
             className="flex items-center gap-3 shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded-xl p-1 cursor-pointer hover:opacity-95 transition-opacity group"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-[#312E81] via-[#4F46E5] to-[#0E7490] flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
-            </div>
+            {/* Logo phương án B "Dấu trang chữ L" (Figma: LibManager – Logo mới) */}
+            <BrandMark className="w-10 h-10 sm:w-12 sm:h-12 shrink-0 rounded-[30%] shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform" />
             <div>
-              <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#312E81] to-[#4F46E5] bg-clip-text text-transparent">
-                LibManager
+              <span className="text-xl sm:text-2xl font-bold tracking-tight text-[#172033]">
+                Lib<span className="text-[#4F46E5]">Manager</span>
               </span>
               <p className="text-[11px] font-medium text-[#5B6B82] hidden sm:block">
                 Cổng Thư viện Số TDTU
