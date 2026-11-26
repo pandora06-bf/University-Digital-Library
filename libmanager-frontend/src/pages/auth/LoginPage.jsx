@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -8,6 +8,7 @@ import { login } from '../../services/authService';
 import { getToken } from '../../services/axios_instance';
 import { getCurrentUser } from '../../mocks/auth';
 import { landingPathFor } from '../../utils/loginRedirect';
+import BrandMark from '../../components/user/BrandMark';
 
 /**
  * Màn hình Đăng nhập (Login Page)
@@ -81,9 +82,7 @@ export default function LoginPage({ onLogin }) {
             title="Về trang chủ"
             className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 transition-colors"
           >
-            <div className="w-8 h-8 rounded-xl bg-white text-indigo-600 flex items-center justify-center font-bold">
-              <BookOpen className="w-5 h-5" />
-            </div>
+            <BrandMark className="w-8 h-8 shrink-0 rounded-[30%] ring-1 ring-white/30" />
             <span className="font-semibold tracking-wide text-sm sm:text-base">LibManager Portal</span>
           </Link>
         </div>
