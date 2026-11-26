@@ -8,7 +8,6 @@ import {
   Files, 
   Search, 
   LogOut,
-  BookOpen,
   ChevronRight,
   X,
   Menu,
@@ -34,6 +33,7 @@ const SEARCH_SUGGESTIONS = [
 ];
 
 import { logout, getMe } from '../services/authService';
+import BrandMark from '../components/BrandMark';
 import { getCurrentUser, setCurrentUser } from '../mocks/auth';
 
 function roleLabel(user) {
@@ -282,12 +282,11 @@ export default function AdminLayout() {
           }}
           className="h-20 bg-white flex items-center gap-3 px-6 border-b border-[#D9E2EE] cursor-pointer hover:bg-slate-50/80 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-inset group"
         >
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#312E81] via-[#4F46E5] to-[#0E7490] flex items-center justify-center text-white shadow-md shadow-indigo-500/20 shrink-0 group-hover:scale-105 transition-transform">
-            <BookOpen className="w-5 h-5" />
-          </div>
+          {/* Logo phương án B "Dấu trang chữ L" — dùng chung BrandMark với cổng Người dùng */}
+          <BrandMark className="w-11 h-11 shrink-0 rounded-[30%] shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform" />
           <div className="flex flex-col justify-center">
-            <span className="text-[22px] font-bold bg-gradient-to-r from-[#312E81] to-[#4F46E5] bg-clip-text text-transparent leading-none mb-1 group-hover:opacity-90">
-              LibManager
+            <span className="text-[22px] font-bold tracking-tight text-[#172033] leading-none mb-1 group-hover:opacity-90">
+              Lib<span className="text-[#4F46E5]">Manager</span>
             </span>
             <span className="text-[10px] font-medium text-[#5B6B82] leading-tight">
               Cổng Quản trị Thư viện Số TDTU

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
 import { getCurrentUser } from '../mocks/auth';
-import BrandMark from '../components/user/BrandMark';
+import BrandMark from '../components/BrandMark';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
 import { Button } from '../components/Button';

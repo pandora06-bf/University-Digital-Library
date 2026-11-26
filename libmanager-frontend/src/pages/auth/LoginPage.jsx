@@ -8,7 +8,7 @@ import { login } from '../../services/authService';
 import { getToken } from '../../services/axios_instance';
 import { getCurrentUser } from '../../mocks/auth';
 import { landingPathFor } from '../../utils/loginRedirect';
-import BrandMark from '../../components/user/BrandMark';
+import BrandMark from '../../components/BrandMark';
 
 /**
  * Màn hình Đăng nhập (Login Page)
