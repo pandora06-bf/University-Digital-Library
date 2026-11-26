@@ -5,8 +5,9 @@ import { toTopUp, toTxn } from '../utils/wallet';
 // fines_router.py, webhook_router.py). Lỗi giữ nguyên dạng Axios để ToastAlertComponent đổi lời.
 export const TXN_PAGE_SIZE = 10;
 
-// Nút giả lập chuyển khoản chỉ hiện ở môi trường chạy thử (dev server, hoặc bật cờ khi demo).
-export const canSimulateTopUp = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TOPUP_SIMULATE === 'true';
+// Hệ thống chạy tiền thật (VietQR + webhook SePay). Nút giả lập chỉ hiện khi bật cờ rõ ràng
+// VITE_ENABLE_TOPUP_SIMULATE=true (kiểm thử nội bộ); container web chạy `npm run dev` nên không dựa vào DEV.
+export const canSimulateTopUp = import.meta.env.VITE_ENABLE_TOPUP_SIMULATE === 'true';
 
 export const walletService = {
   async getBalance() {

@@ -15,7 +15,7 @@ import {
  * 1. Nhập số tiền 10.000–500.000đ → POST /api/wallet/topups trả mã QR + nội dung chuyển khoản (pay_code).
  * 2. Đếm ngược 15 phút; cứ 3 giây hỏi GET /api/wallet/topups/{pay_code}.
  * 3. Ngân hàng báo có qua webhook → trạng thái PAID → báo thành công và gọi onPaid để cập nhật số dư.
- * Nút "Giả lập chuyển khoản" chỉ hiện ở môi trường chạy thử (canSimulateTopUp).
+ * Nút "Giả lập chuyển khoản" mặc định ẩn; chỉ hiện khi VITE_ENABLE_TOPUP_SIMULATE=true (canSimulateTopUp).
  */
 
 // Đọc đồng hồ ngoài thân component (quy tắc react-hooks/purity của nhóm).

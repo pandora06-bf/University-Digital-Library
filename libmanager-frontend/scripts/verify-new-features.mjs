@@ -151,7 +151,23 @@ try {
     assert.deepEqual(snap.rooms[0].slots.map((s) => s.reason), ['Đã qua', 'Đã đặt', 'Còn trống']);
     assert.equal(snap.rooms[0].slotPrice, null);
     assert.equal(roomUi.formatPrice(null), 'Phí theo quy định');
-    assert.deepEqual({ ...snap.bookings[0] }, { id: 7, roomId: 1, roomName: 'Phong 01', date: '2026-10-21', slotId: '12:00', start: '12:00', end: '14:00', price: null, status: 'CONFIRMED' });
+    assert.deepEqual({ ...snap.bookings[0] }, { id: 7, roomId: 1, roomName: 'Phong 01', date: '2026-10-21', slotId: '12:00', start: '12:00', end: '14:00', price: null, status: 'CONFIRMED', attendees: null });
+  });
+  await check('3-18.b API thật: giá price_per_slot, lượt đặt lấy giá theo phòng, lỗi 402 dạng chữ có số tiền thiếu', () => {
+    clock = RealDate.parse('2026-11-26T09:00:00+07:00');
+    const snap = roomUi.toRoomSnapshot({ date: '2026-11-27', now: clock,
+      rooms: [{ id: 1, room_name: 'Phòng học nhóm 01', capacity: 6, price_per_slot: 20000, floor: '1', is_active: true }],
+      availability: { 1: { room: { id: 1 }, date: '2026-11-27', slots: [{ slot_start: '07:00:00', slot_end: '09:00:00', is_booked: false, is_past: false, available: true }] } },
+      bookings: [{ id: 9, room_id: 1, booking_date: '2026-11-27', attendee_count: 3, slot_start: '07:00:00', slot_end: '09:00:00', status: 'CONFIRMED' }],
+      wallet: { user_code: 'SV-DEMO-009', balance: 50000, currency: 'VND' } });
+    assert.equal(snap.balance, 50000);
+    assert.equal(snap.rooms[0].slotPrice, 20000);
+    assert.deepEqual(snap.rooms[0].slots.map((x) => [x.start, x.end, x.reason]), [['07:00', '09:00', 'Còn trống']]);
+    assert.equal(snap.bookings[0].price, 20000); assert.equal(snap.bookings[0].attendees, 3);
+    const err = (status, detail) => ({ response: { status, data: { detail } } });
+    const short = roomUi.mapRoomApiError(err(402, 'Số dư tài khoản dịch vụ không đủ để đặt phòng, cần nạp thêm 15,000đ'));
+    assert.equal(short.code, 'INSUFFICIENT_BALANCE'); assert.match(short.message, /thiếu 15\.000/);
+    assert.equal(roomUi.mapRoomApiError(err(409, 'Mỗi người chỉ được một lượt đặt còn hiệu lực trong ngày')).code, 'DAILY_LIMIT');
   });
   await check('3-18.b mock: khóa tài khoản kiểm tra trước; số tiền thiếu định dạng VNĐ; có lịch sử mẫu', () => {
     clock = RealDate.parse('2026-10-13T08:00:00+07:00');
