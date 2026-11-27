@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Liên kết Vercel CLI trên máy (projectId/orgId), không commit
+.vercel
