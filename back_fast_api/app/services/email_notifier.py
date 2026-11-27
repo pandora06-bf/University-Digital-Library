@@ -35,7 +35,7 @@ def context_base(user_name):
             "pickup_url": site_url("my-books?tab=waitlist"), "wallet_url": site_url("wallet")}
 
 def render_template(template, **context):
-    allowed = {"receipt.html", "due_reminder.html", "hold_24h.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html"}
+    allowed = {"receipt.html", "due_reminder.html", "hold_24h.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html", "overdue_notice.html"}
     if template not in allowed:
         raise ValueError("Mẫu email không được hỗ trợ")
     return environment.get_template(template).render(**context)
@@ -92,6 +92,17 @@ def send_reminder(recipient, user_name, book_title, loan_id, due_date):
     context = context_base(user_name)
     context.update(book_title=book_title, loan_code=f"PM-{loan_id}", due_date=local_date(due_date))
     return send_sync(recipient, "Thư viện - Nhắc hạn trả sách", "due_reminder.html", context)
+
+def vnd(amount):
+    return f"{int(amount):,}".replace(",", ".") + " VNĐ"
+
+
+def send_overdue_notice(recipient, user_name, book_title, loan_id, due_date, overdue_days, fine_amount, fine_rate):
+    """SRS UC12: cảnh báo ngày đầu tiên phiếu mượn chuyển sang quá hạn."""
+    context = context_base(user_name)
+    context.update(book_title=book_title, loan_code=f"PM-{loan_id}", due_date=local_date(due_date),
+                   overdue_days=overdue_days, fine_amount=vnd(fine_amount), fine_rate=vnd(fine_rate))
+    return send_sync(recipient, "Thư viện - Cảnh báo sách quá hạn trả", "overdue_notice.html", context)
 
 def send_hold(recipient, user_name, book_title, hold_id, expires_at):
     context = context_base(user_name)

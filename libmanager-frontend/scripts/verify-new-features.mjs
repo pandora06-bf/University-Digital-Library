@@ -203,7 +203,9 @@ try {
     const map = (status, detail) => borrowErr.mapBorrowError(borrowErr.apiError(status, detail));
     assert.equal(map(403, 'Tài khoản đang bị khóa mượn hoặc còn nợ phạt chưa thanh toán').code, 'BLOCKED');
     assert.equal(map(409, 'Bạn đang có phiếu mượn hoặc đang chờ nhận sách này').code, 'DUPLICATE');
-    assert.equal(map(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)').code, 'LIMIT');
+    const limitOut = map(403, 'Đã đạt hạn mức mượn: đang mượn 3/tối đa 3 cuốn');
+    assert.equal(limitOut.code, 'LIMIT'); assert.match(limitOut.message, /đang mượn 3\/tối đa 3/); // SRS UC05 E2
+    assert.equal(map(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)').code, 'LIMIT'); // API cũ
     assert.equal(map(409, 'Sách này không có bản vật lý để đặt mượn tại quầy').code, 'NO_PRINT');
     const out = map(409, 'Sách đã hết bản khả dụng, vui lòng Hẹn đặt trước');
     assert.equal(out.code, 'OUT_OF_STOCK'); assert.equal(out.offerWaitlist, true);
@@ -211,7 +213,7 @@ try {
   await check('4-14.a: lỗi Axios → Toast đỏ; nợ phạt và thiếu số dư kèm nút sang trang nạp tiền', () => {
     const fine = borrowErr.errorToast(borrowErr.apiError(403, 'Tài khoản đang bị khóa mượn hoặc còn nợ phạt chưa thanh toán'));
     assert.equal(fine.type, 'error'); assert.equal(fine.action.to, '/account?topup=1'); // 4-13: trả phạt bằng ví
-    const limit = borrowErr.errorToast(borrowErr.apiError(409, 'Đã đạt hạn mức mượn đồng thời (3 phiếu)'));
+    const limit = borrowErr.errorToast(borrowErr.apiError(403, 'Đã đạt hạn mức mượn: đang mượn 5/tối đa 5 cuốn'));
     assert.match(limit.message, /tối đa/); assert.equal(limit.action, undefined);
     const room = borrowErr.errorToast(Object.assign(new Error('Số dư không đủ. Bạn còn thiếu 20.000 ₫ để đặt phòng.'), { code: 'INSUFFICIENT_BALANCE' }));
     assert.match(room.message, /thiếu 20\.000/); assert.equal(room.action.label, 'Sang Nạp tiền');

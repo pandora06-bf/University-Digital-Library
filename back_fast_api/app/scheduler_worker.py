@@ -121,6 +121,46 @@ def run_due_reminder_job(session_factory=SessionLocal, now=None):
     finally:
         db.close()
 
+def run_overdue_notice_job(session_factory=SessionLocal, now=None):
+    """JOB-09 (SRS UC12): email cảnh báo một lần khi phiếu sách in vừa chuyển OVERDUE (JOB-01 đặt trạng thái
+    và tạo phí phạt). Khóa theo phiếu + hạn trả nên gia hạn rồi quá hạn lại vẫn được báo; gửi lỗi thì lần chạy sau thử lại."""
+    from app.services.email_notifier import send_overdue_notice
+    from app.models.notification import EmailNotice
+    from sqlalchemy.orm import joinedload
+    now = now or utcnow()
+    if now.tzinfo is not None:
+        now = now.astimezone(__import__("datetime").timezone.utc).replace(tzinfo=None)
+    db = session_factory()
+    sent = 0
+    try:
+        loans = db.query(Loan).options(joinedload(Loan.book), joinedload(Loan.user)).filter(
+            Loan.loan_type != "EBOOK", Loan.loan_status == "OVERDUE").all()
+        for loan in loans:
+            key = f"overdue:{loan.id}:{loan.due_date.isoformat()}"
+            if db.query(EmailNotice.id).filter(EmailNotice.event_key == key).first():
+                continue
+            user = loan.user
+            if not user or not user.email:
+                log.info("JOB-09 skipped missing email loan=%s", loan.id)
+                continue
+            fine = db.query(Fine).filter(Fine.loan_id == loan.id).first()
+            days = fine.overdue_days if fine else 1
+            amount = fine.total_amount if fine else RATE * days
+            try:
+                if send_overdue_notice(user.email, user.full_name, loan.book.title, loan.id, loan.due_date,
+                                       days, amount, RATE):
+                    db.add(EmailNotice(event_key=key, recipient=user.email))
+                    db.commit()
+                    sent += 1
+                else:
+                    log.warning("JOB-09 email failed loan=%s; will retry", loan.id)
+            except Exception:
+                db.rollback()
+                log.exception("JOB-09 failed loan=%s", loan.id)
+        return sent
+    finally:
+        db.close()
+
 def _optional_job(module, function):
     "Load team-owned jobs only if implementations have been merged."
     try:
@@ -134,6 +174,8 @@ def configure_scheduler():
     scheduler = BlockingScheduler(timezone=VN_TZ, job_defaults={"coalesce": True, "max_instances": 1})
     scheduler.add_job(run_fine_job, "cron", hour=0, minute=0, id="JOB-01", replace_existing=True, misfire_grace_time=None)
     scheduler.add_job(run_due_reminder_job, "cron", hour=8, id="JOB-02", replace_existing=True, misfire_grace_time=None)
+    # Sau JOB-01 (00:00) để phí phạt đã có; gửi giờ hành chính thay vì nửa đêm
+    scheduler.add_job(run_overdue_notice_job, "cron", hour=8, minute=5, id="JOB-09", replace_existing=True, misfire_grace_time=None)
     scheduler.add_job(run_ebook_expiry_job, "interval", minutes=5, id="JOB-05", replace_existing=True)
     for job_id, module, func in [
         ("JOB-04", "app.services.job_hold_expiry", "job_hold_expiry"),

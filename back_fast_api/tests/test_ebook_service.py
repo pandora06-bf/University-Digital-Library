@@ -137,7 +137,7 @@ def test_borrow_rejects_when_over_limit(db_session):
     book2 = _make_ebook_book(db_session)
     with pytest.raises(HTTPException) as e:
         svc.borrow(db_session, user.user_code, book2.id)
-    assert e.value.status_code == 409
+    assert e.value.status_code == 403
 
 
 def test_borrow_success_sets_due_date_and_token(db_session):

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from app.models.book import Book
 from app.models.loan import Loan, Waitlist
 from app.models.user import User
-from app.services.loan_states import ACTIVE_LOAN_STATUSES
+from app.services.loan_states import ACTIVE_LOAN_STATUSES, borrow_limit_error
 
 WAITING = "WAITING"
 HELD = "HELD"
@@ -39,7 +39,7 @@ def check_eligible(db: Session, user: User, book_id: int, exclude_waitlist_id=No
         Loan.loan_status.in_(ACTIVE_LOAN_STATUSES),
     )) or 0
     if active_loans >= user.max_borrow_limit:
-        raise HTTPException(409, "Đã đạt hạn mức mượn sách")
+        raise borrow_limit_error(active_loans, user.max_borrow_limit)
     if db.scalar(select(Loan.id).where(Loan.user_code == user.user_code,
                       Loan.book_id == book_id, Loan.loan_status.in_(ACTIVE_LOAN_STATUSES)).limit(1)):
         raise HTTPException(409, "Bạn đang có phiếu mượn sách này")

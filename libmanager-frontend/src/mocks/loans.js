@@ -209,7 +209,7 @@ const setStoredWaitlists = (items) => sessionStorage.setItem(WAITLIST_KEY, JSON.
 function checkBorrower(user, bookId, loans) {
   if (user?.is_locked || Number(user?.total_fines) > 0) throw apiError(403, 'Tài khoản bị khóa hoặc còn nợ phạt');
   const active = loans.filter((loan) => ACTIVE_STATUSES.includes(loan.status));
-  if (active.length >= borrowLimitFor(user)) throw apiError(409, 'Đã đạt hạn mức mượn sách');
+  if (active.length >= borrowLimitFor(user)) throw apiError(403, `Đã đạt hạn mức mượn: đang mượn ${active.length}/tối đa ${borrowLimitFor(user)} cuốn`);
   if (active.some((loan) => loan.bookId === bookId)) throw apiError(409, 'Bạn đang có phiếu mượn sách này');
 }
 

@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.models.book import Book
 from app.models.loan import Loan
 from app.models.user import User
-from app.services.loan_states import ACTIVE_LOAN_STATUSES
+from app.services.loan_states import ACTIVE_LOAN_STATUSES, borrow_limit_error
 from app.services.upload_service import read_private_pdf, resolve_private_pdf
 
 ACTIVE = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
@@ -64,7 +64,7 @@ def borrow(db: Session, user_code: str, book_id: int) -> Loan:
     active_count = db.query(func.count(Loan.id)).filter(Loan.user_code == user_code,
         Loan.loan_status.in_(ACTIVE_LOAN_STATUSES)).scalar() or 0
     if active_count >= user.max_borrow_limit:
-        raise HTTPException(409, "Đã đạt hạn mức mượn")
+        raise borrow_limit_error(active_count, user.max_borrow_limit)
     loan = Loan(user_code=user_code, book_id=book_id, loan_type="EBOOK",
         loan_status="BORROWED", borrow_date=now,
         due_date=now + timedelta(days=book.ebook.borrow_days),

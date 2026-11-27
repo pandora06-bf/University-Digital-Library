@@ -68,7 +68,7 @@ class Waitlist(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_code: Mapped[str] = mapped_column(
-        String(50), ForeignKey("users.user_code", ondelete="CASCADE"), nullable=False, index=True
+        String(50), ForeignKey("users.user_code", ondelete="RESTRICT"), nullable=False, index=True
     )
     book_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("books.id", ondelete="CASCADE"), nullable=False, index=True

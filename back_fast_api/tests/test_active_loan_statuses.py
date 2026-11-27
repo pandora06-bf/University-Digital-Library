@@ -57,8 +57,8 @@ def test_requested_loan_counts_toward_limit_on_web_request(client, db_session):
     _loan(db_session, user.user_code, _book(db_session, "Pending C"), "PENDING_PICKUP")
     fourth = _book(db_session, "Fourth D")
     res = client.post("/api/loans/physical/request", json={"book_id": fourth.id}, headers=headers)
-    assert res.status_code == 409, res.text
-    assert "hạn mức" in res.json()["detail"]
+    assert res.status_code == 403, res.text  # SRS UC05 E2
+    assert "đang mượn 3/tối đa 3" in res.json()["detail"]
 
 
 def test_requested_loan_blocks_duplicate_request(client, db_session):
@@ -76,7 +76,7 @@ def test_pending_pickup_counts_for_waitlist_eligibility(db_session):
     sold_out = _book(db_session, "Sold out F", stock=0)
     with pytest.raises(HTTPException) as e:
         waitlist_logic.check_eligible(db_session, user, sold_out.id)
-    assert e.value.status_code == 409
+    assert e.value.status_code == 403  # SRS UC07 E2
 
 
 def test_pending_pickup_of_same_book_blocks_waitlist(db_session):
@@ -96,7 +96,7 @@ def test_requested_loan_counts_toward_ebook_limit(db_session):
     db_session.commit()
     with pytest.raises(HTTPException) as e:
         ebook_service.borrow(db_session, user.user_code, ebook.id)
-    assert e.value.status_code == 409
+    assert e.value.status_code == 403  # SRS UC04 E1
 
 
 def test_profile_counts_only_open_loans(db_session):

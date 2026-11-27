@@ -14,7 +14,7 @@ from app.models.book import Book, BookCopy
 from app.models.fine import Fine, FinePayment
 from app.models.loan import Incident, Loan, Waitlist
 from app.models.user import User
-from app.services.loan_states import ACTIVE_LOAN_STATUSES
+from app.services.loan_states import ACTIVE_LOAN_STATUSES, borrow_limit_error
 
 # Trạng thái Loan được tính vào hạn mức mượn đồng thời (Active_Loans): xem loan_states.py
 # (một nguồn chung cho loan_service, waitlist_logic, ebook_service, user_service, routers/loans).
@@ -241,10 +241,7 @@ def request_physical_loan_service(db: Session, user_code: str, book_id: int) -> 
         or 0
     )
     if active_loans >= reader.max_borrow_limit:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Đã đạt hạn mức mượn đồng thời ({reader.max_borrow_limit} phiếu)",
-        )
+        raise borrow_limit_error(active_loans, reader.max_borrow_limit)
 
     # (3) Tồn kho khả dụng
     if book.available_stock <= 0:
@@ -591,10 +588,7 @@ def checkout_at_counter_service(
             )
         ) or 0
         if active_borrowed_count >= max_limit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Bạn đọc đã đạt hạn mức mượn tối đa ({max_limit} cuốn)"
-            )
+            raise borrow_limit_error(active_borrowed_count, max_limit)
 
         # PENDING_PICKUP đã trừ tồn kho lúc đặt trên Web -> không trừ lại.
         # REQUESTED (luồng cũ, chưa giữ chỗ) thì mới trừ tồn kho tại đây.
@@ -624,10 +618,7 @@ def checkout_at_counter_service(
             )
         ) or 0
         if active_loans_count >= max_limit:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Bạn đọc đã đạt hạn mức mượn tối đa ({max_limit} cuốn)"
-            )
+            raise borrow_limit_error(active_loans_count, max_limit)
 
         # Kiểm tra xem bạn đọc có đang mượn một cuốn khác của cùng đầu sách này không
         duplicate_loan = db.scalar(

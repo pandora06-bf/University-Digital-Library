@@ -46,7 +46,7 @@ export function borrowMockEbook(bookId) {
   if (existing) return existing;
   const active = loans.filter((loan) => loan.status === 'Đang mượn').length;
   const limit = user?.apiRole === 'LECTURER' ? 5 : 3;
-  if (active >= limit) error(`Bạn đã đạt hạn mức ${limit} tài liệu. Vui lòng trả tài liệu trước khi mượn thêm.`, 409);
+  if (active >= limit) error(`Đã đạt hạn mức mượn: đang mượn ${active}/tối đa ${limit} cuốn`, 403);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 14 * 86400000).toISOString();
   const dateLabel = (value) => new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(value));
