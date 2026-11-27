@@ -1,10 +1,16 @@
 name: CI Pipeline
 
+# SRS: CI chạy trên mọi lần push (mọi nhánh), và trên PR vào main/develop
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "**" ]
   pull_request:
     branches: [ "main", "develop" ]
+
+# Push mới lên cùng nhánh thì hủy lượt chạy cũ đang dở, tránh tốn phút CI
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-backend:
