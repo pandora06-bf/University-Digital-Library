@@ -49,9 +49,16 @@ class SubjectTreeOut(BaseModel):
         from_attributes = True
 
 
+class BookAttributeOut(BaseModel):
+    code: str = Field(..., description="TEXTBOOK | REFERENCE | WORKBOOK")
+    label: str = Field(..., description="Giáo trình / Tài liệu tham khảo / Sách bài tập")
+    count: int = Field(0, description="Số đầu sách đang hoạt động")
+
+
 class CatalogTreeResponse(BaseModel):
     subjects: List[SubjectTreeOut]
     available_book_types: List[str] = Field(default=["PRINTED", "EBOOK"])
+    attributes: List[BookAttributeOut] = Field(default_factory=list, description="Thuộc tính sách (SRS UC02)")
 
 
 class BookShelfLocation(BaseModel):
@@ -79,6 +86,13 @@ class BookDetailResponse(BaseModel):
     subject_code: Optional[str] = None
     category_id: Optional[int] = None
     category_name: Optional[str] = None
+    # SRS UC02 Output: tên khác, thuộc tính, từ khóa, số chương, số trang
+    alternative_title: Optional[str] = None
+    book_attribute: Optional[str] = None
+    book_attribute_label: Optional[str] = None
+    keywords: Optional[str] = None
+    num_chapters: Optional[int] = None
+    num_pages: Optional[int] = None
     locations: List[BookShelfLocation] = Field(default_factory=list)
 
     class Config:

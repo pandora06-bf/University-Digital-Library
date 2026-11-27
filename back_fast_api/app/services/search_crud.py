@@ -7,6 +7,7 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.book import Book, BookCopy, Category
+from app.models.book_attributes import BOOK_ATTRIBUTES
 
 DEFAULT_PAGE_SIZE = 20   # NFR-PE-02
 MAX_PAGE_SIZE = 50       # NFR-PE-02
@@ -157,7 +158,11 @@ def search_books_advanced(
 
     attribute = normalize_text(attribute)
     if attribute:
-        stmt = stmt.where(_ilike(Book.keywords, attribute))
+        # SRS UC02/UC03: thuộc tính sách (TEXTBOOK/REFERENCE/WORKBOOK); chuỗi khác giữ cách cũ là dò từ khóa
+        if attribute.upper() in BOOK_ATTRIBUTES:
+            stmt = stmt.where(Book.book_attribute == attribute.upper())
+        else:
+            stmt = stmt.where(_ilike(Book.keywords, attribute))
 
     if format:
         target = format.upper()

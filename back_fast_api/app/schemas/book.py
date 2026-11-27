@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 BookType = Literal["PRINTED", "EBOOK", "BOTH"]
+# SRS UC02: Giáo trình / Tài liệu tham khảo / Sách bài tập (nhãn tiếng Việt: app/models/book_attributes.py)
+BookAttribute = Literal["TEXTBOOK", "REFERENCE", "WORKBOOK"]
 
 
 class BookBase(BaseModel):
@@ -16,6 +18,9 @@ class BookBase(BaseModel):
     description: str | None = None
     keywords: str | None = None
     num_pages: int | None = Field(default=None, ge=1)
+    alternative_title: str | None = Field(default=None, max_length=255)
+    book_attribute: BookAttribute | None = None
+    num_chapters: int | None = Field(default=None, ge=1)
     book_type: BookType
     category_id: int | None = Field(default=None, ge=1)
     subject_code: str | None = Field(default=None, max_length=50)
@@ -41,6 +46,9 @@ class BookUpdate(BaseModel):
     description: str | None = None
     keywords: str | None = None
     num_pages: int | None = Field(default=None, ge=1)
+    alternative_title: str | None = Field(default=None, max_length=255)
+    book_attribute: BookAttribute | None = None
+    num_chapters: int | None = Field(default=None, ge=1)
     book_type: BookType | None = None
     available_stock: int | None = Field(default=None, ge=0)
     category_id: int | None = Field(default=None, ge=1)

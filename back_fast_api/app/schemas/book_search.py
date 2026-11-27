@@ -27,6 +27,8 @@ class BookSearchItemResponse(BaseModel):
     )
     category_id: Optional[int] = None
     subject_id: Optional[int] = None
+    subject_code: Optional[str] = None
+    book_attribute: Optional[str] = None
     # Admin eBook list: biết sách đã có PDF và quy tắc xem trước
     has_pdf: bool = False
     preview_pages: Optional[int] = None
@@ -57,6 +59,8 @@ class BookSearchItemResponse(BaseModel):
             "published_year": getattr(data, "publication_year", None),
             "category_id": getattr(data, "category_id", None),
             "subject_id": getattr(data, "subject_id", None),
+            "subject_code": getattr(data, "subject_code", None),
+            "book_attribute": getattr(data, "book_attribute", None),
             "has_pdf": ebook is not None,
             "preview_pages": getattr(ebook, "preview_pages", None) if ebook else None,
             "is_free": getattr(ebook, "is_free", None) if ebook else None,

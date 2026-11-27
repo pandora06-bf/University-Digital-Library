@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Bookmark, CheckCircle, XCircle, MapPin, Building, Calendar, Hash, FileText, BellRing, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, BookOpen, Bookmark, CheckCircle, XCircle, MapPin, Building, Calendar, Hash, FileText, BellRing, AlertTriangle, Tags, ListOrdered } from 'lucide-react';
 import { Button } from '../../components/Button';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import ToastAlertComponent from '../../components/ToastAlertComponent';
@@ -271,14 +271,24 @@ export default function BookDetailPage() {
         <div className="md:col-span-2 space-y-6">
           
           <div>
-            {book.category && (
-              <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
-                {book.category}
-              </span>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {book.category && (
+                <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg">
+                  {book.category}
+                </span>
+              )}
+              {book.attributeLabel && (
+                <span className="text-xs font-semibold px-2.5 py-1 bg-cyan-50 text-cyan-800 rounded-lg">
+                  {book.attributeLabel}
+                </span>
+              )}
+            </div>
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-3 break-words">
               {book.title}
             </h1>
+            {book.alternativeTitle && (
+              <p className="text-sm text-slate-500 mt-1 break-words">Tên khác: <span className="italic">{book.alternativeTitle}</span></p>
+            )}
             <p className="text-base text-slate-600 mt-1 font-medium">
               Tác giả: <span className="text-indigo-600">{book.author}</span>
             </p>
@@ -336,6 +346,31 @@ export default function BookDetailPage() {
                 <span className="font-semibold text-slate-800">{hasPrint ? orDash(book.location) : 'Không có bản in'}</span>
               </div>
             </div>
+
+            {/* SRS UC02 Output: thuộc tính, số trang, số chương */}
+            <div className="flex items-start gap-3">
+              <Tags className="w-4 h-4 text-slate-400 mt-0.5" />
+              <div>
+                <span className="text-xs text-slate-400 block font-medium">Thuộc tính</span>
+                <span className="font-semibold text-slate-800">{orDash(book.attributeLabel)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <FileText className="w-4 h-4 text-slate-400 mt-0.5" />
+              <div>
+                <span className="text-xs text-slate-400 block font-medium">Số trang</span>
+                <span className="font-semibold text-slate-800">{book.numPages ? `${book.numPages} trang` : '—'}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <ListOrdered className="w-4 h-4 text-slate-400 mt-0.5" />
+              <div>
+                <span className="text-xs text-slate-400 block font-medium">Số chương</span>
+                <span className="font-semibold text-slate-800">{book.numChapters ? `${book.numChapters} chương` : '—'}</span>
+              </div>
+            </div>
           </div>
 
           {/* Description */}
@@ -347,6 +382,21 @@ export default function BookDetailPage() {
               {book.description || 'Chưa có tóm tắt cho tài liệu này.'}
             </p>
           </div>
+
+          {/* SRS UC02 Output: từ khóa — bấm để tìm sách cùng từ khóa */}
+          {book.keywords?.length > 0 && (
+            <div className="pt-4 border-t border-slate-100 space-y-2">
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Từ khóa</h3>
+              <div className="flex flex-wrap gap-2">
+                {book.keywords.map((word) => (
+                  <Link key={word} to={`/catalog?q=${encodeURIComponent(word)}`}
+                    className="inline-flex items-center min-h-9 px-3 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
+                    #{word}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
 

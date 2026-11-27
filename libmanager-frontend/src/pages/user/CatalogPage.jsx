@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Filter, BookOpen, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Search, Filter, BookOpen, ChevronLeft, ChevronRight, AlertTriangle, GraduationCap, Tags, SlidersHorizontal, X } from 'lucide-react';
 import { BookCard } from '../../components/BookCard';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
@@ -25,12 +25,42 @@ const pageWindow = (page, totalPages) => {
  * - Thể loại lấy từ GET /api/books/categories
  * - Từ khóa, thể loại, eBook, trang đều nằm trên URL (?q=&category=&ebook=1&page=) nên tải lại hoặc
  *   tìm từ ô trên header vẫn giữ đúng kết quả
+ * - SRS UC02/UC03: duyệt theo môn học/bộ môn (?subject=), thuộc tính sách (?attr=), và lọc nâng cao
+ *   theo tác giả, nhà xuất bản, năm (?author=&publisher=&year=)
  */
+
+// Một hàng nút chọn (môn học / thuộc tính / thể loại), cuộn ngang trên điện thoại.
+function ChipRow({ icon: Icon, label, options, selected, onSelect }) {
+  return (
+    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none" role="group" aria-label={label}>
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mr-2 shrink-0">
+        <Icon className="w-3.5 h-3.5" />
+        <span>{label}:</span>
+      </div>
+      {[{ value: null, text: 'Tất cả' }, ...options].map((option) => {
+        const isSelected = (selected ?? null) === (option.value ?? null);
+        return (
+          <button key={option.value ?? 'all'} type="button" aria-pressed={isSelected} onClick={() => onSelect(option.value)}
+            className={`min-h-10 lg:min-h-0 px-3.5 py-2 lg:py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all select-none ${
+              isSelected ? 'bg-[#4F46E5] text-white shadow-sm shadow-indigo-200' : 'bg-white border border-slate-200 text-[#5B6B82] hover:border-slate-300 hover:text-slate-900'
+            }`}>
+            {option.text}{option.count != null && <span className={`ml-1 ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>{option.count}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 export default function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get('q') || '';
   const categoryId = Number(searchParams.get('category')) || null;
   const ebookOnly = searchParams.get('ebook') === '1';
+  const subjectCode = searchParams.get('subject') || null;
+  const attribute = searchParams.get('attr') || null;
+  const author = searchParams.get('author') || '';
+  const publisher = searchParams.get('publisher') || '';
+  const year = searchParams.get('year') || '';
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
 
   // Đổi bộ lọc thì quay về trang 1; chỉ đổi trang thì giữ bộ lọc.
@@ -81,24 +111,42 @@ export default function CatalogPage() {
     },
   };
 
-  const [categories, setCategories] = useState([]);
+  const [catalog, setCatalog] = useState({ categories: [], subjects: [], attributes: [] });
+  const categories = catalog.categories;
   useEffect(() => {
-    bookService.getCategories().then(setCategories).catch(() => setCategories([]));
+    bookService.getCatalog().then(setCatalog).catch(() => setCatalog({ categories: [], subjects: [], attributes: [] }));
   }, []);
 
+  // Lọc nâng cao: gõ xong bấm "Áp dụng" (hoặc Enter) mới đưa lên URL.
+  const advancedCount = [author, publisher, year].filter(Boolean).length;
+  const [advancedOpen, setAdvancedOpen] = useState(advancedCount > 0);
+  const [draft, setDraft] = useState({ author, publisher, year });
+  const applied = `${author}|${publisher}|${year}`;
+  const [appliedSeen, setAppliedSeen] = useState(applied);
+  if (appliedSeen !== applied) { // URL đổi từ nơi khác (Quay lại, Đặt lại) → ô nhập theo URL
+    setAppliedSeen(applied);
+    setDraft({ author, publisher, year });
+  }
+  const applyAdvanced = (event) => {
+    event.preventDefault();
+    const yearValue = String(draft.year).replace(/[^0-9]/g, '').slice(0, 4);
+    updateParams({ author: draft.author.trim() || null, publisher: draft.publisher.trim() || null, year: yearValue || null });
+  };
+  const clearAdvanced = () => updateParams({ author: null, publisher: null, year: null });
+
   const query = searchTerm;
-  const requestKey = JSON.stringify({ query, categoryId, ebookOnly, page });
+  const requestKey = JSON.stringify({ query, categoryId, ebookOnly, subjectCode, attribute, author, publisher, year, page });
   const [result, setResult] = useState({ key: null, data: null, error: null });
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false; // bỏ kết quả của request cũ nếu người dùng đã đổi bộ lọc
     bookService
-      .search({ q: query, categoryId, bookType: ebookOnly ? 'EBOOK' : undefined, page })
+      .search({ q: query, categoryId, bookType: ebookOnly ? 'EBOOK' : undefined, subjectCode, attribute, author, publisher, year, page })
       .then((data) => !cancelled && setResult({ key: requestKey, data, error: null }))
       .catch((error) => !cancelled && setResult({ key: requestKey, data: null, error }));
     return () => { cancelled = true; };
-  }, [requestKey, query, categoryId, ebookOnly, page, reloadCount]);
+  }, [requestKey, query, categoryId, ebookOnly, subjectCode, attribute, author, publisher, year, page, reloadCount]);
 
   const loading = result.key !== requestKey;
   const books = result.data?.items ?? [];
@@ -149,29 +197,49 @@ export default function CatalogPage() {
           </label>
         </div>
 
-        {/* Category Filter Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 mr-2 shrink-0">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Thể loại:</span>
-          </div>
-          {[{ id: null, name: 'Tất cả' }, ...categories].map((cat) => {
-            const isSelected = categoryId === cat.id;
-            return (
-              <button
-                key={cat.id ?? 'all'}
-                type="button"
-                onClick={() => updateParams({ category: cat.id ? String(cat.id) : null })}
-                className={`min-h-10 lg:min-h-0 px-3.5 py-2 lg:py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all select-none ${
-                  isSelected
-                    ? 'bg-[#4F46E5] text-white shadow-sm shadow-indigo-200'
-                    : 'bg-white border border-slate-200 text-[#5B6B82] hover:border-slate-300 hover:text-slate-900'
-                }`}
-              >
-                {cat.name}
-              </button>
-            );
-          })}
+        {/* SRS UC02: duyệt theo Môn học/Bộ môn, Thuộc tính sách, Thể loại */}
+        {catalog.subjects.length > 0 && (
+          <ChipRow icon={GraduationCap} label="Môn học" selected={subjectCode}
+            options={catalog.subjects.map((subject) => ({ value: subject.code, text: subject.name }))}
+            onSelect={(value) => updateParams({ subject: value })} />
+        )}
+        <ChipRow icon={Tags} label="Thuộc tính" selected={attribute}
+          options={catalog.attributes.map((item) => ({ value: item.code, text: item.label, count: item.count }))}
+          onSelect={(value) => updateParams({ attr: value })} />
+        <ChipRow icon={Filter} label="Thể loại" selected={categoryId ? String(categoryId) : null}
+          options={categories.map((cat) => ({ value: String(cat.id), text: cat.name }))}
+          onSelect={(value) => updateParams({ category: value })} />
+
+        {/* SRS UC03: lọc nâng cao theo tác giả, nhà xuất bản, năm */}
+        <div className="space-y-3">
+          <button type="button" onClick={() => setAdvancedOpen((open) => !open)} aria-expanded={advancedOpen} aria-controls="advanced-filters"
+            className="inline-flex items-center gap-2 min-h-10 px-3 rounded-xl text-sm font-semibold text-slate-700 border border-slate-200 bg-white hover:border-indigo-400">
+            <SlidersHorizontal className="w-4 h-4" /> Lọc nâng cao
+            {advancedCount > 0 && <span className="rounded-full bg-indigo-600 text-white text-xs px-1.5">{advancedCount}</span>}
+          </button>
+          {advancedOpen && (
+            <form id="advanced-filters" onSubmit={applyAdvanced}
+              className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_140px_auto] gap-3 items-end rounded-2xl border border-[#D9E2EE] bg-white p-4">
+              <label className="text-xs font-semibold text-slate-600">Tác giả
+                <input value={draft.author} onChange={(event) => setDraft((d) => ({ ...d, author: event.target.value }))} placeholder="Ví dụ: Martin"
+                  className="mt-1 block w-full h-11 rounded-xl border border-slate-300 px-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Nhà xuất bản
+                <input value={draft.publisher} onChange={(event) => setDraft((d) => ({ ...d, publisher: event.target.value }))} placeholder="Ví dụ: Pearson"
+                  className="mt-1 block w-full h-11 rounded-xl border border-slate-300 px-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">Năm xuất bản
+                <input value={draft.year} onChange={(event) => setDraft((d) => ({ ...d, year: event.target.value }))} placeholder="2008" inputMode="numeric" maxLength={4}
+                  className="mt-1 block w-full h-11 rounded-xl border border-slate-300 px-3 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </label>
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" className="min-h-11 flex-1 sm:flex-none">Áp dụng</Button>
+                {advancedCount > 0 && (
+                  <Button type="button" size="sm" variant="outline" onClick={clearAdvanced} icon={<X className="w-4 h-4" />} className="min-h-11" aria-label="Xóa lọc nâng cao">Xóa</Button>
+                )}
+              </div>
+            </form>
+          )}
         </div>
       </div>
 
@@ -263,7 +331,7 @@ export default function CatalogPage() {
           </div>
           <h3 className="text-lg font-bold text-slate-800">Không tìm thấy tài liệu phù hợp</h3>
           <p className="text-sm text-slate-500 max-w-md mx-auto">
-            Hãy thử tìm kiếm với từ khóa khác hoặc bỏ các bộ lọc thể loại để xem nhiều kết quả hơn.
+            Hãy thử từ khóa khác hoặc bỏ bớt bộ lọc (môn học, thuộc tính, thể loại, tác giả, NXB, năm) để xem nhiều kết quả hơn.
           </p>
           <button
             type="button"
