@@ -8,15 +8,17 @@ from app.models.book import Book
 from app.models.fine import Fine
 from app.models.loan import Loan
 from app.models.user import User
+from app.services.loan_states import ACTIVE_LOAN_STATUSES
 
 
 def get_user_profile(db: Session, current_user: User) -> Dict[str, Any]:
-    # Đếm số sách đang mượn (chưa có ngày trả hoặc trạng thái chưa kết thúc)
+    # Đếm phiếu còn hiệu lực theo đúng quy tắc hạn mức (loan_states.py); phiếu đã hủy /
+    # hết hạn nhận cũng không có ngày trả nên không được đếm theo return_date.
     current_borrow_count = (
         db.scalar(
             select(func.count(Loan.id)).where(
                 Loan.user_code == current_user.user_code,
-                Loan.return_date.is_(None),
+                Loan.loan_status.in_(ACTIVE_LOAN_STATUSES),
             )
         )
         or 0

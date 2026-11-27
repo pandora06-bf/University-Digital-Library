@@ -9,10 +9,11 @@ from app.models.loan import Loan
 from app.models.user import Account
 from app.schemas.loan import LoanResponse, PhysicalLoanRequest
 from app.services.loan_service import renew_loan_service, request_physical_loan_service
+from app.services.loan_states import ACTIVE_LOAN_STATUSES
 
 # Trạng thái coi là "đang mượn" (chưa đóng phiếu) cho /my-loans; phần còn lại
 # (RETURNED/CANCELLED/LOST/EXPIRED) thuộc /my-history.
-OPEN_LOAN_STATUSES = ("PENDING_PICKUP", "REQUESTED", "BORROWED", "OVERDUE")
+OPEN_LOAN_STATUSES = ACTIVE_LOAN_STATUSES  # cùng một nguồn với kiểm tra hạn mức (loan_states.py)
 
 router = APIRouter(
     prefix="/api/loans",

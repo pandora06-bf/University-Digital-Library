@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from app.models.book import Book
 from app.models.loan import Loan, Waitlist
 from app.models.user import User
+from app.services.loan_states import ACTIVE_LOAN_STATUSES
 
 WAITING = "WAITING"
 HELD = "HELD"
@@ -35,12 +36,12 @@ def check_eligible(db: Session, user: User, book_id: int, exclude_waitlist_id=No
         raise HTTPException(403, "Tài khoản bị khóa hoặc còn nợ phạt")
     active_loans = db.scalar(select(func.count(Loan.id)).where(
         Loan.user_code == user.user_code,
-        Loan.loan_status.in_(["REQUESTED", "BORROWED", "OVERDUE"]),
+        Loan.loan_status.in_(ACTIVE_LOAN_STATUSES),
     )) or 0
     if active_loans >= user.max_borrow_limit:
         raise HTTPException(409, "Đã đạt hạn mức mượn sách")
     if db.scalar(select(Loan.id).where(Loan.user_code == user.user_code,
-                      Loan.book_id == book_id, Loan.loan_status.in_(["REQUESTED", "BORROWED", "OVERDUE"])).limit(1)):
+                      Loan.book_id == book_id, Loan.loan_status.in_(ACTIVE_LOAN_STATUSES)).limit(1)):
         raise HTTPException(409, "Bạn đang có phiếu mượn sách này")
     stmt = select(Waitlist.id).where(Waitlist.user_code == user.user_code,
                                   Waitlist.book_id == book_id, Waitlist.status.in_(ACTIVE))
