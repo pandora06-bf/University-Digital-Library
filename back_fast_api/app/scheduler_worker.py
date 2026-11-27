@@ -86,7 +86,7 @@ def run_ebook_expiry_job(session_factory=SessionLocal, now=None):
         db.close()
 
 def run_due_reminder_job(session_factory=SessionLocal, now=None):
-    """JOB-02: next-day reminders, keyed per loan/due date; failure retried next run."""
+    """JOB-02 (SRS UC12): nhắc khi còn 1–2 ngày tới hạn; mỗi phiếu + hạn trả chỉ nhắc một lần; gửi lỗi thì lần sau thử lại."""
     from app.services.email_notifier import send_reminder
     from app.models.notification import EmailNotice
     from sqlalchemy.orm import joinedload
@@ -98,7 +98,7 @@ def run_due_reminder_job(session_factory=SessionLocal, now=None):
     try:
         loans = db.query(Loan).options(joinedload(Loan.book), joinedload(Loan.user)).filter(
             Loan.loan_type != "EBOOK", Loan.loan_status == "BORROWED",
-            Loan.due_date > now, Loan.due_date <= now + timedelta(days=1)).all()
+            Loan.due_date > now, Loan.due_date <= now + timedelta(days=2)).all()  # SRS UC12: nhắc trước 1–2 ngày
         for loan in loans:
             key = f"due:{loan.id}:{loan.due_date.isoformat()}"
             if db.query(EmailNotice.id).filter(EmailNotice.event_key == key).first():

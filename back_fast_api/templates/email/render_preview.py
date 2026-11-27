@@ -15,7 +15,7 @@ def render_previews():
         autoescape=select_autoescape(["html", "xml"]),
         undefined=StrictUndefined,
     )
-    for name in ("receipt", "due_reminder", "hold_24h", "top_up"):
+    for name in ("receipt", "due_reminder", "hold_notice", "top_up"):
         rendered = environment.get_template(f"{name}.html").render(**context)
         (output / f"{name}.html").write_text(rendered, encoding="utf-8")
         print(f"Rendered {name}: {len(rendered.encode('utf-8'))} bytes")

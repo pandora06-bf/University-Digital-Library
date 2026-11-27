@@ -87,3 +87,22 @@ def test_background_scheduler_for_free_cloud(monkeypatch):
         assert scheduler.running
     finally:
         scheduler.shutdown(wait=False)
+
+
+def test_due_reminder_covers_one_to_two_days(db_session, test_account, monkeypatch):
+    """SRS UC12: nhắc khi phiếu còn 1–2 ngày tới hạn; còn 3 ngày thì chưa nhắc."""
+    from app.scheduler_worker import run_due_reminder_job
+    user = db_session.query(User).filter_by(account_id=test_account.id).first()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    titles = []
+    for title, hours in (("Còn 36 giờ", 36), ("Còn 3 ngày", 72)):
+        book = Book(title=title, author="A", publisher="B", publication_year=2024, price=0,
+                    book_type="PRINTED", available_stock=1)
+        db_session.add(book)
+        db_session.flush()
+        db_session.add(Loan(user_code=user.user_code, book_id=book.id, loan_type="PHYSICAL", loan_status="BORROWED",
+                            borrow_date=now - timedelta(days=10), due_date=now + timedelta(hours=hours)))
+    db_session.commit()
+    monkeypatch.setattr(email_notifier, "send_reminder", lambda _to, _name, title, *rest: titles.append(title) or True)
+    assert run_due_reminder_job(session_factory=lambda: _NonClosing(db_session), now=now) == 1
+    assert titles == ["Còn 36 giờ"]

@@ -35,7 +35,7 @@ def context_base(user_name):
             "pickup_url": site_url("my-books?tab=waitlist"), "wallet_url": site_url("wallet")}
 
 def render_template(template, **context):
-    allowed = {"receipt.html", "due_reminder.html", "hold_24h.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html", "overdue_notice.html"}
+    allowed = {"receipt.html", "due_reminder.html", "hold_notice.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html", "overdue_notice.html"}
     if template not in allowed:
         raise ValueError("Mẫu email không được hỗ trợ")
     return environment.get_template(template).render(**context)
@@ -108,7 +108,7 @@ def send_hold(recipient, user_name, book_title, hold_id, expires_at):
     context = context_base(user_name)
     context.update(book_title=book_title, hold_code=f"GC-{hold_id}", pickup_deadline=local_date(expires_at),
                    pickup_location=os.getenv("PICKUP_LOCATION", "Quầy mượn trả thư viện"))
-    return send_sync(recipient, "Thư viện - Sách đã được giữ trong 24 giờ", "hold_24h.html", context)
+    return send_sync(recipient, "Thư viện - Sách đã được giữ cho bạn trong 48 giờ", "hold_notice.html", context)
 
 
 def send_room_booking(recipient, user_name, booking_id, room_name, date, slot):

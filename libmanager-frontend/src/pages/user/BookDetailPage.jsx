@@ -62,7 +62,7 @@ function BorrowButton({ book, onChanged }) {
     setBusy(true);
     try {
       const entry = await loanService.joinWaitlist(book.id);
-      setNotice({ type: 'success', message: `Đã hẹn đặt trước. Bạn đang ở vị trí số ${entry.queuePosition}; khi có sách, thư viện giữ chỗ cho bạn 24 giờ và gửi email báo.` });
+      setNotice({ type: 'success', message: `Đã hẹn đặt trước. Bạn đang ở vị trí số ${entry.queuePosition}; khi có sách, thư viện giữ chỗ cho bạn 48 giờ và gửi email báo.` });
     } catch (failure) {
       setError(failure);
     } finally {
@@ -108,7 +108,7 @@ function BorrowButton({ book, onChanged }) {
       {(dialog === 'waitlist' || dialog === 'outOfStock') && (
         <ConfirmDialog title={dialog === 'outOfStock' ? 'Sách vừa hết bản' : 'Hẹn đặt trước'} confirmLabel="Hẹn đặt trước" loading={busy} onClose={() => setDialog(null)} onConfirm={waitlist}>
           {dialog === 'outOfStock' && <p>Bản cuối vừa được người khác đặt mượn. Bạn có muốn chuyển sang Hẹn đặt trước không?</p>}
-          <p>Khi có sách trả về, người đầu hàng chờ được giữ chỗ 24 giờ và nhận email thông báo.</p>
+          <p>Khi có sách trả về, người đầu hàng chờ được giữ chỗ 48 giờ và nhận email thông báo.</p>
         </ConfirmDialog>
       )}
 
