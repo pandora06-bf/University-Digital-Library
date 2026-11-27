@@ -1,13 +1,13 @@
 # Tài Liệu Triển Khai Hệ Thống Cloud (Task 4-12)
 ## Supabase (Database) + Render (FastAPI Backend) + Vercel (React Frontend)
 
-> **Người thực hiện:** Lợi (L)  
+> **Người thực hiện:** Lợi (L): kiến trúc & tài liệu Sprint 3; Đạt: triển khai thật Sprint 4  
 > **Dự án:** University Digital Library (ULMS)  
-> **Cập nhật:** Sprint 3 (Chuẩn bị và kiểm thử triển khai Cloud)
+> **Cập nhật:** 27/11/2026: đã triển khai thật (Supabase + Render + Vercel)
 
 ---
 
-## 1. Kiến Trúc & Danh Sách URL Mẫu Triển Khai
+## 1. Kiến Trúc & URL Triển Khai
 
 Hệ thống được thiết kế theo kiến trúc 3 lớp độc lập:
 
@@ -16,101 +16,87 @@ Hệ thống được thiết kế theo kiến trúc 3 lớp độc lập:
              │
              ▼
    [ Vercel CDN Frontend ]
-   https://<ten-du-an-nhom>.vercel.app
+   https://libmanager-ecru.vercel.app
              │  (REST API calls qua HTTPS)
              ▼
    [ Render Web Service (FastAPI) ]
-   https://<ten-api-nhom>.onrender.com
+   https://libmanager-api-zvuf.onrender.com
              │  (PostgreSQL Connection Pool qua SSL)
              ▼
-   [ Supabase Managed Database (PostgreSQL 15) ]
-   aws-0-ap-southeast-1.pooler.supabase.com:6543 / db.<project-ref>.supabase.co:5432
+   [ Supabase Managed Database (PostgreSQL 17) ]
+   aws-1-ap-south-1.pooler.supabase.com:5432 (Session pooler, IPv4)
 ```
 
-### Bảng Thông Số Endpoint (Mẫu cấu hình khi nhóm đăng ký):
+### Bảng URL thật (đã triển khai ngày 27/11/2026)
 
-| Thành phần | Nền tảng Cloud | Địa chỉ URL / Hostname Mẫu | Cổng | Ghi chú trạng thái |
-|---|---|---|---|---|
-| **Frontend Web** | **Vercel** | `https://<ten-du-an-nhom>.vercel.app` | 443 | Sẵn sàng liên kết repo GitHub |
-| **Backend API** | **Render** | `https://<ten-api-nhom>.onrender.com` | 443 | Web Service (Python 3) |
-| **API Docs (Swagger)** | **Render** | `https://<ten-api-nhom>.onrender.com/docs` | 443 | Tự động sinh từ FastAPI |
-| **Database Pooler** | **Supabase** | `aws-0-ap-southeast-1.pooler.supabase.com` | 6543 | Transaction Pooler (Session mode) |
-| **Database Direct** | **Supabase** | `db.<project-ref>.supabase.co` | 5432 | Direct connection (Cần IPv6/SSL) |
+| Thành phần | Nền tảng Cloud | URL / Hostname | Ghi chú |
+|---|---|---|---|
+| **Frontend Web** | **Vercel** (Hobby) | https://libmanager-ecru.vercel.app | Tự deploy bằng GitHub Actions (`deploy-frontend.yml`) khi `main` đổi `libmanager-frontend/` |
+| **Backend API** | **Render** (Free, Singapore) | https://libmanager-api-zvuf.onrender.com | Docker, tạo từ `render.yaml`; tự deploy khi merge vào `main` |
+| **API Docs (Swagger)** | **Render** | https://libmanager-api-zvuf.onrender.com/docs | Tự sinh từ FastAPI |
+| **Health check** | **Render** | https://libmanager-api-zvuf.onrender.com/health | `keep-alive.yml` gọi 10 phút/lần để gói Free không ngủ |
+| **Database** | **Supabase** (Free, PostgreSQL 17) | `aws-1-ap-south-1.pooler.supabase.com:5432` | **Session pooler** (IPv4). Database chính duy nhất, local Docker cũng dùng chung |
+| **Lưu trữ PDF eBook** | **Cloudflare R2** | bucket private | API cấp link đọc, PDF không công khai |
+
+> Scheduler (JOB-01 tính phạt … JOB-09 cảnh báo quá hạn) chạy **bên trong API** (`RUN_SCHEDULER=true`) vì Render Free không có Background Worker. **Không chạy thêm scheduler ở máy local** kẻo gửi email trùng.
 
 ---
 
-## 2. Template Cấu Hình Biến Môi Trường (Placeholder An Toàn)
+## 2. Biến môi trường (chỉ placeholder, giá trị thật nằm trên Dashboard)
 
 > [!IMPORTANT]
-> **Quy định bảo mật:** Không lưu bất kỳ mật khẩu thật, khóa bí mật (Secret Key) hay thông tin tài khoản SMTP thật nào vào kho mã nguồn (Git Repository). Mọi giá trị nhạy cảm dưới đây đều sử dụng **Placeholder** làm khuôn mẫu. Người quản trị sẽ điền trực tiếp vào giao diện quản lý biến môi trường của từng nền tảng Cloud.
+> **Quy định bảo mật:** Không lưu bất kỳ mật khẩu thật, khóa bí mật hay thông tin SMTP/R2/ngân hàng nào vào Git. Giá trị thật chỉ điền trên Render / Vercel / GitHub Secrets.
 
-### A. Backend FastAPI (Cấu hình trên Render Dashboard -> Environment)
+### A. Backend FastAPI (Render → `libmanager-api` → Environment)
+Các biến không bí mật đã khai báo sẵn trong `render.yaml`. Cần tự điền:
 ```bash
-# Kết nối PostgreSQL Supabase với SSL bắt buộc (sử dụng mật khẩu DB do nhóm đặt)
-DATABASE_URL=postgresql+psycopg2://postgres.<project-ref>:[YOUR-SUPABASE-PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require
+# Supabase → Connect → Session pooler. Đổi "postgresql://" thành "postgresql+psycopg2://".
+# Mật khẩu chỉ nên gồm chữ và số (ký tự @ # / ? làm hỏng chuỗi kết nối).
+DATABASE_URL=postgresql+psycopg2://postgres.<project-ref>:<PASSWORD>@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
 
-# Khóa bí mật ký phát hành JWT Token (tạo chuỗi ngẫu nhiên dài trên 32 ký tự)
-SECRET_KEY=[GENERATE-LONG-RANDOM-SECRET-KEY]
+FRONTEND_ORIGINS=https://libmanager-ecru.vercel.app,http://localhost:5174,http://localhost:5173
+LIBRARY_URL=https://libmanager-ecru.vercel.app      # link trong email, bắt buộc https
 
-# CORS Whitelist cho phép Frontend Vercel và Localhost gọi API
-FRONTEND_ORIGINS=https://<ten-du-an-nhom>.vercel.app,http://localhost:5173,http://localhost:5174
+ADMIN_PASSWORD=<mật khẩu admin mạnh>
+RESET_ADMIN_PASSWORD=false   # đặt true MỘT lần để ghi đè mật khẩu admin trong DB bằng ADMIN_PASSWORD, rồi trả về false
 
-# Tài khoản Quản trị viên khởi tạo
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=[YOUR-STRONG-ADMIN-PASSWORD]
-RESET_ADMIN_PASSWORD=false
-
-# Cấu hình Webhook bí mật (Dành cho cổng thanh toán / nạp tiền)
-WEBHOOK_SECRET_KEY=[YOUR-WEBHOOK-SECRET-TOKEN]
-
-# Cấu hình SMTP gửi email nhắc hẹn trả sách (JOB-03)
-# (Để trống SMTP_HOST nếu chưa kích hoạt dịch vụ gửi mail)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=[YOUR-EMAIL-SERVICE@gmail.com]
-SMTP_PASSWORD=[YOUR-APP-SPECIFIC-PASSWORD]
-SMTP_FROM=[YOUR-EMAIL-SERVICE@gmail.com]
-SMTP_SSL=false
+R2_ENDPOINT=...  R2_ACCESS_KEY_ID=...  R2_SECRET_ACCESS_KEY=...  R2_BUCKET=...
+SMTP_HOST=...  SMTP_USER=...  SMTP_PASSWORD=...  SMTP_FROM=...
+BANK_BIN=...  BANK_ACCOUNT_NO=...  BANK_ACCOUNT_NAME=...  BANK_WEBHOOK_KEY=...
 ```
+Đặt sẵn trong `render.yaml`: `UVICORN_RELOAD=false`, `RUN_SCHEDULER=true`, `STORAGE_BACKEND=r2`, `TZ`, `SECRET_KEY` (Render tự sinh). **`RUN_SEEDER` phải là `false`**.
 
-### B. Frontend ReactJS (Cấu hình trên Vercel Dashboard -> Settings -> Environment Variables)
+Webhook SePay: `https://libmanager-api-zvuf.onrender.com/api/webhooks/bank`.
+
+### B. Frontend React (Vercel → project `libmanager` → Settings → Environment Variables)
 ```bash
-# URL Backend Production trên Render
-VITE_API_URL=https://<ten-api-nhom>.onrender.com
-
-# Chế độ chạy thật với Backend API (hoặc true nếu bật mock dự phòng)
 VITE_USE_MOCK=false
-
-# Kích hoạt tính năng đặt phòng trực tiếp qua API backend khi sẵn sàng
-VITE_ROOM_BOOKING_API=false
+VITE_API_URL=https://libmanager-api-zvuf.onrender.com
 ```
 
----
-
-## 3. Quy Trình Chạy Migration & Seeder Khi Triển Khai Lên Supabase
-
-Sau khi nhóm tạo Database trên Supabase và Web Service trên Render:
-
-1. **Khởi tạo và nâng cấp cấu trúc bảng (Alembic):**
-   ```bash
-   cd back_fast_api
-   export DATABASE_URL="postgresql+psycopg2://postgres.<project-ref>:[PASSWORD]@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?sslmode=require"
-   alembic upgrade head
-   ```
-
-2. **Khởi tạo tài khoản quản trị:**
-   ```bash
-   python app/bootstrap_admin.py
-   ```
-
-3. **Nạp 100 đầu sách demo và bộ dữ liệu 16 Use Cases:**
-   ```bash
-   python database_seeder.py
-   ```
-   *Lưu ý:* Seeder sẽ đọc dữ liệu sách từ `data/books_seed.csv` và gán ảnh bìa từ `/static/covers/book_xxx.jpg`.
+### C. GitHub (repo → Settings → Secrets and variables → Actions)
+| Loại | Tên | Dùng cho |
+|---|---|---|
+| Secret | `VERCEL_TOKEN` | `deploy-frontend.yml`. **Hết hạn sau 90 ngày**, tạo token mới tại vercel.com/account/settings/tokens |
+| Secret | `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | `deploy-frontend.yml` |
+| Variable | `API_HEALTH_URL` | `keep-alive.yml` |
 
 ---
 
-## 4. Ghi Chú Đánh Giá Trạng Thái Triển Khai (Sprint 3)
-- Các file cấu hình mẫu và tài liệu kiến trúc đã được thiết lập đầy đủ, an toàn, không chứa thông tin nhạy cảm.
-- Khi nhóm thống nhất tài khoản Cloud chính thức (Supabase / Render / Vercel), nhóm có thể chạy các lệnh trên để hoàn tất việc đưa hệ thống lên mạng Internet phục vụ đánh giá cuối kỳ.
+## 3. Dữ liệu & migration
+
+- Migration chạy **tự động** mỗi lần Render khởi động (`docker-entrypoint.sh` → `alembic upgrade head`).
+- Dữ liệu trên Supabase là bản đã dọn sạch (100 sách, tài khoản MSSV, 61 eBook trên R2), nạp từ database local ngày 27/11/2026.
+- **Không chạy `database_seeder.py` vào database chính**: seeder vẫn tạo sách `[DEMO-…]` và tài khoản `demo_*`.
+- Sao lưu thủ công (cần Docker, dùng image `postgres:17` vì Supabase là PostgreSQL 17):
+  ```bash
+  docker run --rm -e SUPABASE_DB_URL postgres:17-alpine sh -c 'pg_dump "$SUPABASE_DB_URL" -n public --no-owner --no-privileges' > backup.sql
+  ```
+  (`SUPABASE_DB_URL` dạng `postgresql://…`, không có `+psycopg2`.)
+
+---
+
+## 4. Giới hạn gói miễn phí
+- Render Free: nếu ngủ, request đầu chờ khoảng 1 phút; `keep-alive.yml` giữ thức. GitHub tắt workflow theo lịch nếu repo 60 ngày không có commit.
+- Supabase Free: tạm dừng project sau 7 ngày không hoạt động (API + scheduler truy vấn thường xuyên nên không bị).
+- Vercel Hobby: deploy qua GitHub Actions + token nên commit của mọi thành viên đều deploy được.
