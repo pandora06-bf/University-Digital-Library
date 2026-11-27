@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
 import { getCurrentUser } from '../mocks/auth';
 import BrandMark from '../components/BrandMark';
+import HeaderAccount from '../components/user/HeaderAccount';
 import { SHOW_UI_KIT } from '../utils/featureFlags';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
@@ -114,11 +115,7 @@ export default function UserLayout() {
 
             {user ? (
               <div className="flex items-center gap-3 pl-2 sm:border-l border-slate-200">
-                <NavLink to={user.role === 'admin' ? '/admin' : '/account'} title="Thông tin người dùng"
-                  className="hidden sm:flex flex-col text-right rounded-lg px-1 hover:bg-slate-50">
-                  <span className="text-sm font-semibold text-slate-900 line-clamp-1">{user.name}</span>
-                  <span className="text-xs text-slate-500">{user.role === 'admin' ? 'Thủ thư / Quản trị viên' : 'Độc giả'}</span>
-                </NavLink>
+                <HeaderAccount user={user} />
                 <Button
                   variant="ghost"
                   size="sm"
