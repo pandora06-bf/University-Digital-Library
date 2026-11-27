@@ -1,0 +1,46 @@
+name: Deploy Frontend (Vercel)
+
+# Tự deploy User/Admin Portal lên Vercel khi main có thay đổi ở libmanager-frontend.
+# Dùng Vercel CLI + token nên ai merge cũng deploy được (gói Hobby chặn deploy từ commit của người khác
+# khi kết nối Git trực tiếp). Cần secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+# Biến build (VITE_USE_MOCK=false, VITE_API_URL=...) lấy từ cài đặt project trên Vercel qua `vercel pull`.
+on:
+  push:
+    branches: [ "main", "deploy/vercel-actions" ]  # TEMP: chạy thử, bỏ trước khi merge
+    paths:
+      - "libmanager-frontend/**"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: ./libmanager-frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: libmanager-frontend/package-lock.json
+
+      - name: Pull Vercel project settings
+        run: npx --yes vercel@67.0.0 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: npx --yes vercel@67.0.0 build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        run: npx --yes vercel@67.0.0 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
