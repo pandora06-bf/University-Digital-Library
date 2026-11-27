@@ -102,7 +102,7 @@ def test_request_physical_loan_out_of_stock_returns_409(client, db_session):
     assert response.status_code == 409
 
 
-def test_request_physical_loan_over_limit_returns_409(client, db_session):
+def test_request_physical_loan_over_limit_returns_403(client, db_session):
     user, headers = _make_reader(db_session, user_code="PL0005", max_borrow_limit=1)
     book_a = _make_book(db_session, available_stock=1, title="Book A")
     book_b = _make_book(db_session, available_stock=1, title="Book B")
@@ -115,7 +115,8 @@ def test_request_physical_loan_over_limit_returns_409(client, db_session):
     second = client.post(
         "/api/loans/physical/request", json={"book_id": book_b.id}, headers=headers
     )
-    assert second.status_code == 409
+    assert second.status_code == 403  # SRS UC05 E2
+    assert "đang mượn 1/tối đa 1" in second.json()["detail"]
 
 
 def test_request_physical_loan_duplicate_same_book_returns_409(client, db_session):

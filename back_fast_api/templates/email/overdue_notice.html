@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CẢNH BÁO QUÁ HẠN TRẢ SÁCH</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f6f8fc;font-family:Arial,Helvetica,sans-serif;color:#172033;">
+  <div style="display:none;font-size:1px;line-height:1px;color:#f6f8fc;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">Tài liệu của bạn đã quá hạn trả. Phí phạt đang được tính mỗi ngày.</div>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f6f8fc" style="width:100%;border-collapse:collapse;background-color:#f6f8fc;">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;border-collapse:collapse;">
+        <tr><td style="padding:0 12px 20px;font-size:20px;line-height:28px;font-weight:bold;color:#3730a3;">{{ library_name | default('LibManager · Thư viện Số TDTU') | e }}</td></tr>
+        <tr><td bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid #d9e2ee;border-top:5px solid #b91c1c;border-radius:12px;padding:28px 24px;">
+          <p style="margin:0 0 12px;font-size:11px;line-height:18px;letter-spacing:1px;font-weight:bold;color:#b91c1c;">CẢNH BÁO QUÁ HẠN</p>
+          <h1 style="margin:0 0 24px;font-size:26px;line-height:35px;font-weight:bold;color:#172033;">Sách bạn mượn đã quá hạn trả</h1>
+          <p style="margin:0 0 12px;font-size:15px;line-height:24px;">Xin chào <strong>{{ user_name | e }}</strong>,</p>
+          <p style="margin:0 0 20px;font-size:15px;line-height:24px;color:#5b6b82;">Tài liệu bạn đang mượn đã quá hạn trả. Tài khoản tạm thời bị khóa mượn cho tới khi bạn trả sách và thanh toán phí phạt.</p>
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed;"><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px;width:38%;vertical-align:top;">Tài liệu</td><td style="padding:10px 0 10px 12px;border-bottom:1px solid #e2e8f0;color:#172033;font-size:14px;font-weight:bold;vertical-align:top;word-break:break-word;">{{ book_title | e }}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px;width:38%;vertical-align:top;">Mã phiếu mượn</td><td style="padding:10px 0 10px 12px;border-bottom:1px solid #e2e8f0;color:#172033;font-size:14px;font-weight:bold;vertical-align:top;word-break:break-word;">{{ loan_code | e }}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px;width:38%;vertical-align:top;">Hạn trả</td><td style="padding:10px 0 10px 12px;border-bottom:1px solid #e2e8f0;color:#172033;font-size:14px;font-weight:bold;vertical-align:top;word-break:break-word;">{{ due_date | e }}</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px;width:38%;vertical-align:top;">Số ngày quá hạn</td><td style="padding:10px 0 10px 12px;border-bottom:1px solid #e2e8f0;color:#172033;font-size:14px;font-weight:bold;vertical-align:top;word-break:break-word;">{{ overdue_days | e }} ngày</td></tr><tr><td style="padding:10px 0;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:14px;width:38%;vertical-align:top;">Phí phạt hiện tại</td><td style="padding:10px 0 10px 12px;border-bottom:1px solid #e2e8f0;color:#b91c1c;font-size:14px;font-weight:bold;vertical-align:top;word-break:break-word;">{{ fine_amount | e }} ({{ fine_rate | e }}/ngày)</td></tr></table>
+          
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin-top:24px;"><tr><td bgcolor="#fef2f2" style="background-color:#fef2f2;padding:16px;border-radius:8px;font-size:14px;line-height:23px;color:#334155;">Phí phạt tăng thêm mỗi ngày cho tới khi sách được trả. Bạn có thể trả phí bằng tài khoản dịch vụ hoặc tại quầy. Nếu bạn đã trả sách, vui lòng bỏ qua thông báo này.</td></tr></table>
+          <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:24px;"><tr><td bgcolor="#b91c1c" style="background-color:#b91c1c;border-radius:8px;text-align:center;"><a href="{{ my_books_url | e }}" style="display:inline-block;padding:14px 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:bold;color:#ffffff;text-decoration:none;">Kiểm tra phiếu mượn</a></td></tr></table>
+          <p style="margin:24px 0 0;font-size:13px;line-height:21px;color:#64748b;">Cần hỗ trợ? Liên hệ <a href="mailto:{{ support_email | e }}" style="color:#b91c1c;text-decoration:underline;word-break:break-word;">{{ support_email | e }}</a>.</p>
+        </td></tr>
+        <tr><td align="center" style="padding:20px 12px;font-size:12px;line-height:20px;color:#64748b;">Email tự động từ {{ library_name | default('LibManager') | e }}.<br>Thời gian trong email theo múi giờ Việt Nam (UTC+7).<br><a href="{{ library_url | e }}" style="color:#64748b;text-decoration:underline;">Truy cập thư viện</a></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

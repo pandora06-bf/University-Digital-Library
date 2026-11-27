@@ -78,7 +78,7 @@ def test_check_eligible_rejects_over_limit(db_session):
     book2 = _make_book(db_session)
     with pytest.raises(HTTPException) as e:
         svc.check_eligible(db_session, user, book2.id)
-    assert e.value.status_code == 409
+    assert e.value.status_code == 403
 
 
 def test_check_eligible_rejects_already_borrowing_same_book(db_session):

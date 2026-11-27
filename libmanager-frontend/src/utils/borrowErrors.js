@@ -1,5 +1,6 @@
 // Đổi lỗi API mượn sách / đặt trước (3-01.a, 3-04.a) thành thông báo Toast (3-12.a).
-// Backend trả 403 khi khóa tài khoản hoặc nợ phạt; 409 khi vượt hạn mức, hết sách, mượn trùng.
+// Backend trả 403 khi khóa tài khoản, nợ phạt hoặc vượt hạn mức (SRS UC04 E1, UC05 E2, UC07 E2);
+// 409 khi hết sách, mượn trùng.
 
 function detailText(error) {
   const detail = error?.response?.data?.detail;
@@ -16,6 +17,13 @@ export function mapBorrowError(error) {
   const raw = (code, message) => ({ code, status, message: text || message, detail: text });
 
   if (!status) return { code: 'NETWORK', status: 0, message: 'Không kết nối được máy chủ. Vui lòng thử lại.' };
+  // Vượt hạn mức: SRS trả 403 "đang mượn x/tối đa y". Vẫn nhận 409 kiểu cũ để không vỡ khi gọi bản API cũ.
+  if ((status === 403 || status === 409) && /hạn mức|limit/i.test(text)) {
+    const [, current, max] = text.match(/(\d+)\s*\/\s*(?:tối đa\s*)?(\d+)/i) || [];
+    return make('LIMIT', current
+      ? `Bạn đang mượn ${current}/tối đa ${max} cuốn. Hãy trả bớt sách trước khi mượn thêm.`
+      : 'Bạn đã mượn đủ số sách tối đa (sinh viên 3, giảng viên 5). Hãy trả bớt sách trước khi mượn thêm.');
+  }
   if (status === 403) {
     return /nợ|phạt|fine/i.test(text) && !/khóa|lock/i.test(text)
       ? make('DEBT', 'Bạn còn nợ phạt chưa thanh toán nên tạm thời không thể mượn sách.')
@@ -23,7 +31,6 @@ export function mapBorrowError(error) {
   }
   if (status === 409) {
     if (/không có bản vật lý|no physical/i.test(text)) return make('NO_PRINT', 'Sách này hiện chưa cho đặt mượn bản in. Bạn có thể đọc hoặc mượn bản eBook.');
-    if (/hạn mức|limit/i.test(text)) return make('LIMIT', 'Bạn đã mượn đủ số sách tối đa (sinh viên 3, giảng viên 5). Hãy trả bớt sách trước khi mượn thêm.');
     if (/đã đặt trước|already.*wait/i.test(text)) return make('ALREADY_WAITLISTED', 'Bạn đã đặt trước sách này.');
     if (/còn bản|still available/i.test(text)) return make('STILL_AVAILABLE', 'Sách vẫn còn bản để mượn, không cần đặt trước.');
     if (/đang có phiếu|đang mượn|already/i.test(text)) return make('DUPLICATE', 'Bạn đang có phiếu mượn sách này.');
