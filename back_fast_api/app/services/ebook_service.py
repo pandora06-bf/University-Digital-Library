@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.models.book import Book
 from app.models.loan import Loan
 from app.models.user import User
+from app.services.loan_states import ACTIVE_LOAN_STATUSES
 from app.services.upload_service import read_private_pdf, resolve_private_pdf
 
 ACTIVE = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
@@ -59,8 +60,9 @@ def borrow(db: Session, user_code: str, book_id: int) -> Loan:
         return current
     if user.is_borrowing_blocked or user.total_fines > 0:
         raise HTTPException(403, "Bạn đọc đang bị khóa hoặc còn nợ phạt")
+    # Hạn mức tính chung mọi phiếu còn hiệu lực (sách in lẫn eBook), xem loan_states.py
     active_count = db.query(func.count(Loan.id)).filter(Loan.user_code == user_code,
-        Loan.loan_status.in_(ACTIVE)).scalar() or 0
+        Loan.loan_status.in_(ACTIVE_LOAN_STATUSES)).scalar() or 0
     if active_count >= user.max_borrow_limit:
         raise HTTPException(409, "Đã đạt hạn mức mượn")
     loan = Loan(user_code=user_code, book_id=book_id, loan_type="EBOOK",

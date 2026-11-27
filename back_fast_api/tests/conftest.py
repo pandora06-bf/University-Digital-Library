@@ -51,6 +51,13 @@ def _set_sqlite_custom_functions(dbapi_connection, connection_record):
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def _local_pdf_storage(monkeypatch):
+    """Không test nào được chạm vào kho Cloudflare R2 thật, kể cả khi máy chạy test có STORAGE_BACKEND=r2.
+    Test R2 (test_r2_storage.py) tự bật lại r2 với client giả trong bộ nhớ."""
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=engine)

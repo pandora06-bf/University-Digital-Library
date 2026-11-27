@@ -14,11 +14,10 @@ from app.models.book import Book, BookCopy
 from app.models.fine import Fine, FinePayment
 from app.models.loan import Incident, Loan, Waitlist
 from app.models.user import User
+from app.services.loan_states import ACTIVE_LOAN_STATUSES
 
-# Trạng thái Loan được tính vào hạn mức mượn đồng thời (Active_Loans) của một
-# bạn đọc: phiếu vật lý đang chờ nhận tại quầy, đang mượn, đang quá hạn, và
-# eBook đang mượn (loan_type không phân biệt ở đây).
-ACTIVE_LOAN_STATUSES = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
+# Trạng thái Loan được tính vào hạn mức mượn đồng thời (Active_Loans): xem loan_states.py
+# (một nguồn chung cho loan_service, waitlist_logic, ebook_service, user_service, routers/loans).
 PICKUP_HOLD_PERIOD = timedelta(hours=24)
 
 
@@ -621,7 +620,7 @@ def checkout_at_counter_service(
         active_loans_count = db.scalar(
             select(func.count(Loan.id)).where(
                 Loan.user_code == user.user_code,
-                Loan.loan_status.in_(["REQUESTED", "PENDING_PICKUP", "BORROWED", "OVERDUE"]),
+                Loan.loan_status.in_(ACTIVE_LOAN_STATUSES),
             )
         ) or 0
         if active_loans_count >= max_limit:
