@@ -13,6 +13,7 @@ import LoginPage from './pages/auth/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotFoundPage from './pages/NotFoundPage';
 import UiKitPage from './pages/dev/UiKitPage';
+import { SHOW_UI_KIT } from './utils/featureFlags';
 
 // Admin Portal
 import AdminLayout from './layouts/AdminLayout';
@@ -55,8 +56,8 @@ export default function App() {
         <Route path="/reader/:loanId" element={<ProtectedRoute><Suspense fallback={<p className="p-12 text-center">Đang mở trình đọc…</p>}><PdfReaderPage /></Suspense></ProtectedRoute>} />
         <Route path="/books/:bookId/preview" element={<Suspense fallback={<p className="p-12 text-center">Đang mở bản xem trước…</p>}><PdfReaderPage /></Suspense>} />
 
-        {/* Trang kiểm thử Component Dev UI-Kit */}
-        {import.meta.env.DEV && (
+        {/* Trang kiểm thử Component Dev UI-Kit — chỉ khi VITE_SHOW_UI_KIT=true */}
+        {SHOW_UI_KIT && (
           <Route path="/dev/ui-kit" element={<UiKitPage />} />
         )}
 

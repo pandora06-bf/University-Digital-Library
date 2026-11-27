@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, UserRound } from 'lucide-react';
 import { getCurrentUser } from '../mocks/auth';
 import BrandMark from '../components/BrandMark';
+import { SHOW_UI_KIT } from '../utils/featureFlags';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
 import { Button } from '../components/Button';
@@ -101,8 +102,8 @@ export default function UserLayout() {
 
           {/* User Profile & Actions */}
           <div className="flex items-center gap-3">
-            {/* Link trang Dev UI-Kit nếu ở môi trường DEV */}
-            {import.meta.env.DEV && (
+            {/* Link trang Dev UI-Kit — ẩn mặc định, bật bằng VITE_SHOW_UI_KIT=true */}
+            {SHOW_UI_KIT && (
               <NavLink
                 to="/dev/ui-kit"
                 className="hidden xl:inline-flex items-center px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs font-semibold hover:bg-amber-100 transition-colors"
@@ -185,7 +186,7 @@ export default function UserLayout() {
                   </NavLink>
                 );
               })}
-              {import.meta.env.DEV && (
+              {SHOW_UI_KIT && (
                 <NavLink
                   to="/dev/ui-kit"
                   onClick={() => setMobileMenuOpen(false)}
