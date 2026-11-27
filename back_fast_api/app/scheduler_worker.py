@@ -170,8 +170,8 @@ def _optional_job(module, function):
         log.warning("Pending integration: %s.%s", module, function)
         return None
 
-def configure_scheduler():
-    scheduler = BlockingScheduler(timezone=VN_TZ, job_defaults={"coalesce": True, "max_instances": 1})
+def configure_scheduler(scheduler_cls=BlockingScheduler):
+    scheduler = scheduler_cls(timezone=VN_TZ, job_defaults={"coalesce": True, "max_instances": 1})
     scheduler.add_job(run_fine_job, "cron", hour=0, minute=0, id="JOB-01", replace_existing=True, misfire_grace_time=None)
     scheduler.add_job(run_due_reminder_job, "cron", hour=8, id="JOB-02", replace_existing=True, misfire_grace_time=None)
     # Sau JOB-01 (00:00) để phí phạt đã có; gửi giờ hành chính thay vì nửa đêm
@@ -190,10 +190,25 @@ def configure_scheduler():
             scheduler.add_job(job, "interval", minutes=5, id=job_id, replace_existing=True)
     return scheduler
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    # Catch up on missed calendar days after an outage.
+def run_startup_catch_up():
+    "Bù các ngày bị lỡ khi máy chủ tắt/ngủ, rồi mới chạy theo lịch."
     log.info("Startup fine catch-up: %s", run_fine_job())
     log.info("Startup ebook expiry: %s", run_ebook_expiry_job())
     log.info("Startup due reminders: %s", run_due_reminder_job())
+    log.info("Startup overdue notices: %s", run_overdue_notice_job())
+
+
+def start_background_scheduler():
+    """Cloud gói Free (Render không có Background Worker): chạy scheduler ngay trong tiến trình API khi
+    RUN_SCHEDULER=true. Chỉ dùng với 1 tiến trình uvicorn, nếu không job chạy lặp."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+    scheduler = configure_scheduler(BackgroundScheduler)
+    scheduler.add_job(run_startup_catch_up, "date", id="STARTUP-CATCH-UP")
+    scheduler.start()
+    return scheduler
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    run_startup_catch_up()
     configure_scheduler().start()

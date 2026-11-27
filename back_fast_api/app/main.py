@@ -77,6 +77,20 @@ def root():
 def health_check():
     return {"status": "ok"}
 
+
+# Cloud gói Free: không có tiến trình scheduler riêng nên chạy chung trong API (xem render.yaml)
+if os.getenv("RUN_SCHEDULER", "").lower() == "true":
+    @app.on_event("startup")
+    def _start_scheduler():
+        from app.scheduler_worker import start_background_scheduler
+        app.state.scheduler = start_background_scheduler()
+
+    @app.on_event("shutdown")
+    def _stop_scheduler():
+        scheduler = getattr(app.state, "scheduler", None)
+        if scheduler:
+            scheduler.shutdown(wait=False)
+
 from app.routers.admin_user_import_router import router as admin_user_import_router
 from app.routers.room_booking_router import router as room_booking_router
 from app.routers.fine_wallet_router import router as fine_wallet_router

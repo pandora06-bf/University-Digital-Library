@@ -1,0 +1,63 @@
+# Render Blueprint (gói Free): New > Blueprint > chọn repo này.
+# Biến có sync: false phải tự điền trên Render Dashboard, KHÔNG ghi bí mật vào file này.
+services:
+  - type: web
+    name: libmanager-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: back_fast_api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: UVICORN_RELOAD
+        value: "false"
+      - key: RUN_SCHEDULER          # gói Free không có Background Worker → chạy JOB-01..09 trong API
+        value: "true"
+      - key: RUN_SEEDER             # nạp sách/tài khoản mẫu; tắt (false) sau lần deploy đầu nếu muốn
+        value: "true"
+      - key: TZ
+        value: Asia/Ho_Chi_Minh
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENABLE_DEV_SIMULATE
+        value: "false"
+      - key: STORAGE_BACKEND
+        value: r2
+      - key: DATABASE_URL           # Supabase > Connect > Session pooler (cổng 5432, IPv4), dạng postgresql+psycopg2://...
+        sync: false
+      - key: FRONTEND_ORIGINS       # vd. https://libmanager.vercel.app
+        sync: false
+      - key: LIBRARY_URL            # giống FRONTEND_ORIGINS, phải là https://
+        sync: false
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: BANK_BIN
+        sync: false
+      - key: BANK_ACCOUNT_NO
+        sync: false
+      - key: BANK_ACCOUNT_NAME
+        sync: false
+      - key: BANK_WEBHOOK_KEY
+        sync: false

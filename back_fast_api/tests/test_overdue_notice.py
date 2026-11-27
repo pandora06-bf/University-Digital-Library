@@ -74,3 +74,16 @@ def test_overdue_template_renders_fine(monkeypatch):
 
 def test_scheduler_registers_overdue_job():
     assert "JOB-09" in {job.id for job in configure_scheduler().get_jobs()}
+
+
+def test_background_scheduler_for_free_cloud(monkeypatch):
+    """Render gói Free: RUN_SCHEDULER=true chạy cùng bộ job trong tiến trình API."""
+    import app.scheduler_worker as worker
+    monkeypatch.setattr(worker, "run_startup_catch_up", lambda: None)
+    scheduler = worker.start_background_scheduler()
+    try:
+        ids = {job.id for job in scheduler.get_jobs()}
+        assert {"JOB-01", "JOB-02", "JOB-05", "JOB-09"} <= ids
+        assert scheduler.running
+    finally:
+        scheduler.shutdown(wait=False)
