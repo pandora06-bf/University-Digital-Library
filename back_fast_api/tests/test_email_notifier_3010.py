@@ -31,7 +31,7 @@ def test_send_html_reads_smtp_settings_from_dotenv(monkeypatch, tmp_path):
     with patch("app.services.email_notifier.render_template", return_value="<p>Reminder</p>"):
         sent = asyncio.run(
             email.send_html(
-                "reader@example.test",
+                "reader@example.edu.vn",
                 "Reminder",
                 "due_reminder.html",
                 {"book_title": "Sách", "loan_code": "PM-1", "due_date": "11/11/2026"},
@@ -165,3 +165,13 @@ def test_site_url_rejects_insecure_public_domain(monkeypatch):
     import pytest
     with pytest.raises(ValueError):
         email.site_url("my-books")
+
+
+def test_reserved_domain_is_skipped_without_smtp(monkeypatch):
+    """@library.local (tài khoản mẫu) không gửi được: bỏ qua êm, không gọi SMTP, không ném lỗi."""
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("SMTP_FROM", "library@example.test")
+    with patch("fastapi_mail.FastMail") as fast_mail:
+        assert asyncio.run(email.send_html("sv52400011@library.local", "S", "due_reminder.html", {})) is False
+        fast_mail.assert_not_called()
+    assert email.is_deliverable("reader@example.edu.vn") is True

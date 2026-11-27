@@ -40,9 +40,23 @@ def render_template(template, **context):
         raise ValueError("Mẫu email không được hỗ trợ")
     return environment.get_template(template).render(**context)
 
+def is_deliverable(recipient):
+    """Địa chỉ có gửi được không (cùng quy tắc EmailStr của fastapi_mail). Tài khoản mẫu dùng @library.local:
+    .local là tên miền dành riêng nên không bao giờ nhận thư; bỏ qua êm thay vì in traceback mỗi lần gửi."""
+    from email_validator import EmailNotValidError, validate_email
+    try:
+        validate_email(recipient, check_deliverability=False)
+        return True
+    except EmailNotValidError:
+        return False
+
+
 async def send_html(recipient, subject, template, context):
     if not recipient or not recipient.strip():
         log.info("Skip %s: user has no email", template)
+        return False
+    if not is_deliverable(recipient.strip()):
+        log.info("Skip %s: address cannot receive mail (%s)", template, recipient.strip().rsplit("@", 1)[-1])
         return False
     from app.core.config import Settings
 
