@@ -18,17 +18,6 @@ router = APIRouter(
 )
 
 
-@router.get("")
-def get_books(
-    limit: int = Query(default=10, ge=1, le=50),
-    offset: int = Query(default=0, ge=0),
-):
-    return {
-        "message": "Get books API",
-        "limit": limit,
-        "offset": offset,
-        "data": [],
-    }
 class BookFormat(str, Enum):
     PRINTED = "PRINTED"
     EBOOK = "EBOOK"
@@ -85,6 +74,36 @@ def search_books(
 )
 def get_catalog_tree(db: Session = Depends(get_db)):
     return get_catalog_tree_service(db)
+
+
+@router.get(
+    "",
+    response_model=PaginatedResponse[BookSearchItemResponse],
+    summary="Duyệt / lọc danh mục theo SRS UC02–UC03 (cùng bộ lọc với /search; tối đa 50 bản ghi)",
+)
+def list_books(
+    q: Optional[str] = Query(None, max_length=200),
+    author: Optional[str] = Query(None, max_length=150),
+    publisher: Optional[str] = Query(None, max_length=150),
+    year: Optional[int] = Query(None, ge=0, le=9999),
+    subject_code: Optional[str] = Query(None, max_length=50),
+    category: Optional[str] = Query(None, max_length=100),
+    attribute: Optional[str] = Query(None, max_length=200, description="TEXTBOOK | REFERENCE | WORKBOOK"),
+    format: Optional[BookFormat] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: Optional[int] = Query(None, ge=1, le=MAX_PAGE_SIZE),
+    limit: Optional[int] = Query(None, ge=1, le=MAX_PAGE_SIZE, description="Tên khác của page_size (SRS: page, limit)"),
+    offset: Optional[int] = Query(None, ge=0, description="Tương thích bản cũ: offset → trang"),
+    db: Session = Depends(get_db),
+):
+    size = page_size or limit or DEFAULT_PAGE_SIZE
+    if offset is not None:
+        page = offset // size + 1
+    return search_books_advanced(
+        db=db, query_text=q, author=author, publisher=publisher, year=year, subject_code=subject_code,
+        category=category, attribute=attribute, format=format.value if format else None,
+        exact_format=False, exact_publisher=False, page=page, page_size=size,
+    )
 
 
 # Phải khai báo SAU các route tĩnh (/search, /categories)

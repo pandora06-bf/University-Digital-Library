@@ -26,6 +26,7 @@ from faker import Faker
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
+from app.models.book_attributes import infer_book_attribute
 from app.models import (
     Account,
     Book,
@@ -328,6 +329,7 @@ def seed_database():
                 keywords=f"{subj_code} {cat_name} demo",
                 num_pages=pages,
                 book_type=btype,
+                book_attribute=infer_book_attribute(book_data["title"], desc),
                 cover_image_path=cover_path,
                 available_stock=0,
                 category_id=categories[cat_name].id,
@@ -341,6 +343,7 @@ def seed_database():
             book.cover_image_path = cover_path
             book.num_pages = pages
             book.book_type = btype
+            book.book_attribute = book.book_attribute or infer_book_attribute(book_data["title"], desc)
             book.category_id = categories[cat_name].id
             book.subject_code = subj_code
 

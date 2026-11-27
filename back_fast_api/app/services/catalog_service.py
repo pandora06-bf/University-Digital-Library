@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.book import Book, BookCopy, Category, Subject
+from app.models.book_attributes import BOOK_ATTRIBUTES
 
 # Bản sao ở các trạng thái này coi như ngừng lưu hành
 INACTIVE_COPY_STATUSES = {"LOST", "DAMAGED", "RETIRED"}
@@ -47,6 +48,10 @@ def get_catalog_tree_service(db: Session) -> Dict[str, Any]:
     return {
         "subjects": subject_tree,
         "available_book_types": ["PRINTED", "EBOOK"],
+        "attributes": [
+            {"code": code, "label": label, "count": sum(1 for b in books if b.book_attribute == code)}
+            for code, label in BOOK_ATTRIBUTES.items()
+        ],
     }
 
 
@@ -111,5 +116,11 @@ def get_book_detail_service(db: Session, book_id: int) -> Dict[str, Any]:
         "subject_code": book.subject_code,
         "category_id": book.category_id,
         "category_name": cat_name,
+        "alternative_title": book.alternative_title,
+        "book_attribute": book.book_attribute,
+        "book_attribute_label": BOOK_ATTRIBUTES.get(book.book_attribute or ""),
+        "keywords": book.keywords,
+        "num_chapters": book.num_chapters,
+        "num_pages": book.num_pages,
         "locations": locations,
     }

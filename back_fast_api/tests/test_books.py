@@ -2,10 +2,12 @@ from app.models.book import Book, Category, Subject  # noqa: F401
 
 
 def test_book_categories_empty(client):
-    """GET /api/books phải trả 200 và cấu trúc data list."""
+    """GET /api/books (SRS UC02/UC03) trả trang kết quả có phân trang: items, total, page, page_size."""
     response = client.get("/api/books")
     assert response.status_code == 200
-    assert "data" in response.json()
+    body = response.json()
+    assert isinstance(body["items"], list)
+    assert {"total", "page", "page_size", "total_pages"} <= set(body)
 
 
 def test_book_search_empty(client):

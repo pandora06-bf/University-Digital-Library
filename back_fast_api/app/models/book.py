@@ -48,6 +48,9 @@ class Book(Base):
     __table_args__ = (
         CheckConstraint("available_stock >= 0", name="chk_book_available_stock_positive"),
         CheckConstraint("price >= 0", name="chk_book_price_nonnegative"),
+        CheckConstraint("book_attribute IS NULL OR book_attribute IN ('TEXTBOOK','REFERENCE','WORKBOOK')",
+                        name="chk_book_attribute_valid"),
+        CheckConstraint("num_chapters IS NULL OR num_chapters >= 1", name="chk_book_num_chapters_positive"),
         Index("idx_books_search_vector", "search_vector", postgresql_using="gin"),
     )
 
@@ -62,6 +65,10 @@ class Book(Base):
     cover_image_path: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     keywords: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     num_pages: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # SRS UC02: tên khác, thuộc tính (TEXTBOOK/REFERENCE/WORKBOOK – xem book_attributes.py), số chương
+    alternative_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    book_attribute: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
+    num_chapters: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     book_type: Mapped[str] = mapped_column(String(50), nullable=False)
     available_stock: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
     # Soft-delete UC09 E3: False = vô hiệu hóa, giữ lịch sử mượn/phạt
