@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.models.book import Book
 from app.models.loan import Loan
 from app.models.user import User
-from app.services.upload_service import resolve_private_pdf
+from app.services.upload_service import read_private_pdf, resolve_private_pdf
 
 ACTIVE = ("PENDING_PICKUP", "BORROWED", "OVERDUE")
 
@@ -28,10 +28,10 @@ def get_ebook(db: Session, book_id: int) -> Book:
     return book
 
 def pdf_preview(book: Book) -> bytes:
-    path = resolve_private_pdf(book.ebook.file_path)
-    reader = PdfReader(path)
+    data = read_private_pdf(book.ebook.file_path)  # đĩa hoặc Cloudflare R2
     if book.ebook.is_free:
-        return path.read_bytes()
+        return data
+    reader = PdfReader(BytesIO(data))
     writer = PdfWriter()
     for page in reader.pages[:min(book.ebook.preview_pages, 10, len(reader.pages))]:
         writer.add_page(page)
@@ -72,7 +72,7 @@ def borrow(db: Session, user_code: str, book_id: int) -> Loan:
     db.refresh(loan)
     return loan
 
-def authorized_file(db: Session, user_code: str, book_id: int, read_token: str) -> Path:
+def _check_read_access(db: Session, user_code: str, book_id: int, read_token: str) -> Book:
     try:
         payload = jwt.decode(read_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError as exc:
@@ -84,7 +84,17 @@ def authorized_file(db: Session, user_code: str, book_id: int, read_token: str) 
         raise HTTPException(403, "Không có quyền đọc")
     if loan.loan_status not in ACTIVE or loan.due_date <= utcnow():
         raise HTTPException(403, "Phiếu mượn hết hiệu lực")
-    return resolve_private_pdf(get_ebook(db, book_id).ebook.file_path)
+    return get_ebook(db, book_id)
+
+
+def authorized_file(db: Session, user_code: str, book_id: int, read_token: str) -> Path:
+    """Đường dẫn PDF trên đĩa sau khi kiểm tra quyền (chỉ dùng với kho 'private:ebooks/')."""
+    return resolve_private_pdf(_check_read_access(db, user_code, book_id, read_token).ebook.file_path)
+
+
+def authorized_pdf(db: Session, user_code: str, book_id: int, read_token: str) -> bytes:
+    """Nội dung PDF sau khi kiểm tra quyền; đọc từ đĩa hoặc R2. Router /stream dùng hàm này."""
+    return read_private_pdf(_check_read_access(db, user_code, book_id, read_token).ebook.file_path)
 
 def return_ebook(db: Session, user_code: str, loan_id: int) -> Loan:
     loan = (db.query(Loan).filter(Loan.id == loan_id, Loan.user_code == user_code).with_for_update().first())

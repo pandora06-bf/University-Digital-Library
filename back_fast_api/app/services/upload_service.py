@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 
+from app.services import object_storage
+
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 STATIC_ROOT = BACKEND_ROOT / "static"
@@ -84,6 +86,12 @@ async def save_ebook_pdf(file: UploadFile) -> str:
         PdfReader(BytesIO(data), strict=True).pages[0]
     except Exception as exc:
         raise HTTPException(status_code=400, detail="PDF bị hỏng hoặc không hợp lệ") from exc
+    # STORAGE_BACKEND=r2: lưu lên bucket Cloudflare R2 riêng tư; mặc định vẫn lưu trên đĩa server.
+    if object_storage.r2_enabled():
+        try:
+            return object_storage.put_pdf(filename, data)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Không tải được PDF lên kho lưu trữ, vui lòng thử lại") from exc
     target = EBOOKS_DIR / filename
     target.write_bytes(data)
     return f"private:ebooks/{filename}"
@@ -91,6 +99,9 @@ async def save_ebook_pdf(file: UploadFile) -> str:
 
 def delete_static_file(file_path: str | None) -> None:
     if not file_path:
+        return
+    if file_path.startswith(object_storage.R2_EBOOK_PREFIX):
+        object_storage.delete_pdf(file_path)
         return
     if file_path.startswith("/static/covers/"):
         target = (STATIC_ROOT / file_path.removeprefix("/static/")).resolve()
@@ -124,3 +135,10 @@ def resolve_private_pdf(file_path: str) -> Path:
     if target.parent != EBOOKS_DIR.resolve() or not target.is_file():
         raise HTTPException(status_code=404, detail="Không tìm thấy PDF")
     return target
+
+
+def read_private_pdf(file_path: str) -> bytes:
+    """Nội dung PDF riêng tư, dù nằm trên đĩa ('private:ebooks/…') hay trên R2 ('r2:ebooks/…')."""
+    if isinstance(file_path, str) and file_path.startswith(object_storage.R2_EBOOK_PREFIX):
+        return object_storage.get_pdf(file_path)
+    return resolve_private_pdf(file_path).read_bytes()
