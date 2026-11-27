@@ -45,6 +45,12 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       SMTP_SSL: ${SMTP_SSL:-false}
+      # PDF eBook trên Cloudflare R2 (bucket riêng tư). Để trống / local = lưu trên đĩa như cũ.
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-}
     depends_on:
       db:
         condition: service_healthy

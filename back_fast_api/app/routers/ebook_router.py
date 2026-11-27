@@ -29,8 +29,9 @@ def borrow_ebook(payload: EbookBorrowRequest, user: User = Depends(get_current_u
 @router.get("/api/ebooks/{book_id}/stream")
 def stream(book_id: int, read_token: str = Query(...),
            user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    pdf_path = service.authorized_file(db, user.user_code, book_id, read_token)
-    return Response(pdf_path.read_bytes(), media_type="application/pdf",
+    # Backend tự trả nội dung (đĩa hoặc Cloudflare R2) sau khi kiểm tra read_token: không lộ link gốc.
+    data = service.authorized_pdf(db, user.user_code, book_id, read_token)
+    return Response(data, media_type="application/pdf",
                     headers={"Cache-Control": "private, no-store", "Content-Disposition": "inline"})
 
 @router.post("/api/loans/{loan_id}/return-ebook")
