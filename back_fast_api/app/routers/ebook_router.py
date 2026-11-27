@@ -14,7 +14,8 @@ class EbookBorrowRequest(BaseModel):
     book_id: int = Field(gt=0)
 
 @router.get("/api/ebooks/{book_id}/preview")
-def preview(book_id: int, db: Session = Depends(get_db)):
+def preview(book_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # SRS UC04 / danh mục API: đọc thử yêu cầu "Đã đăng nhập"; Khách chỉ duyệt danh mục và chi tiết sách.
     book = service.get_ebook(db, book_id)
     return Response(service.pdf_preview(book), media_type="application/pdf",
                     headers={"Cache-Control": "no-store", "Content-Disposition": "inline"})

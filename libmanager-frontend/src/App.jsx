@@ -54,7 +54,8 @@ export default function App() {
 
         {/* Trình đọc Sách PDF toàn màn hình */}
         <Route path="/reader/:loanId" element={<ProtectedRoute><Suspense fallback={<p className="p-12 text-center">Đang mở trình đọc…</p>}><PdfReaderPage /></Suspense></ProtectedRoute>} />
-        <Route path="/books/:bookId/preview" element={<Suspense fallback={<p className="p-12 text-center">Đang mở bản xem trước…</p>}><PdfReaderPage /></Suspense>} />
+        {/* SRS UC04: đọc thử eBook cần đăng nhập; Khách được chuyển sang Đăng nhập rồi quay lại (UC02 E3) */}
+        <Route path="/books/:bookId/preview" element={<ProtectedRoute><Suspense fallback={<p className="p-12 text-center">Đang mở bản xem trước…</p>}><PdfReaderPage /></Suspense></ProtectedRoute>} />
 
         {/* Trang kiểm thử Component Dev UI-Kit — chỉ khi VITE_SHOW_UI_KIT=true */}
         {SHOW_UI_KIT && (
