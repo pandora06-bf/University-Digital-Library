@@ -1,4 +1,4 @@
-"""Regression checks for Sprint 2C backfill and demo-data contracts."""
+"""Regression checks for Sprint 2C backfill and sample-data contracts."""
 
 from datetime import datetime, timedelta
 
@@ -9,6 +9,7 @@ from app.models import (
     Account,
     Base,
     Book,
+    BookCopy,
     Category,
     Fine,
     Incident,
@@ -55,7 +56,7 @@ def test_backfill_books_is_idempotent_and_preserves_zero_price(db_session):
     assert book.subject_code == "IT"
 
 
-def test_seeder_creates_reconciled_100_book_demo(monkeypatch, tmp_path):
+def test_seeder_creates_reconciled_100_book_catalog(monkeypatch, tmp_path):
     import database_seeder
 
     engine = create_engine(f"sqlite:///{tmp_path / 'sprint2c-seed.db'}")
@@ -86,17 +87,30 @@ def test_seeder_creates_reconciled_100_book_demo(monkeypatch, tmp_path):
                 {row[0] for row in db.query(WalletTxn.txn_type).distinct()}
             )
             assert db.query(Fine).count() >= 2
-            assert db.query(Incident).filter(Incident.description.like("DEMO:%")).count() >= 1
+            assert db.query(Incident).filter(Incident.description.like("Báo mất %")).count() >= 1
 
-            checked = db.query(RoomBooking).filter_by(notes="DEMO-RB-002").one()
+            # Dữ liệu mẫu không còn chữ DEMO và đặt tên giống database chính (MSSV, GV0NNN, BC-NNN-CC)
+            assert db.query(Book).filter(Book.title.ilike("%demo%")).count() == 0
+            assert db.query(Book).filter(Book.keywords.ilike("%demo%")).count() == 0
+            assert db.query(User).filter(User.user_code.ilike("%demo%") | User.email.ilike("%demo%")).count() == 0
+            assert db.query(Account).filter(Account.username.ilike("%demo%")).count() == 0
+            assert {"52400011", "gv0004"} <= {row[0] for row in db.query(Account.username)}
+            assert db.query(User).filter_by(user_code="52400011", email="52400011@library.local").count() == 1
+            assert db.query(BookCopy).filter(BookCopy.copy_barcode.ilike("%demo%")).count() == 0
+            assert db.query(BookCopy).filter_by(copy_barcode="BC-001-01").count() == 1
+            for table, column in ((Loan, Loan.checkout_condition), (RoomBooking, RoomBooking.notes),
+                                  (TopUp, TopUp.pay_code), (WalletTxn, WalletTxn.reference_id)):
+                assert db.query(table).filter(column.ilike("%demo%")).count() == 0
+
+            checked = db.query(RoomBooking).filter_by(notes="RB-002").one()
             local_checkin = checked.checkin_time + timedelta(hours=7)
             assert checked.booking_date == local_checkin.date()
             assert checked.slot_start <= local_checkin.time() < checked.slot_end
             assert checked.checkin_time <= datetime.utcnow() + timedelta(seconds=2)
 
-            # Wallet ledger closes at the balance shown in each demo profile.
-            demo_users = db.query(User).filter(User.user_code.like("%-DEMO-%")).all()
-            for user in demo_users:
+            # Wallet ledger closes at the balance shown in each sample profile.
+            sample_users = db.query(User).filter(User.user_type != "ADMIN").all()
+            for user in sample_users:
                 entries = (
                     db.query(WalletTxn)
                     .filter_by(user_code=user.user_code)

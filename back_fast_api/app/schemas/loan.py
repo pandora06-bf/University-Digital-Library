@@ -61,9 +61,9 @@ class LoanCheckoutRequest(BaseModel):
         "example": {
             "loan_id": None,
             "loan_code": None,
-            "user_code": "SV-DEMO-001",
+            "user_code": "52400001",
             "book_id": None,
-            "copy_barcode": "DEMO-BC-001-01",
+            "copy_barcode": "BC-001-01",
             "loan_type": "PHYSICAL",
             "loan_status": None,
             "borrow_date": None,

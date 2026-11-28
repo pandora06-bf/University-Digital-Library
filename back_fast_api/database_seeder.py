@@ -3,16 +3,16 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-"""Seed repeatable development/demo data after applying Alembic migrations.
+"""Seed repeatable development/sample data after applying Alembic migrations.
 
 Sprint 2C - Lợi (3-21, 4-21):
   - Mở rộng seeder với:
     + Lịch đặt phòng mẫu (đủ 5 trạng thái: CONFIRMED, CHECKED_IN, COMPLETED, CANCELLED, NO_SHOW)
     + Số dư và lịch sử giao dịch ví mẫu (TOPUP, BOOKING_PAYMENT, REFUND, FINE_PAYMENT)
-    + Vài giao dịch chưa khớp (UnmatchedTx) để demo UC16
-    + Dữ liệu demo cho tất cả 16 UC: sách quá hạn, giữ chỗ, phiếu phạt, báo mất/hỏng
+    + Vài giao dịch chưa khớp (UnmatchedTx) để minh họa UC16
+    + Dữ liệu mẫu cho tất cả 16 UC: sách quá hạn, giữ chỗ, phiếu phạt, báo mất/hỏng
   - Giữ idempotent (chạy lại nhiều lần vẫn đúng)
-  - Dùng chung cho môi trường dev và demo
+  - Dùng cho môi trường dev/kiểm thử. KHÔNG chạy vào database chính (Supabase) đang phục vụ thật
 """
 
 import csv
@@ -50,7 +50,17 @@ from app.models import (
 
 fake = Faker("vi_VN")
 fake.seed_instance(20261016)
-DEMO_PASSWORD = "User@123"
+SAMPLE_PASSWORD = "User@123"
+
+
+def _sample_user_code(index: int) -> str:
+    """Mã hồ sơ mẫu: chỉ số lẻ là sinh viên (MSSV 52400NNN), chẵn là giảng viên (GV0NNN)."""
+    return f"52400{index:03d}" if index % 2 else f"GV0{index:03d}"
+
+
+def _sample_username(index: int) -> str:
+    """Tên đăng nhập mẫu: 52400011, gv0004…"""
+    return _sample_user_code(index).lower()
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Admin@123")
 
@@ -75,7 +85,7 @@ SUBJECTS = [
     ("ECO",  "Kinh tế",             "Khoa Kinh tế"),
     ("ENG",  "Tiếng Anh",           "Khoa Ngoại ngữ"),
 ]
-# Đủ 5 category → 5 subject (trừ PHYS không có category riêng trong demo)
+# Đủ 5 category → 5 subject (trừ PHYS không có category riêng trong dữ liệu mẫu)
 CATEGORY_SUBJECT = {
     "Công nghệ thông tin": "IT",
     "Khoa học": "MATH",
@@ -169,7 +179,7 @@ def _validate_books_catalog(rows):
         raise ValueError("Catalog is missing subject groups: " + ", ".join(missing_subjects))
 
 
-def _seed_user(db, *, username, role, user_code, name, email, password, balance=0):
+def _seed_user(db, *, username, role, user_code, name, email, password, balance=0, managed=False):
     account = _get_or_create(
         db,
         Account,
@@ -196,9 +206,9 @@ def _seed_user(db, *, username, role, user_code, name, email, password, balance=
         db.add(user)
         db.flush()
     else:
-        # Tài khoản demo do script quản lý bắt đầu từ 0; các giao dịch phía
+        # Tài khoản mẫu do script quản lý bắt đầu từ 0; các giao dịch phía
         # dưới sẽ tính lại số dư chính xác từ ledger.
-        if username.startswith("demo_"):
+        if managed:
             user.service_balance = balance
     return user
 
@@ -208,11 +218,11 @@ def _seed_user(db, *, username, role, user_code, name, email, password, balance=
 # ────────────────────────────────────────────────────────────────────────────
 
 def seed_database():
-    """Insert/reconcile this seeder's stable demo rows without touching user data.
+    """Insert/reconcile this seeder's stable sample rows without touching user data.
 
-    Run ``alembic upgrade head`` before invoking this script. The stable demo
+    Run ``alembic upgrade head`` before invoking this script. The stable sample
     keys make this safe to run repeatedly and allow partially seeded databases
-    to be completed later. Rows carrying this seeder's stable demo keys are
+    to be completed later. Rows carrying this seeder's stable sample keys are
     reconciled; unrelated accounts and transactions are preserved.
     """
     if not ADMIN_USERNAME or not ADMIN_PASSWORD:
@@ -252,18 +262,18 @@ def seed_database():
             password=ADMIN_PASSWORD,
         )
 
-        # 100 người dùng demo (sinh viên / giảng viên)
+        # 100 người dùng mẫu (sinh viên / giảng viên)
         for index in range(1, 101):
             role = "STUDENT" if index % 2 else "LECTURER"
-            prefix = "SV" if role == "STUDENT" else "GV"
             _seed_user(
                 db,
-                username=f"demo_{role.lower()}_{index:03d}",
+                username=_sample_username(index),
                 role=role,
-                user_code=f"{prefix}-DEMO-{index:03d}",
+                user_code=_sample_user_code(index),
                 name=fake.name(),
-                email=f"demo.user.{index:03d}@library.local",
-                password=DEMO_PASSWORD,
+                email=f"{_sample_username(index)}@library.local",
+                password=SAMPLE_PASSWORD,
+                managed=True,
                 # Wallet balances are derived from the explicit ledger below.
                 balance=0,
             )
@@ -271,7 +281,7 @@ def seed_database():
 
         # ── 3. Books + Copies + Ebooks: nạp catalog đã lấy từ Google Books API ──
         # Lấy catalog trước bằng scripts/fetch_books_from_google_books.py.
-        # Không lấp thiếu sách bằng Faker để tránh trộn nguồn dữ liệu trong demo.
+        # Không lấp thiếu sách bằng Faker để tránh trộn nguồn dữ liệu mẫu.
         base_dir = Path(__file__).resolve().parent
         csv_file = base_dir / "data" / "books_seed.csv"
         if not csv_file.exists():
@@ -299,8 +309,9 @@ def seed_database():
             )
         _validate_books_catalog(raw_books)
 
+        seeded_books = []  # theo đúng thứ tự trong catalog, dùng cho các phiếu mượn mẫu bên dưới
         for index, book_data in enumerate(raw_books, start=1):
-            title = f"[DEMO-{index:03d}] {book_data['title']}"
+            title = book_data["title"]
             author = book_data["author"]
             publisher = book_data["publisher"]
             pub_year = int(book_data["publication_year"])
@@ -326,7 +337,7 @@ def seed_database():
                 publication_year=pub_year,
                 price=price,
                 description=desc,
-                keywords=f"{subj_code} {cat_name} demo",
+                keywords=f"{subj_code} {cat_name}",
                 num_pages=pages,
                 book_type=btype,
                 book_attribute=infer_book_attribute(book_data["title"], desc),
@@ -346,13 +357,14 @@ def seed_database():
             book.book_attribute = book.book_attribute or infer_book_attribute(book_data["title"], desc)
             book.category_id = categories[cat_name].id
             book.subject_code = subj_code
+            seeded_books.append(book)
 
             # Giữ 1-3 bản sao mỗi sách theo yêu cầu 2B-30.a
             copy_count = int(book_data.get("copies_count", 1 + (index % 3)))
             existing_copy_count = db.query(BookCopy).filter_by(book_id=book.id).count()
             for copy_index in range(existing_copy_count + 1, copy_count + 1):
                 copy = BookCopy(
-                    copy_barcode=f"DEMO-BC-{index:03d}-{copy_index:02d}",
+                    copy_barcode=f"BC-{index:03d}-{copy_index:02d}",
                     book_id=book.id,
                     zone=chr(ord("A") + (index % 4)),
                     floor=str(1 + index % 3),
@@ -395,11 +407,9 @@ def seed_database():
             rooms.append(r)
         db.flush()
 
-        # ── 5. Demo Loans + Waitlists – trạng thái và tồn kho nhất quán ────
-        books_all = db.query(Book).filter(
-            Book.title.like("[DEMO-%")
-        ).order_by(Book.id).all()
-        _seed_demo_loans_and_waitlists(db, books_all, now)
+        # ── 5. Phiếu mượn + hàng chờ mẫu – trạng thái và tồn kho nhất quán ────
+        books_all = seeded_books
+        _seed_sample_loans_and_waitlists(db, books_all, now)
         db.flush()
 
 
@@ -415,17 +425,17 @@ def seed_database():
         _seed_unmatched_tx(db, now)
         db.flush()
 
-        # ── 10. FinePayments demo (UC08/UC10) ───────────────────────────────
-        _seed_fine_payments(db, now)
+        # ── 10. FinePayments mẫu (UC08/UC10) ───────────────────────────────
+        _seed_fine_payments(db, now, books_all)
         db.flush()
 
         db.commit()
         print("=" * 60)
         print("Seed hoàn tất (Sprint 2C – 3-21 + 4-21):")
         print("  - 100 sách, 101 hồ sơ (gồm ADMIN), 4 phòng")
-        print("  - Dữ liệu demo đủ 16 UC")
+        print("  - Dữ liệu mẫu đủ 16 UC")
         print(f"Tài khoản ADMIN: {ADMIN_USERNAME} / {ADMIN_PASSWORD}")
-        print(f"Tài khoản mẫu:   demo_student_001 / {DEMO_PASSWORD}")
+        print(f"Tài khoản mẫu:   {_sample_username(1)} (sinh viên), {_sample_username(2)} (giảng viên) / {SAMPLE_PASSWORD}")
         print("=" * 60)
 
     except Exception:
@@ -440,24 +450,24 @@ def seed_database():
 # Ghi chú cũ (dạng mô tả) do phiên bản seeder trước tạo ra.
 # Dùng để nhận lại và cập nhật chúng thay vì tạo bản ghi trùng.
 _LEGACY_RB_NOTES = {
-    "DEMO-RB-001": "Học nhóm môn Lập trình Web",
-    "DEMO-RB-002": "Họp nhóm đồ án tốt nghiệp",
-    "DEMO-RB-003": "Thảo luận báo cáo cuối kỳ",
-    "DEMO-RB-004": "Hủy trước 2 giờ – được hoàn tiền",
-    "DEMO-RB-005": "Không đến sau 15 phút – JOB-06 chuyển NO_SHOW",
-    "DEMO-RB-006": "Buổi hướng dẫn đồ án – ngày mai",
+    "RB-001": "Học nhóm môn Lập trình Web",
+    "RB-002": "Họp nhóm đồ án tốt nghiệp",
+    "RB-003": "Thảo luận báo cáo cuối kỳ",
+    "RB-004": "Hủy trước 2 giờ – được hoàn tiền",
+    "RB-005": "Không đến sau 15 phút – JOB-06 chuyển NO_SHOW",
+    "RB-006": "Buổi hướng dẫn đồ án – ngày mai",
 }
 
 
 def _seed_room_bookings(db, rooms, now: datetime, vn_now: datetime) -> None:
-    """Tạo lượt đặt phòng demo đủ 5 trạng thái.
+    """Tạo lượt đặt phòng mẫu đủ 5 trạng thái.
 
     Quy ước timestamp:
       - booking_date dùng giờ VN (vn_now) vì đây là ngày lịch người dùng nhìn.
       - checkin_time và created_at lưu UTC-naive (now) khớp backend.
 
     Idempotent:
-      - Tra cứu theo notes = "DEMO-RB-xxx" (stable key hiện tại).
+      - Tra cứu theo notes = "RB-xxx" (stable key hiện tại).
       - Nếu không tìm thấy, thử nhận lại ghi chú cũ dạng mô tả (_LEGACY_RB_NOTES)
         để tránh tạo bản ghi trùng và đụng partial unique index.
 
@@ -504,31 +514,31 @@ def _seed_room_bookings(db, rooms, now: datetime, vn_now: datetime) -> None:
     # (ref, room_idx, user_code, booking_date, slot_start, slot_end, status, checkin_utc_or_None)
     definitions = [
         # 1. COMPLETED – hôm qua, đã xong, check-in trong slot
-        ("DEMO-RB-001", 0, "SV-DEMO-001",
+        ("RB-001", 0, "52400001",
          completed_date,  "08:00", "10:00", "COMPLETED", completed_checkin),
         # 2. CHECKED_IN – slot hai giờ hiện tại theo giờ Việt Nam
-        ("DEMO-RB-002", 1, "SV-DEMO-003",
+        ("RB-002", 1, "52400003",
          checked_in_date, ci_slot_start, ci_slot_end, "CHECKED_IN", checkin_utc),
         # 3. CONFIRMED – ngày mai, chưa đến
-        ("DEMO-RB-003", 2, "SV-DEMO-005",
+        ("RB-003", 2, "52400005",
          vn_tomorrow,    "14:00", "16:00", "CONFIRMED",  None),
         # 4. CANCELLED – 3 ngày trước, đã hủy, hoàn tiền
-        ("DEMO-RB-004", 0, "GV-DEMO-004",
+        ("RB-004", 0, "GV0004",
          vn_3days_ago,   "16:00", "18:00", "CANCELLED",  None),
         # 5. NO_SHOW – 2 ngày trước, đặt mà không đến
-        ("DEMO-RB-005", 1, "SV-DEMO-007",
+        ("RB-005", 1, "52400007",
          vn_2days_ago,   "08:00", "10:00", "NO_SHOW",    None),
         # 6. CONFIRMED – ngày mai, giảng viên hướng dẫn đồ án
-        ("DEMO-RB-006", 3, "GV-DEMO-006",
+        ("RB-006", 3, "GV0006",
          vn_tomorrow,    "10:00", "12:00", "CONFIRMED",  None),
         # 7. CONFIRMED hôm nay – slot bắt đầu ~5 phút trước (còn trong cửa sổ check-in 15 phút)
-        ("DEMO-RB-CHECKIN-NOW", 2, "SV-DEMO-001",
+        ("RB-CHECKIN-NOW", 2, "52400001",
          vn_today,
          (vn_now - timedelta(minutes=5)).time().replace(second=0, microsecond=0),
          (vn_now + timedelta(hours=1, minutes=55)).time().replace(second=0, microsecond=0),
          "CONFIRMED", None),
         # 8. CONFIRMED hôm nay – slot sau (hiện trên bảng, chưa tới giờ check-in)
-        ("DEMO-RB-CHECKIN-LATER", 2, "GV-DEMO-002",
+        ("RB-CHECKIN-LATER", 2, "GV0002",
          vn_today,
          "16:00" if vn_now.hour < 16 else "22:00",
          "18:00" if vn_now.hour < 16 else "23:59",
@@ -571,14 +581,14 @@ def _seed_room_bookings(db, rooms, now: datetime, vn_now: datetime) -> None:
 def _seed_wallet_data(db, now):
     """Tạo TopUp và ledger ví có số dư chạy cộng dồn khớp từng giao dịch."""
     topups = [
-        ("SV-DEMO-001", 100_000, "PAY-DEMO-001-A", "BANK-DEMO-001-A", "PAID", -9),
-        ("SV-DEMO-001", 200_000, "PAY-DEMO-001-B", "BANK-DEMO-001-B", "PAID", -6),
-        ("SV-DEMO-003", 150_000, "PAY-DEMO-003-A", "BANK-DEMO-003-A", "PAID", -8),
-        ("GV-DEMO-004", 30_000, "PAY-DEMO-004-A", "BANK-DEMO-004-A", "PAID", -5),
-        ("SV-DEMO-005", 50_000, "PAY-DEMO-005-A", "BANK-DEMO-005-A", "PAID", -4),
-        ("SV-DEMO-011", 100_000, "PAY-DEMO-011-A", "BANK-DEMO-011-A", "PAID", -5),
-        ("SV-DEMO-007", 100_000, "PAY-DEMO-007-P", None, "PENDING", 0),
-        ("SV-DEMO-009", 50_000, "PAY-DEMO-009-E", None, "EXPIRED", -1),
+        ("52400001", 100_000, "PAY-001-A", "BANK-001-A", "PAID", -9),
+        ("52400001", 200_000, "PAY-001-B", "BANK-001-B", "PAID", -6),
+        ("52400003", 150_000, "PAY-003-A", "BANK-003-A", "PAID", -8),
+        ("GV0004", 30_000, "PAY-004-A", "BANK-004-A", "PAID", -5),
+        ("52400005", 50_000, "PAY-005-A", "BANK-005-A", "PAID", -4),
+        ("52400011", 100_000, "PAY-011-A", "BANK-011-A", "PAID", -5),
+        ("52400007", 100_000, "PAY-007-P", None, "PENDING", 0),
+        ("52400009", 50_000, "PAY-009-E", None, "EXPIRED", -1),
     ]
     for user_code, amount, pay_code, bank_tx, status, day_offset in topups:
         if not db.query(User).filter_by(user_code=user_code).first():
@@ -595,41 +605,20 @@ def _seed_wallet_data(db, now):
         row.created_at = created
         row.expired_at = created + timedelta(minutes=15)
 
-    # Remove only transaction/payment fixtures created by the earlier version
-    # of this same demo seeder; these have stable DEMO references/notes.
-    legacy_refs = [
-        "PAY-20261015-D001", "PAY-20261018-D001", "RB-DEMO-001",
-        "PAY-20261016-D003", "RB-DEMO-002", "PAY-20261020-D005",
-        "PAY-20261019-D002", "RB-DEMO-003", "FINE-DEMO-003",
-        "PAY-20261022-D007", "PAY-20261023-D009",
-    ]
-    db.query(WalletTxn).filter(WalletTxn.reference_id.in_(legacy_refs)).delete(synchronize_session=False)
-    db.query(TopUp).filter(TopUp.pay_code.in_([
-        "PAY-20261015-D001", "PAY-20261018-D001", "PAY-20261016-D003",
-        "PAY-20261020-D005", "PAY-20261019-D002", "PAY-20261022-D007",
-        "PAY-20261023-D009",
-    ])).delete(synchronize_session=False)
-    db.query(FinePayment).filter(FinePayment.notes.in_([
-        "Thu phạt trễ hạn 6 ngày tại quầy",
-        "Thu phạt bồi thường sách mất",
-        "Trả phạt qua tài khoản dịch vụ (UC10)",
-    ])).delete(synchronize_session=False)
-    db.flush()
-
     # Each user's events are ordered by time; balances are derived, never guessed.
     events = [
-        ("SV-DEMO-001", "TOPUP", 100_000, "PAY-DEMO-001-A", "Nạp tiền đã đối soát", -9),
-        ("SV-DEMO-001", "TOPUP", 200_000, "PAY-DEMO-001-B", "Nạp tiền đã đối soát", -6),
-        ("SV-DEMO-001", "BOOKING_PAYMENT", -20_000, "DEMO-RB-001", "Thanh toán đặt phòng đã hoàn tất", -2),
-        ("SV-DEMO-003", "TOPUP", 150_000, "PAY-DEMO-003-A", "Nạp tiền đã đối soát", -8),
-        ("SV-DEMO-003", "BOOKING_PAYMENT", -30_000, "DEMO-RB-002", "Thanh toán đặt phòng đang sử dụng", -0.04),
-        ("GV-DEMO-004", "TOPUP", 30_000, "PAY-DEMO-004-A", "Nạp tiền để thanh toán đặt phòng", -5),
-        ("GV-DEMO-004", "BOOKING_PAYMENT", -30_000, "DEMO-RB-004", "Thanh toán trước khi hủy", -4),
-        ("GV-DEMO-004", "REFUND", 30_000, "DEMO-RB-004", "Hoàn tiền lượt đặt đã hủy", -3),
-        ("SV-DEMO-005", "TOPUP", 50_000, "PAY-DEMO-005-A", "Nạp tiền đã đối soát", -4),
-        ("SV-DEMO-011", "TOPUP", 100_000, "PAY-DEMO-011-A", "Nạp tiền đã đối soát", -5),
-        ("SV-DEMO-011", "FINE_PAYMENT", -50_000, "FINE-DEMO-PAID-011", "Thanh toán đủ khoản phạt mẫu", -0.5),
-        ("SV-DEMO-009", "TOPUP", 50_000, "FT26_UNMATCHED_003", "Cộng ví sau khi gán giao dịch ngân hàng", -0.99),
+        ("52400001", "TOPUP", 100_000, "PAY-001-A", "Nạp tiền đã đối soát", -9),
+        ("52400001", "TOPUP", 200_000, "PAY-001-B", "Nạp tiền đã đối soát", -6),
+        ("52400001", "BOOKING_PAYMENT", -20_000, "RB-001", "Thanh toán đặt phòng đã hoàn tất", -2),
+        ("52400003", "TOPUP", 150_000, "PAY-003-A", "Nạp tiền đã đối soát", -8),
+        ("52400003", "BOOKING_PAYMENT", -30_000, "RB-002", "Thanh toán đặt phòng đang sử dụng", -0.04),
+        ("GV0004", "TOPUP", 30_000, "PAY-004-A", "Nạp tiền để thanh toán đặt phòng", -5),
+        ("GV0004", "BOOKING_PAYMENT", -30_000, "RB-004", "Thanh toán trước khi hủy", -4),
+        ("GV0004", "REFUND", 30_000, "RB-004", "Hoàn tiền lượt đặt đã hủy", -3),
+        ("52400005", "TOPUP", 50_000, "PAY-005-A", "Nạp tiền đã đối soát", -4),
+        ("52400011", "TOPUP", 100_000, "PAY-011-A", "Nạp tiền đã đối soát", -5),
+        ("52400011", "FINE_PAYMENT", -50_000, "FINE-PAID-011", "Thanh toán đủ khoản phạt mẫu", -0.5),
+        ("52400009", "TOPUP", 50_000, "FT26_UNMATCHED_003", "Cộng ví sau khi gán giao dịch ngân hàng", -0.99),
     ]
     balances = {}
     for user_code, txn_type, amount, ref, description, day_offset in sorted(events, key=lambda event: event[-1]):
@@ -638,7 +627,7 @@ def _seed_wallet_data(db, now):
         before = balances.get(user_code, 0)
         after = before + amount
         if after < 0:
-            raise ValueError(f"Số dư demo âm: {user_code}, {ref}")
+            raise ValueError(f"Số dư mẫu âm: {user_code}, {ref}")
         txn = db.query(WalletTxn).filter_by(
             user_code=user_code, reference_id=ref, txn_type=txn_type
         ).one_or_none()
@@ -664,7 +653,7 @@ def _seed_unmatched_tx(db, now):
             "bank_tx_id": "FT26_UNMATCHED_001",
             "amount": 100_000,
             "bank_account_number": "0901234567",
-            "transfer_content": "NGUYEN VAN DEMO NAP TIEN THU VIEN",
+            "transfer_content": "NGUYEN VAN AN NAP TIEN THU VIEN",
             "received_at": now - timedelta(days=3),
             "status": "UNRESOLVED",
             "resolved_by": None,
@@ -684,11 +673,11 @@ def _seed_unmatched_tx(db, now):
             "bank_tx_id": "FT26_UNMATCHED_003",
             "amount": 50_000,
             "bank_account_number": "0923456789",
-            "transfer_content": "NAP TIEN KHONG GHI MA PAY CODE DEMO",
+            "transfer_content": "NAP TIEN KHONG GHI MA PAY CODE",
             "received_at": now - timedelta(days=1),
             "status": "ASSIGNED",
             "resolved_by": "ADMIN-0001",
-            "resolution_notes": "Đã đối soát, cộng số dư cho SV-DEMO-009",
+            "resolution_notes": "Đã đối soát, cộng số dư cho 52400009",
         },
     ]
 
@@ -702,12 +691,12 @@ def _seed_unmatched_tx(db, now):
         row.created_at = item["received_at"] + timedelta(minutes=1)
 
 
-def _seed_fine_payments(db, now):
+def _seed_fine_payments(db, now, books):
     """Seed một khoản phạt đã thanh toán khớp với fine và ledger ví."""
-    user_code = "SV-DEMO-011"
-    loan = db.query(Loan).filter_by(user_code=user_code, checkout_condition="DEMO-PAID-FINE").one_or_none()
+    user_code = "52400011"
+    loan = db.query(Loan).filter_by(user_code=user_code, checkout_condition="PAID-FINE").one_or_none()
     if loan is None:
-        book = db.query(Book).filter(Book.title.like("[DEMO-%")).order_by(Book.id).offset(7).first()
+        book = books[7] if len(books) > 7 else None
         copy = db.query(BookCopy).filter_by(book_id=book.id, status="AVAILABLE").first() if book else None
         if not book or not copy:
             return
@@ -715,7 +704,7 @@ def _seed_fine_payments(db, now):
             user_code=user_code, book_id=book.id, copy_barcode=copy.copy_barcode,
             loan_type="PHYSICAL", loan_status="RETURNED",
             borrow_date=now - timedelta(days=25), due_date=now - timedelta(days=11),
-            return_date=now - timedelta(days=1), checkout_condition="DEMO-PAID-FINE",
+            return_date=now - timedelta(days=1), checkout_condition="PAID-FINE",
         )
         db.add(loan)
         db.flush()
@@ -728,9 +717,9 @@ def _seed_fine_payments(db, now):
     fine.total_amount = 50_000
     fine.payment_status = "PAID"
     fine.created_at = now - timedelta(days=1)
-    payment = db.query(FinePayment).filter_by(notes="DEMO-FINE-PAID-011").one_or_none()
+    payment = db.query(FinePayment).filter_by(notes="FINE-PAID-011").one_or_none()
     if payment is None:
-        payment = FinePayment(notes="DEMO-FINE-PAID-011")
+        payment = FinePayment(notes="FINE-PAID-011")
         db.add(payment)
     payment.user_code = user_code
     payment.admin_collector_code = "ADMIN-0001"
@@ -742,7 +731,7 @@ def _seed_fine_payments(db, now):
     )
 
 
-def _seed_demo_loans_and_waitlists(db, books, now):
+def _seed_sample_loans_and_waitlists(db, books, now):
     """Seed stable UC fixtures; every physical loan reserves one real copy."""
     if len(books) < 8:
         return
@@ -770,9 +759,9 @@ def _seed_demo_loans_and_waitlists(db, books, now):
         return query.order_by(BookCopy.copy_barcode).first()
 
     fixtures = [
-        ("SV-DEMO-001", books[0], "BORROWED", "AVAILABLE", "DEMO-ACTIVE-LOAN"),
-        ("SV-DEMO-003", books[1], "OVERDUE", "AVAILABLE", "DEMO-OVERDUE-LOAN"),
-        ("SV-DEMO-005", books[2], "LOST", None, "DEMO-LOST-LOAN"),
+        ("52400001", books[0], "BORROWED", "AVAILABLE", "ACTIVE-LOAN"),
+        ("52400003", books[1], "OVERDUE", "AVAILABLE", "OVERDUE-LOAN"),
+        ("52400005", books[2], "LOST", None, "LOST-LOAN"),
     ]
     for user_code, book, loan_status, wanted_copy_status, marker in fixtures:
         existing = db.query(Loan).filter_by(user_code=user_code, book_id=book.id).filter(
@@ -785,7 +774,7 @@ def _seed_demo_loans_and_waitlists(db, books, now):
             continue
         if loan_status == "LOST":
             copy.status = "LOST"
-            copy.damage_notes = "Mất sách – fixture demo UC15"
+            copy.damage_notes = "Mất sách (UC15)"
         else:
             copy.status = "BORROWED"
         borrow_date = now - timedelta(days=10 if loan_status == "LOST" else (25 if loan_status == "OVERDUE" else 5))
@@ -816,7 +805,7 @@ def _seed_demo_loans_and_waitlists(db, books, now):
             incident.incident_type = "BOOK_LOST"
             incident.severity = "SEVERE"
             incident.penalty_amount = penalty
-            incident.description = f"DEMO: báo mất {book.title}; bồi thường theo giá bìa"
+            incident.description = f"Báo mất {book.title}; bồi thường theo giá bìa"
             incident.status = "RESOLVED"
             # UC10/UC15: bồi thường mất sách phải có Fine UNPAID khớp Total_Fines để lookup/collect.
             fine = db.query(Fine).filter_by(loan_id=loan.id).one_or_none()
@@ -831,10 +820,10 @@ def _seed_demo_loans_and_waitlists(db, books, now):
                 {User.total_fines: penalty, User.is_borrowing_blocked: True}
             )
 
-    # Thêm SV demo đang nợ thật để test UC10 (lookup + thu đủ).
+    # Thêm sinh viên mẫu đang nợ thật để test UC10 (lookup + thu đủ).
     extra_unpaid = [
-        ("SV-DEMO-007", books[3], "DEMO-UNPAID-FINE-007", 7, 35_000),
-        ("SV-DEMO-009", books[4], "DEMO-UNPAID-FINE-009", 9, 45_000),
+        ("52400007", books[3], "UNPAID-FINE-007", 7, 35_000),
+        ("52400009", books[4], "UNPAID-FINE-009", 9, 45_000),
     ]
     for user_code, book, marker, overdue_days, amount in extra_unpaid:
         if db.query(User).filter_by(user_code=user_code).first() is None:
@@ -868,29 +857,29 @@ def _seed_demo_loans_and_waitlists(db, books, now):
         )
 
     # EBook loan uses a book that has a matching Ebook row.
-    ebook = db.query(Book).join(Ebook).filter(Book.title.like("[DEMO-%")).order_by(Book.id).first()
+    ebook = next((book for book in books if db.query(Ebook.id).filter_by(id=book.id).first()), None)
     if ebook:
-        loan_for("GV-DEMO-002", ebook, "EBOOK", "BORROWED", None,
-                 now - timedelta(days=3), now + timedelta(days=11), "DEMO-EBOOK-LOAN")
+        loan_for("GV0002", ebook, "EBOOK", "BORROWED", None,
+                 now - timedelta(days=3), now + timedelta(days=11), "EBOOK-LOAN")
     # A REQUESTED loan is a hold request, so it has no copy and does not change stock.
-    # SV-DEMO-007 đã dùng cho nợ demo; REQUESTED chuyển sang SV-DEMO-011 nếu còn.
-    requested_user = "SV-DEMO-011" if db.query(User).filter_by(user_code="SV-DEMO-011").first() else "SV-DEMO-007"
+    # 52400007 đã dùng cho khoản nợ mẫu; REQUESTED chuyển sang 52400011 nếu còn.
+    requested_user = "52400011" if db.query(User).filter_by(user_code="52400011").first() else "52400007"
     loan_for(requested_user, books[4], "PHYSICAL", "REQUESTED", None,
-             now - timedelta(hours=2), now + timedelta(hours=22), "DEMO-REQUESTED-LOAN")
+             now - timedelta(hours=2), now + timedelta(hours=22), "REQUESTED-LOAN")
 
     # Make the waitlisted title genuinely unavailable, with one borrowed loan per copy.
     waitlisted_book = books[5]
     for index, copy in enumerate(db.query(BookCopy).filter_by(book_id=waitlisted_book.id).order_by(BookCopy.copy_barcode).all(), start=11):
         if copy.status == "AVAILABLE":
             copy.status = "BORROWED"
-        assigned_user = f"SV-DEMO-{index:03d}"
+        assigned_user = _sample_user_code(index)
         if db.query(User).filter_by(user_code=assigned_user).first():
             loan_for(assigned_user, waitlisted_book, "PHYSICAL", "BORROWED", copy.copy_barcode,
-                     now - timedelta(days=2), now + timedelta(days=12), f"DEMO-WAITLIST-FILL-{copy.copy_barcode}")
+                     now - timedelta(days=2), now + timedelta(days=12), f"WAITLIST-FILL-{copy.copy_barcode}")
 
     # Another book remains available; HELD reserves one available copy logically.
-    waiting_user = db.query(User).filter_by(user_code="SV-DEMO-009").first()
-    held_user = db.query(User).filter_by(user_code="GV-DEMO-004").first()
+    waiting_user = db.query(User).filter_by(user_code="52400009").first()
+    held_user = db.query(User).filter_by(user_code="GV0004").first()
     if waiting_user:
         row = db.query(Waitlist).filter_by(user_code=waiting_user.user_code, book_id=waitlisted_book.id).one_or_none()
         if row is None:
