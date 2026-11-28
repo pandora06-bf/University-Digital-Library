@@ -27,6 +27,7 @@ import UserManagement from './pages/admin/UserManagement';
 import RoomManagement from './pages/admin/RoomManagement';
 import RoomCheckin from './pages/admin/RoomCheckin';
 import UnmatchedTxPage from './pages/admin/UnmatchedTxPage';
+import SupportTicketsPage from './pages/admin/SupportTicketsPage';
 
 import AdminRoute from './components/AdminRoute';
 
@@ -78,6 +79,7 @@ export default function App() {
           <Route path="rooms" element={<RoomManagement />} />
           <Route path="rooms/checkin" element={<RoomCheckin />} />
           <Route path="unmatched" element={<UnmatchedTxPage />} />
+          <Route path="support" element={<SupportTicketsPage />} />
         </Route>
 
         {/* 404 Route */}

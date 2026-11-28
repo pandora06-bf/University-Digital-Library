@@ -6,7 +6,9 @@ from app.models.fine import Fine, FinePayment
 from app.models.wallet import TopUp, WalletTxn, UnmatchedTx
 from app.models.room import Room, RoomBooking
 from app.models.notification import EmailNotice
+from app.models.support import SupportTicket
 __all__ = [
+    "SupportTicket",
     "Base",
     "Account",
     "User",

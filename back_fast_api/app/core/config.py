@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +28,18 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SMTP_SSL: bool = False
     SMTP_STARTTLS: bool = True
+
+    # Chatbot (mặc định tắt). Khóa API chỉ đặt qua biến môi trường, không ghi vào mã.
+    CHATBOT_ENABLED: bool = False
+    CHATBOT_PROVIDER: Literal["claude", "gemini"] = "claude"
+    CHATBOT_MODEL: str = "claude-opus-5-5"
+    ANTHROPIC_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
+    GEMINI_API_KEY: str = ""
+    CHAT_RATE_PER_MINUTE: int = 6
+    CHAT_DAILY_LIMIT_GUEST: int = 20
+    CHAT_DAILY_LIMIT_USER: int = 60
+    CHAT_DAILY_LIMIT_TOTAL: int = 500
 
     model_config = SettingsConfigDict(
         env_file=".env",

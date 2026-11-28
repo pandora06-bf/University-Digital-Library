@@ -4,6 +4,7 @@ import { Search, Home, Layers, BookmarkCheck, LogOut, Menu, X, CalendarDays, Use
 import { getCurrentUser } from '../mocks/auth';
 import BrandMark from '../components/BrandMark';
 import HeaderAccount from '../components/user/HeaderAccount';
+import ChatWidget from '../components/chat/ChatWidget';
 import { SHOW_UI_KIT } from '../utils/featureFlags';
 import { logout } from '../services/authService';
 import { loginPathFor } from '../utils/loginRedirect';
@@ -226,6 +227,9 @@ export default function UserLayout() {
           })}
         </nav>
       )}
+
+      {/* Trợ lý ảo: key theo người dùng để đổi tài khoản là xóa hội thoại */}
+      <ChatWidget key={user?.id ?? 'guest'} raised={showMobileBottomNav} />
 
       {/* Footer */}
       <footer className="bg-white border-t border-[#D9E2EE] py-6 px-4 sm:px-8 mt-auto">
