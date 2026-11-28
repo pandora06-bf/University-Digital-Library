@@ -87,7 +87,7 @@ VITE_API_URL=https://libmanager-api-zvuf.onrender.com
 
 - Migration chạy **tự động** mỗi lần Render khởi động (`docker-entrypoint.sh` → `alembic upgrade head`).
 - Dữ liệu trên Supabase là bản đã dọn sạch (100 sách, tài khoản MSSV, 61 eBook trên R2), nạp từ database local ngày 27/11/2026.
-- **Không chạy `database_seeder.py` vào database chính**: seeder vẫn tạo sách `[DEMO-…]` và tài khoản `demo_*`.
+- **Không chạy `database_seeder.py` vào database chính**: seeder dành cho máy dev/kiểm thử; nó đặt lại số dư ví và các phiếu mẫu về trạng thái ban đầu, làm mất thao tác thật.
 - Sao lưu thủ công (cần Docker, dùng image `postgres:17` vì Supabase là PostgreSQL 17):
   ```bash
   docker run --rm -e SUPABASE_DB_URL postgres:17-alpine sh -c 'pg_dump "$SUPABASE_DB_URL" -n public --no-owner --no-privileges' > backup.sql

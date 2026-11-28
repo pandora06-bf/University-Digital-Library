@@ -91,7 +91,7 @@ uvicorn app.main:app --reload
 
 File `mocks/users_mock.json` chứa hồ sơ bạn đọc/nhân viên, **không có mật khẩu**.
 Khi nạp mock, công cụ sẽ tạo tài khoản trong `accounts`, tạo hồ sơ tương ứng
-trong `users`, liên kết hai bản ghi và hỏi một mật khẩu demo dùng chung. Mật khẩu
+trong `users`, liên kết hai bản ghi và hỏi một mật khẩu mẫu dùng chung. Mật khẩu
 chỉ được lưu dưới dạng bcrypt hash.
 
 1. Đảm bảo các container đang chạy và migration đã áp dụng:
@@ -107,7 +107,7 @@ chỉ được lưu dưới dạng bcrypt hash.
    docker compose exec -it api python -m app.cli seed-mock-users --source /data/mocks/users_mock.json
    ```
 
-3. Nhập mật khẩu khi được hỏi. Có thể dùng `12345678` cho môi trường demo để
+3. Nhập mật khẩu khi được hỏi. Có thể dùng `12345678` cho môi trường thử nghiệm để
    khớp với tài khoản mẫu frontend. Lệnh tạo username từ email trong JSON.
    Ví dụ đăng nhập bằng `sinhvien@tdtu.edu.vn` và mật khẩu đã chọn.
 

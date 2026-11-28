@@ -12,7 +12,7 @@ def make_account(db, username, code, role="ADMIN", fines=0):
     account = Account(username=username, password=hash_password("Password123@"), role=role, is_active=True)
     db.add(account)
     db.flush()
-    user = User(account_id=account.id, user_code=code, full_name="Demo Tester", email=f"{code}@example.test",
+    user = User(account_id=account.id, user_code=code, full_name="Sample Tester", email=f"{code}@example.test",
                 department="CNTT", user_type=role, total_fines=fines)
     db.add(user)
     db.commit()
@@ -22,7 +22,7 @@ def make_account(db, username, code, role="ADMIN", fines=0):
 def test_admin_crud_lifecycle(client, db_session):
     admin = make_account(db_session, "admin_crud", "ADMIN_CRUD", role="ADMIN")
     h = headers(admin)
-    data = {"user_code": "SV_CRUD_1", "full_name": "Nguyen Van Demo", "email": "crud1@example.test", "department": "CNTT", "role": "STUDENT"}
+    data = {"user_code": "SV_CRUD_1", "full_name": "Nguyen Van Thu", "email": "crud1@example.test", "department": "CNTT", "role": "STUDENT"}
     created = client.post("/api/admin/users", json=data, headers=h)
     assert created.status_code == 201, created.text
     assert created.json()["account_id"]

@@ -1,12 +1,12 @@
 [
   {
     "id": 2,
-    "file_path": "demo/ebook-002.pdf",
+    "file_path": "private:ebooks/ebook-002.pdf",
     "is_free": false
   },
   {
     "id": 5,
-    "file_path": "demo/ebook-005.pdf",
+    "file_path": "private:ebooks/ebook-005.pdf",
     "is_free": true
   }
 ]

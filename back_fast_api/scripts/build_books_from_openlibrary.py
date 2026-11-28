@@ -1,4 +1,4 @@
-"""Build the 100-book demo catalog from Open Library (2B-30.a).
+"""Build the 100-book sample catalog from Open Library (2B-30.a).
 
 Every record (title, author, publisher, year, ISBN, cover) is taken from ONE
 real Open Library *edition*, so the cover image always belongs to the book that

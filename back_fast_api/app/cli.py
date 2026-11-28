@@ -58,8 +58,8 @@ def seed_mock_users(source: Path) -> None:
     if not isinstance(users, list) or not users:
         raise SystemExit("Mock users file must contain a non-empty JSON array")
 
-    password = getpass("Shared demo password (minimum 8 characters): ")
-    confirmation = getpass("Confirm demo password: ")
+    password = getpass("Shared sample password (minimum 8 characters): ")
+    confirmation = getpass("Confirm sample password: ")
     if len(password) < 8:
         raise SystemExit("Password must contain at least 8 characters")
     if password != confirmation:

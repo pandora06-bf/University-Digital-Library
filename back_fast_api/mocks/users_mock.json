@@ -2,7 +2,7 @@
   {
     "user_code": "SV20210001",
     "account_id": 1,
-    "full_name": "Sinh Viên Demo",
+    "full_name": "Sinh Viên Mẫu",
     "email": "sinhvien@tdtu.edu.vn",
     "phone_number": "0901234567",
     "department": "Khoa CNTT",
@@ -17,7 +17,7 @@
   {
     "user_code": "CB19980012",
     "account_id": 2,
-    "full_name": "Thủ Thư Demo",
+    "full_name": "Thủ Thư Mẫu",
     "email": "thuthu@tdtu.edu.vn",
     "phone_number": "0912345678",
     "department": "Thư viện",
@@ -47,7 +47,7 @@
   {
     "user_code": "GV20150045",
     "account_id": 4,
-    "full_name": "Giảng Viên Demo",
+    "full_name": "Giảng Viên Mẫu",
     "email": "giangvien@tdtu.edu.vn",
     "phone_number": "0902223334",
     "department": "Khoa Quản trị Kinh doanh",

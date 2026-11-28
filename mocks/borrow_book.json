@@ -57,7 +57,7 @@
     "renewal_count": 0,
     "checkout_condition": null,
     "checkin_condition": null,
-    "ebook_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ebook_access_demo_token_gv"
+    "ebook_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ebook_access_sample_token_gv"
   },
   {
     "id": 5,
@@ -72,6 +72,6 @@
     "renewal_count": 0,
     "checkout_condition": null,
     "checkin_condition": null,
-    "ebook_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ebook_access_demo_token_tte"
+    "ebook_access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ebook_access_sample_token_tte"
   }
 ]
