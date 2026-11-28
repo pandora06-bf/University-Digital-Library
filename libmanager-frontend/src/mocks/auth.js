@@ -3,7 +3,7 @@
  * Không lưu mật khẩu nhạy cảm hay can thiệp ngầm vào backend
  */
 
-export const DEMO_USERS = [
+export const SAMPLE_USERS = [
   {
     id: 'user_01',
     email: 'sinhvien@tdtu.edu.vn',

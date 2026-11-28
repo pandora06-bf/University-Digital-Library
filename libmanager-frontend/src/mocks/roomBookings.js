@@ -11,20 +11,20 @@ export const ROOM_SLOTS = Array.from({ length: 5 }, (_, i) => ({
 }));
 
 // Lịch sử mẫu để giao diện thể hiện trạng thái do thủ thư/JOB-06 cập nhật (2B-27).
-function demoHistory() {
+function sampleHistory() {
   const daysAgo = (n) => libraryToday(new Date(Date.now() - n * 86400000));
-  const past = (n, room, slot, status) => ({ id: `demo-${status.toLowerCase()}`, roomId: room.id, roomName: room.name,
+  const past = (n, room, slot, status) => ({ id: `sample-${status.toLowerCase()}`, roomId: room.id, roomName: room.name,
     date: daysAgo(n), slotId: slot.id, start: slot.start, end: slot.end, price: room.slotPrice, status, createdAt: daysAgo(n + 1) });
   return [past(2, ROOMS[0], ROOM_SLOTS[1], 'COMPLETED'), past(5, ROOMS[1], ROOM_SLOTS[3], 'NO_SHOW')];
 }
 
 function storageKey() {
-  return `libmanager_rooms_v1_${getCurrentUser()?.id ?? 'demo'}`;
+  return `libmanager_rooms_v1_${getCurrentUser()?.id ?? 'guest'}`;
 }
 function readState() {
   const raw = sessionStorage.getItem(storageKey());
   if (raw) return JSON.parse(raw);
-  return { balance: 50000, bookings: demoHistory() };
+  return { balance: 50000, bookings: sampleHistory() };
 }
 function saveState(state) {
   // Số dư và lượt đặt ghi cùng một lần; không có bước trừ tiền riêng.
@@ -75,7 +75,7 @@ export function cancelRoomBooking(id) {
   return booking;
 }
 
-export function topUpDemoWallet(amount) {
+export function topUpSampleWallet(amount) {
   if (![50000, 100000, 200000].includes(amount)) fail('INVALID_AMOUNT', 'Số tiền nạp thử không hợp lệ.');
   const state = readState();
   saveState({ ...state, balance: state.balance + amount });

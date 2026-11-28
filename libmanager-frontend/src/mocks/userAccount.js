@@ -4,7 +4,7 @@ import { http, HttpResponse } from 'msw';
 // Đăng ký trước `handlers` (mocks/browser.js) nên các route trùng ở đây được ưu tiên.
 // Hợp đồng theo backend thật: wallet_router.py, webhook_router.py, fine_wallet_router.py, waitlist_router.py.
 
-const USER_CODE = 'SV-DEMO-001';
+const USER_CODE = '52400001';
 const iso = (date) => date.toISOString().replace('Z', ''); // backend trả giờ UTC không kèm múi giờ
 const state = {
   balance: 150_000,
@@ -31,7 +31,7 @@ const topupView = (t) => ({
   pay_code: t.pay_code, amount: t.amount, status: t.status, expired_at: t.expired_at, created_at: t.created_at,
   // Ảnh QR minh họa (SVG nội tuyến) để chạy mock không cần mạng.
   qr_url: `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><rect width='120' height='120' fill='#fff'/><rect x='10' y='10' width='30' height='30' fill='#111'/><rect x='80' y='10' width='30' height='30' fill='#111'/><rect x='10' y='80' width='30' height='30' fill='#111'/><text x='60' y='66' font-size='9' text-anchor='middle' font-family='monospace'>${t.pay_code}</text></svg>`)}`,
-  bank: { bin: '970422', account_no: 'VQRDEMO0001', account_name: 'THU VIEN DEMO', content: t.pay_code },
+  bank: { bin: '970422', account_no: 'VQR0000001', account_name: 'THU VIEN TDTU', content: t.pay_code },
 });
 
 export const userAccountHandlers = [

@@ -48,7 +48,7 @@ try {
   await check('Thiếu số dư không tạo lượt đặt; nạp thử rồi đặt được', () => {
     assert.throws(() => rooms.createRoomBooking({ roomId: 'room-03', date: '2026-10-14', slotId: '16' }), { code: 'INSUFFICIENT_BALANCE' });
     assert.equal(rooms.getRoomSnapshot('2026-10-14').bookings.filter((item) => item.status === 'CONFIRMED').length, 0);
-    rooms.topUpDemoWallet(50000);
+    rooms.topUpSampleWallet(50000);
     rooms.createRoomBooking({ roomId: 'room-03', date: '2026-10-14', slotId: '16' });
     assert.equal(rooms.getRoomSnapshot('2026-10-14').balance, 40000);
   });
@@ -102,9 +102,9 @@ try {
     assert.throws(() => ebooks.getMockLoanSession('not-a-loan'), { status: 404 });
   });
   await check('Quyền đọc thiếu token hoặc hạn sai bị khóa; phát hiện 403', () => {
-    assert.equal(accessDeadline({ access: 'borrowed', expiresAt: 'bad', readToken: 'demo' }), 0);
+    assert.equal(accessDeadline({ access: 'borrowed', expiresAt: 'bad', readToken: 'mock' }), 0);
     assert.equal(accessDeadline({ access: 'borrowed', expiresAt: '2026-10-27T09:00:00+07:00' }), 0);
-    assert.equal(accessDeadline({ access: 'borrowed', readToken: 'demo', expiresAt: '2026-10-27T09:00:00+07:00', loanExpiresAt: '2026-10-26T09:00:00+07:00' }), RealDate.parse('2026-10-26T09:00:00+07:00'));
+    assert.equal(accessDeadline({ access: 'borrowed', readToken: 'mock', expiresAt: '2026-10-27T09:00:00+07:00', loanExpiresAt: '2026-10-26T09:00:00+07:00' }), RealDate.parse('2026-10-26T09:00:00+07:00'));
     assert.equal(isForbidden({ status: 403 }), true);
     assert.equal(isForbidden({ response: { status: 401 } }), true);
     assert.equal(previewLimit(3), 5); assert.equal(previewLimit(20), 10);
@@ -159,7 +159,7 @@ try {
       rooms: [{ id: 1, room_name: 'Phòng học nhóm 01', capacity: 6, price_per_slot: 20000, floor: '1', is_active: true }],
       availability: { 1: { room: { id: 1 }, date: '2026-11-27', slots: [{ slot_start: '07:00:00', slot_end: '09:00:00', is_booked: false, is_past: false, available: true }] } },
       bookings: [{ id: 9, room_id: 1, booking_date: '2026-11-27', attendee_count: 3, slot_start: '07:00:00', slot_end: '09:00:00', status: 'CONFIRMED' }],
-      wallet: { user_code: 'SV-DEMO-009', balance: 50000, currency: 'VND' } });
+      wallet: { user_code: '52400009', balance: 50000, currency: 'VND' } });
     assert.equal(snap.balance, 50000);
     assert.equal(snap.rooms[0].slotPrice, 20000);
     assert.deepEqual(snap.rooms[0].slots.map((x) => [x.start, x.end, x.reason]), [['07:00', '09:00', 'Còn trống']]);

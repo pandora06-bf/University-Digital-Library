@@ -10,10 +10,10 @@ import { formatMoney } from '../../utils/libraryDate';
 // Phòng đọc chạy API thật (VITE_ROOM_BOOKING_API=true) → dùng ví thật ở trang Tài khoản (4-13).
 export default function WalletTopUpPage() {
   if (roomBookingService.mode === 'api') return <Navigate to="/account?topup=1" replace />;
-  return <DemoTopUp />;
+  return <SimulatedTopUp />;
 }
 
-function DemoTopUp() {
+function SimulatedTopUp() {
   const [amount, setAmount] = useState(50000);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);

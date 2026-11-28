@@ -870,7 +870,7 @@ export default function IncidentPage() {
             <div className="flex items-stretch gap-2 min-w-0">
               <div className="min-w-0 flex-1">
                 <Input
-                  placeholder="VD: DEMO-BC-005-02 · 15 · SV-DEMO-009 · GV-DEMO-002"
+                  placeholder="VD: BC-005-02 · 15 · 52400009 · GV0002"
                   leftIcon={<ScanLine className="w-4 h-4" />}
                   className="!h-11 font-mono text-sm"
                   value={createForm.code}

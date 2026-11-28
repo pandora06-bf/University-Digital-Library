@@ -304,7 +304,7 @@ export default function LoanManagement() {
     }
   };
 
-  // Từ Thu phạt / Chi tiết: /admin/loans?mssv=SV-DEMO-007 → tự điền + tra cứu
+  // Từ Thu phạt / Chi tiết: /admin/loans?mssv=52400007 → tự điền + tra cứu
   useEffect(() => {
     const mssv = (searchParams.get('mssv') || '').trim();
     if (!mssv || autoLookupDone.current === mssv) return;
@@ -316,7 +316,7 @@ export default function LoanManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query mssv đổi
   }, [searchParams]);
 
-  // Từ Tồn kho: /admin/loans?barcode=DEMO-BC-006-02 → tự mở phiếu đang mượn (cột Nhận trả)
+  // Từ Tồn kho: /admin/loans?barcode=BC-006-02 → tự mở phiếu đang mượn (cột Nhận trả)
   useEffect(() => {
     const barcode = (searchParams.get('barcode') || '').trim();
     if (!barcode || autoBarcodeDone.current === barcode) return;
@@ -345,7 +345,7 @@ export default function LoanManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi query book_id đổi
   }, [searchParams]);
 
-  // Từ Tồn kho chọn bản Sẵn sàng: /admin/loans?checkout_barcode=DEMO-BC-…
+  // Từ Tồn kho chọn bản Sẵn sàng: /admin/loans?checkout_barcode=BC-…
   useEffect(() => {
     const checkoutBarcode = (searchParams.get('checkout_barcode') || '').trim();
     if (!checkoutBarcode || autoCheckoutBarcodeDone.current === checkoutBarcode) return;

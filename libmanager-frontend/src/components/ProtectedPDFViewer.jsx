@@ -77,7 +77,7 @@ export default function ProtectedPDFViewer({ session, onBorrow, onReturn, busy =
         </div>
       </header>
       <div className="px-4 py-3 text-center text-xs bg-slate-900/70 text-slate-300">
-        {session.isDemo ? 'Tài liệu mẫu để trải nghiệm trình đọc · ' : ''}
+        {session.isSample ? 'Tài liệu mẫu để trải nghiệm trình đọc · ' : ''}
         {preview ? `Bản xem trước · Tối đa ${previewLimit(session.previewPages)} trang đầu` : session.access === 'free' ? 'Sách miễn phí · Đọc toàn bộ' : session.expiresAt && Number.isFinite(new Date(session.expiresAt).getTime()) ? `Quyền đọc đến ${new Date(session.expiresAt).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}` : 'Quyền đọc được thư viện quản lý'}
       </div>
       {notice && <p role="status" className="p-3 text-center text-sm bg-amber-950 text-amber-100">{notice}</p>}

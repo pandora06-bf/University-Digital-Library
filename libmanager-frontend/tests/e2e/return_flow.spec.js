@@ -48,12 +48,12 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
         contentType: 'application/json',
         body: JSON.stringify({
           loan_id: 101,
-          user_code: 'SV-DEMO-001',
+          user_code: '52400001',
           full_name: 'Quý cô Phương Vũ',
           book_id: 1,
           book_title: 'Clean Code',
           book_price: 150000,
-          copy_barcode: 'DEMO-BC-001-01',
+          copy_barcode: 'BC-001-01',
           loan_status: 'BORROWED',
           due_date: '2026-11-11T17:00:00Z',
           overdue: false,
@@ -93,7 +93,7 @@ test.describe('Return Flow (Nghiệp vụ trả sách tại Quầy Lưu thông /
     // 2. Nhập mã vạch sách trả tại quầy
     const barcodeInput = page.getByPlaceholder(/Quét mã vạch/i);
     await expect(barcodeInput).toBeVisible();
-    await barcodeInput.fill('DEMO-BC-001-01');
+    await barcodeInput.fill('BC-001-01');
     await barcodeInput.press('Enter');
 
     // 3. Nút "Xác nhận trả sách" hiển thị sau khi quét thành công

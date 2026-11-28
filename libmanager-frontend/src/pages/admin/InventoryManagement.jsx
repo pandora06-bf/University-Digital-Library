@@ -319,7 +319,7 @@ export default function InventoryManagement() {
       return;
     }
 
-    // Mã vạch bản sao (DEMO-BC-001-02) → mở đầu sách chứa bản đó
+    // Mã vạch bản sao (BC-001-02) → mở đầu sách chứa bản đó
     const looksLikeBarcode = !/\s/.test(q) && /[A-Za-z]/.test(q) && /\d/.test(q) && q.includes('-');
     if (looksLikeBarcode) {
       const candidates = q === q.toUpperCase() ? [q] : [q, q.toUpperCase()];

@@ -9,7 +9,7 @@ test.describe('Topup Flow (Nạp tiền giả lập vào ví dịch vụ)', () =
         body: JSON.stringify({
           access_token: 'mock-jwt-student-token',
           token_type: 'bearer',
-          user: { id: 1, username: 'demo_student_001', role: 'STUDENT' },
+          user: { id: 1, username: '52400001', role: 'STUDENT' },
         }),
       });
     });
@@ -21,7 +21,7 @@ test.describe('Topup Flow (Nạp tiền giả lập vào ví dịch vụ)', () =
       sessionStorage.clear();
     });
     await page.reload();
-    await page.getByPlaceholder('Nhập tên đăng nhập').fill('demo_student_001');
+    await page.getByPlaceholder('Nhập tên đăng nhập').fill('52400001');
     await page.getByPlaceholder('Nhập mật khẩu').fill('User@123');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
     await expect(page).not.toHaveURL(/\/login/);
