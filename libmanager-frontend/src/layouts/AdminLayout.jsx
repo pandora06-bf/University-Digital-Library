@@ -15,6 +15,7 @@ import {
   Users,
   DoorOpen,
   WalletCards,
+  LifeBuoy,
 } from 'lucide-react';
 
 // Quick search data để navigate (2B-17: đủ mục Admin)
@@ -30,6 +31,7 @@ const SEARCH_SUGGESTIONS = [
   { label: 'Check-in phòng', desc: 'Quầy nhập mã đặt trong ngày', path: '/admin/rooms/checkin', icon: <DoorOpen className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Giao dịch chưa khớp', desc: 'Gán nạp tiền chưa khớp cho người dùng', path: '/admin/unmatched', icon: <WalletCards className="w-4 h-4" strokeWidth={2} /> },
   { label: 'Quản lý Người dùng', desc: 'Tạo/sửa, khóa, đặt lại mật khẩu', path: '/admin/users', icon: <Users className="w-4 h-4" strokeWidth={2} /> },
+  { label: 'Yêu cầu hỗ trợ', desc: 'Trả lời câu hỏi bạn đọc gửi từ trợ lý ảo', path: '/admin/support', icon: <LifeBuoy className="w-4 h-4" strokeWidth={2} /> },
 ];
 
 import { logout, getMe } from '../services/authService';
@@ -220,6 +222,10 @@ export default function AdminLayout() {
         root,
         { label: 'Giao dịch chưa khớp' }
       ],
+      '/admin/support': [
+        root,
+        { label: 'Yêu cầu hỗ trợ' }
+      ],
     };
 
     if (STATIC_CRUMBS[pathname]) {
@@ -256,6 +262,7 @@ export default function AdminLayout() {
     { path: '/admin/rooms', icon: <DoorOpen size={20} strokeWidth={2} />, label: 'Phòng học nhóm' },
     { path: '/admin/unmatched', icon: <WalletCards size={20} strokeWidth={2} />, label: 'Giao dịch chưa khớp' },
     { path: '/admin/users', icon: <Users size={20} strokeWidth={2} />, label: 'Người dùng' },
+    { path: '/admin/support', icon: <LifeBuoy size={20} strokeWidth={2} />, label: 'Yêu cầu hỗ trợ' },
   ];
 
   return (

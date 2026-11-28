@@ -60,9 +60,17 @@ def compact_queue(db: Session, book_id: int):
     return rows
 
 
+def active_holds(db: Session, book_id: int, now: datetime):
+    """Lượt giữ chỗ còn hạn của một đầu sách; mỗi lượt chiếm một bản trong available_stock."""
+    return list(db.scalars(select(Waitlist).where(
+        Waitlist.book_id == book_id, Waitlist.status == HELD, Waitlist.hold_expires_at > now,
+    ).order_by(Waitlist.queue_position, Waitlist.id)).all())
+
+
 def enqueue(db: Session, book_id: int, user: User) -> Waitlist:
     book = lock_book(db, book_id)
-    if book.available_stock != 0:
+    # Còn bản chưa bị ai giữ thì mượn luôn, không cần xếp hàng
+    if book.available_stock > len(active_holds(db, book_id, utc_now())):
         raise HTTPException(409, "Sách vẫn còn bản có thể mượn, không thể đặt trước")
     check_eligible(db, user, book_id)
     rows = compact_queue(db, book_id)

@@ -15,6 +15,8 @@ from app.models.fine import Fine, FinePayment
 from app.models.loan import Incident, Loan, Waitlist
 from app.models.user import User
 from app.services.loan_states import ACTIVE_LOAN_STATUSES, borrow_limit_error
+from app.services.waitlist_logic import ACTIVE as ACTIVE_QUEUE_STATUSES
+from app.services.waitlist_logic import active_holds, compact_queue, remove
 
 # Trạng thái Loan được tính vào hạn mức mượn đồng thời (Active_Loans): xem loan_states.py
 # (một nguồn chung cho loan_service, waitlist_logic, ebook_service, user_service, routers/loans).
@@ -252,6 +254,25 @@ def request_physical_loan_service(db: Session, user_code: str, book_id: int) -> 
 
     # Loan timestamps are stored as naive UTC, consistent with scheduler and API consumers.
     now = _utcnow_naive()
+
+    # Bản đang giữ cho người đặt trước khác thì không ai được đặt chồng lên (như check-out)
+    holds = active_holds(db, book_id, now)
+    if all(item.user_code != reader.user_code for item in holds) and book.available_stock <= len(holds):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sách đang được giữ cho người đặt trước khác, vui lòng Hẹn đặt trước",
+        )
+    # Đã có phiếu chờ nhận thì rời hàng đợi, nếu không lượt giữ của mình chiếm thêm một bản
+    own_entry = db.scalar(
+        select(Waitlist).where(
+            Waitlist.user_code == reader.user_code,
+            Waitlist.book_id == book_id,
+            Waitlist.status.in_(ACTIVE_QUEUE_STATUSES),
+        )
+    )
+    if own_entry is not None:
+        remove(db, own_entry)
+
     loan = Loan(
         user_code=reader.user_code,
         book_id=book_id,
@@ -559,17 +580,13 @@ def checkout_at_counter_service(
     due_date = now + timedelta(days=borrow_days)  # GĐ-04 / BR-17 (Mặc định 14 ngày)
 
     # Kiểm tra danh sách giữ chỗ còn hiệu lực (Waitlist HELD)
-    active_holds = list(db.scalars(
-        select(Waitlist).where(
-            Waitlist.book_id == copy.book_id,
-            Waitlist.status == "HELD",
-            Waitlist.hold_expires_at > now,
-        ).order_by(Waitlist.queue_position, Waitlist.id)
-    ).all())
-    own_hold = next((item for item in active_holds if item.user_code == user.user_code), None)
+    holds = active_holds(db, copy.book_id, now)
+    own_hold = next((item for item in holds if item.user_code == user.user_code), None)
 
-    # Nếu người nhận không phải chính chủ giữ chỗ mà số sách khả dụng <= số lượng đang HELD -> Chặn lại
-    if own_hold is None and book.available_stock <= len(active_holds):
+    # Nếu người nhận không phải chính chủ giữ chỗ mà số sách khả dụng <= số lượng đang HELD -> Chặn lại.
+    # Phiếu PENDING_PICKUP đã trừ tồn kho lúc đặt nên đã có sẵn một bản dành riêng.
+    reserved = loan is not None and loan.loan_status == "PENDING_PICKUP"
+    if not reserved and own_hold is None and book.available_stock <= len(holds):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Sách đang được giữ cho người đặt trước khác",
@@ -678,7 +695,6 @@ def checkout_at_counter_service(
     if own_hold is not None:
         db.delete(own_hold)
         db.flush()
-        from app.services.waitlist_logic import compact_queue
         compact_queue(db, copy.book_id)
 
     db.commit()

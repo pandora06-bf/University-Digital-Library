@@ -35,7 +35,7 @@ def context_base(user_name):
             "pickup_url": site_url("my-books?tab=waitlist"), "wallet_url": site_url("wallet")}
 
 def render_template(template, **context):
-    allowed = {"receipt.html", "due_reminder.html", "hold_notice.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html", "overdue_notice.html"}
+    allowed = {"receipt.html", "due_reminder.html", "hold_notice.html", "top_up.html", "room_booking.html", "incident.html", "topup_confirmed.html", "fine_paid.html", "temporary_password.html", "overdue_notice.html", "support_reply.html"}
     if template not in allowed:
         raise ValueError("Mẫu email không được hỗ trợ")
     return environment.get_template(template).render(**context)
@@ -172,6 +172,11 @@ def send_fine_paid(recipient, user_name, amount, balance):
     context = context_base(user_name)
     context.update(amount=amount, balance=balance)
     return send_sync(recipient, 'Thư viện - Xác nhận trả phạt', 'fine_paid.html', context)
+
+def send_support_reply(recipient, user_name, ticket_id, summary, reply):
+    context = context_base(user_name)
+    context.update(ticket_id=ticket_id, summary=summary, reply=reply, account_url=site_url('account'))
+    return send_sync(recipient, 'Thư viện - Thủ thư đã trả lời yêu cầu của bạn', 'support_reply.html', context)
 
 def send_temporary_password(recipient, user_name, username, temp_password):
     context = context_base(user_name)

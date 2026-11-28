@@ -105,3 +105,8 @@ app.include_router(admin_user_router)
 
 from app.routers.room_router import router as room_router
 app.include_router(room_router)
+
+from app.routers.chat_router import router as chat_router
+from app.routers.support_router import router as support_router
+app.include_router(chat_router)
+app.include_router(support_router)

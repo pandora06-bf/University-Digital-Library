@@ -41,6 +41,14 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+      - key: CHATBOT_ENABLED       # "true" sau khi đã điền khóa API
+        sync: false
+      - key: CHATBOT_PROVIDER      # "claude" hoặc "gemini"
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: R2_BUCKET
         sync: false
       - key: SMTP_HOST

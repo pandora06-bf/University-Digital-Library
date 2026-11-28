@@ -34,7 +34,8 @@ export function mapBorrowError(error) {
     if (/đã đặt trước|already.*wait/i.test(text)) return make('ALREADY_WAITLISTED', 'Bạn đã đặt trước sách này.');
     if (/còn bản|still available/i.test(text)) return make('STILL_AVAILABLE', 'Sách vẫn còn bản để mượn, không cần đặt trước.');
     if (/đang có phiếu|đang mượn|already/i.test(text)) return make('DUPLICATE', 'Bạn đang có phiếu mượn sách này.');
-    if (/hết|out of stock|stock/i.test(text)) return make('OUT_OF_STOCK', 'Sách vừa hết bản trên kệ.', { offerWaitlist: true });
+    // "Đang được giữ cho người đặt trước": không còn bản nào mượn được, cũng mời đặt trước.
+    if (/hết|đang được giữ|out of stock|stock/i.test(text)) return make('OUT_OF_STOCK', 'Sách vừa hết bản trên kệ.', { offerWaitlist: true });
     return raw('CONFLICT', 'Không thể mượn sách lúc này. Vui lòng thử lại.');
   }
   if (status === 404) return raw('NOT_FOUND', 'Không tìm thấy tài liệu.');

@@ -88,6 +88,31 @@ const categories = () => [
 ];
 
 export const handlers = [
+  // Trợ lý ảo và phiếu hỗ trợ (chat_router.py, support_router.py)
+  http.get('*/api/chat/status', () => HttpResponse.json({ enabled: true })),
+  http.post('*/api/chat', async ({ request }) => {
+    const { messages = [] } = await request.json();
+    const question = String(messages.at(-1)?.content || '');
+    const base = { language: 'vi', books: [], actions: [], needs_consent: false, needs_login: false, handoff_summary: null };
+    if (/nấu|y khoa/i.test(question)) {
+      return HttpResponse.json({ ...base, reply: 'Xin lỗi, hệ thống chưa có loại sách bạn muốn tìm.' });
+    }
+    const book = API_BOOKS[0];
+    return HttpResponse.json({
+      ...base,
+      reply: 'Đây là cuốn bạn có thể thích.',
+      books: [{
+        id: book.id, title: book.title, author: book.author, cover_image_path: null,
+        has_print: true, copies_available: 2, is_borrowed_by_someone: false, has_ebook: false,
+      }],
+    });
+  }),
+  http.get('*/api/support/tickets/my', () => HttpResponse.json({ data: [] })),
+  http.post('*/api/support/tickets', async ({ request }) => {
+    const { summary } = await request.json();
+    return HttpResponse.json({ id: 1, summary, status: 'OPEN', created_at: new Date().toISOString() }, { status: 201 });
+  }),
+  http.get('*/api/admin/support/tickets', () => HttpResponse.json({ data: [], total: 0 })),
   http.post('*/api/auth/login', async ({ request }) => {
     const { username = '', password = '' } = await request.json();
     if (password === 'WrongPassword@999' || password === 'wrong_password') {

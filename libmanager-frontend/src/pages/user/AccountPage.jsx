@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { UserRound, Mail, Phone, Building2, BookMarked, ShieldAlert, BellRing } from 'lucide-react';
 import WalletSection from '../../components/user/WalletSection';
+import SupportTickets from '../../components/user/SupportTickets';
 import { profileService } from '../../services/profileService';
 import { TOPUP_MIN, TOPUP_MAX } from '../../utils/wallet';
 
@@ -105,6 +106,8 @@ export default function AccountPage() {
 
         <WalletSection topUpRequest={topUpRequest} onChanged={reloadProfile} />
       </div>
+
+      <SupportTickets />
     </div>
   );
 }
