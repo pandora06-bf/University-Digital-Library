@@ -16,7 +16,7 @@ from app.services.loan_states import ACTIVE_LOAN_STATUSES, borrow_limit_error
 WAITING = "WAITING"
 HELD = "HELD"
 ACTIVE = (WAITING, HELD)
-HOLD_PERIOD = timedelta(hours=24)
+HOLD_PERIOD = timedelta(hours=24)  # Nhóm chốt giữ chỗ hàng đợi 24 giờ (SRS BR-08 ghi 48 giờ, cần cập nhật tài liệu)
 
 
 def utc_now():

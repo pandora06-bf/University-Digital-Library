@@ -48,7 +48,7 @@ def test_template_all_three_transactional_events(monkeypatch):
     base = email.context_base("Nguyễn Văn A")
     receipt = email.render_template("receipt.html", **base, receipt_id="BL-1", borrow_date="28/10/2026", due_date="11/11/2026", books=[{"title":"Sách", "author":"Tác giả", "loan_code":"PM-1"}])
     due = email.render_template("due_reminder.html", **base, book_title="Sách", loan_code="PM-1", due_date="11/11/2026")
-    hold = email.render_template("hold_24h.html", **base, book_title="Sách", hold_code="GC-1", pickup_deadline="29/10/2026", pickup_location="Quầy mượn")
+    hold = email.render_template("hold_notice.html", **base, book_title="Sách", hold_code="GC-1", pickup_deadline="29/10/2026", pickup_location="Quầy mượn")
     assert "PM-1" in receipt and "Sách" in due and "GC-1" in hold
 
 
