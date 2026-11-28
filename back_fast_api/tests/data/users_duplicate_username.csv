@@ -1,4 +1,4 @@
 username,full_name,email,phone_number,department,user_type,academic_title
-sv_demo_dup,Nguyễn Văn Demo 1,sv.demo.dup1@tdtu.edu.vn,0901999001,Khoa Công nghệ thông tin,STUDENT,
-sv_demo_dup,Nguyễn Văn Demo 2,sv.demo.dup2@tdtu.edu.vn,0901999002,Khoa Ngoại ngữ,STUDENT,
-sv_demo_valid,Sinh Viên Hợp Lệ,sv.demo.valid@tdtu.edu.vn,0901999003,Khoa Kinh tế,STUDENT,
+sv_dup_test,Nguyễn Văn Thử 1,sv.dup1@library.local,0901999001,Khoa Công nghệ thông tin,STUDENT,
+sv_dup_test,Nguyễn Văn Thử 2,sv.dup2@library.local,0901999002,Khoa Ngoại ngữ,STUDENT,
+sv_valid_test,Sinh Viên Hợp Lệ,sv.valid@library.local,0901999003,Khoa Kinh tế,STUDENT,

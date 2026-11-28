@@ -22,17 +22,18 @@ Hệ thống sẽ chạy máy chủ phát triển tại: **[http://localhost:517
 
 ---
 
-## 2. Tài khoản Đăng nhập Demo
+## 2. Tài khoản đăng nhập
 
-Truy cập vào trang đăng nhập: **[http://localhost:5173/login](http://localhost:5173/login)**
+Web chạy thật: **https://libmanager-ecru.vercel.app** (dữ liệu dùng chung với Docker local).
 
-Đăng nhập gọi API backend. Trên màn hình có nút **1-click điền** tài khoản ADMIN mẫu:
-
-| Vai trò | Username | Mật khẩu | Chức năng chính |
+| Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| **Thủ thư / Admin** | `admin` | `Admin@123` | Cổng Quản trị (`/admin`) — tài khoản bootstrap backend / Docker `.env`. |
+| **Sinh viên** | `52400011` (hoặc MSSV mẫu khác: `52400001`, `52400013`…) | `User@123` | Không nợ; có phiếu chờ nhận và ví 120.000 ₫ |
+| **Giảng viên** | `gv0004` (hoặc `gv0002`…) | `User@123` | Hạn mức 5 cuốn |
+| **Thủ thư / Admin** | `admin` | Do nhóm quản lý (không ghi trong tài liệu) | Vào cổng `/admin` |
 
-*(Các tài khoản `sinhvien@…` / `thuthu@…` trong mock cũ không còn dùng cho form login hiện tại.)*
+Danh sách đầy đủ tài khoản mẫu và trạng thái từng tài khoản: `docs/HUONG_DAN_THU_THU.md` (mục 1).
+Chế độ mock (`VITE_USE_MOCK=true`, chỉ dùng cho CI/E2E): nhập tên bất kỳ; tên có chữ `admin`/`thuthu` vào cổng Admin.
 
 > [!TIP]
 > Bạn có thể bấm vào biểu tượng **Con mắt** ở ô mật khẩu để kiểm tra tính năng hiển thị/ẩn mật khẩu bằng nút bấm chuẩn tiếp cận (accessibility).

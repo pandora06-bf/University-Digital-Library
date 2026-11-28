@@ -18,8 +18,8 @@
   "hold_code": "GC-2026-0024",
   "pickup_deadline": "14/10/2026, 09:00",
   "pickup_location": "Quầy mượn trả, tầng 1, thư viện",
-  "transaction_id": "TX-DEMO-001",
-  "pay_code": "NAP_DEMO_001",
+  "transaction_id": "TX-2026-0001",
+  "pay_code": "NAP52400011A",
   "amount": "50.000 ₫",
   "paid_at": "13/10/2026, 09:15",
   "balance_after": "100.000 ₫"

@@ -2,62 +2,66 @@
 
 | | |
 |---|---|
-| **Cập nhật** | 26/11/2026 — Users: xác nhận trước khi cấp mật khẩu tạm + email |
-| **Người biên soạn** | Vân (FE Admin) |
+| **Cập nhật** | 28/11/2026 — số liệu theo database chính (Supabase), thay tài khoản mẫu kiểu cũ bằng MSSV |
+| **Người biên soạn** | Vân (FE Admin); Đạt cập nhật dữ liệu mẫu |
 | **Ứng dụng** | Cổng Quản trị LibManager |
-| **FE local** | http://127.0.0.1:5173 |
-| **FE Docker** | http://127.0.0.1:5174 |
-| **API** | http://127.0.0.1:8010 · Swagger `/docs` |
-| **Đăng nhập** | `admin` / `Admin@123` |
+| **Web (cloud)** | https://libmanager-ecru.vercel.app |
+| **API (cloud)** | https://libmanager-api-zvuf.onrender.com · Swagger `/docs` |
+| **Docker local** | FE http://127.0.0.1:5174 · API http://127.0.0.1:8010 (dùng chung database chính) |
+| **Đăng nhập** | `admin` / mật khẩu do nhóm quản lý (không ghi trong tài liệu) |
 | **File nguồn** | `docs/HUONG_DAN_THU_THU.md` |
 
 Tài liệu ca trực trên cổng Admin. Sidebar đủ mục quản trị (không có trang Tổng quan riêng).
 
 **Quy ước chung**
 
-- Ô quầy (mượn / trả / phạt / người dùng) nhận **mã bạn đọc** (`SV-DEMO-…` / `GV-DEMO-…`), không nhận username `demo_student_…`.
-- Sinh viên demo số **lẻ** (`001`, `003`…). Giảng viên demo số **chẵn** (`002`, `004`…). Không có `SV-DEMO-002`.
-- **Barcode** là mã từng bản in (`DEMO-BC-005-01`). File eBook không có barcode.
+- Ô quầy (mượn / trả / phạt / người dùng) nhận **mã bạn đọc**: sinh viên là MSSV (`52400011`), giảng viên là `GV0004`.
+- Sinh viên mẫu mang mã **lẻ** (`52400001`, `52400003`…), giảng viên mẫu mang mã **chẵn** (`GV0002`, `GV0004`…). Không có `52400002`.
+- **Barcode** là mã từng bản in, dạng `BC-<mã sách>-<số bản>` (`BC-005-02`). File eBook không có barcode.
 - Thẻ thống kê trên nhiều trang **bấm được** để lọc bảng.
 - Máy quét: ô quét tự focus → quét hoặc gõ rồi **Enter**. Toast giữa phía trên.
-- Demo an toàn: mở modal / tra cứu rồi **Hủy**. **Xác nhận trả / thu phạt / gán ví / check-in / lập mất** sẽ đổi seed.
+- ⚠️ Web cloud và Docker local **dùng chung database thật**. Thử an toàn: mở modal / tra cứu rồi **Hủy**. **Xác nhận trả / thu phạt / gán ví / check-in / lập mất** sẽ đổi dữ liệu thật.
+- Phạt quá hạn tăng **5.000 ₫/ngày** (JOB-01 lúc 00:00), nên số tiền ở các bảng dưới là tại ngày **28/11/2026**.
 
 Script thuyết trình chi tiết: `docs/SCRIPT_THUYET_TRINH_ADMIN_FE.md`.
 
 ---
 
-## 1. Tài khoản demo
+## 1. Tài khoản mẫu
 
-| Vai trò | Login cổng bạn đọc | Mã quầy | Mật khẩu | Trạng thái live |
-|---------|-------------------|---------|----------|-----------------|
-| Admin / Thủ thư | `admin` | — | `Admin@123` | Vào `/admin/catalog` |
-| SV khóa + nợ | `demo_student_001` | `SV-DEMO-001` Quý cô Phương Vũ | `User@123` | Nợ **89.000 ₫**, khóa mượn |
-| SV khóa + nợ mất sách | `demo_student_003` | `SV-DEMO-003` Bà Ngọc Lê | `User@123` | Nợ **250.000 ₫**, khóa; bản `DEMO-BC-002-01` **LOST** |
-| SV khóa + mất sách | `demo_student_005` | `SV-DEMO-005` Bác Nhiên Bùi | `User@123` | Nợ **280.000 ₫**, khóa; `DEMO-BC-003-01` **LOST** |
-| SV sạch | `demo_student_007` | `SV-DEMO-007` Kim Bùi | `User@123` | Không nợ, không khóa; phạt 35.000 ₫ **đã thu** |
-| SV quá hạn + nợ | `demo_student_009` | `SV-DEMO-009` Anh Tùng Mai | `User@123` | Nợ **45.000 ₫**; đang mượn quá hạn `DEMO-BC-005-02` |
-| SV sạch + đã thu | `demo_student_011` | `SV-DEMO-011` Cô Kim Dương | `User@123` | Nợ 0; phạt 50.000 ₫ **đã thu**; phiếu chờ nhận *Refactoring* |
-| SV chờ nhận | `demo_student_013` | `SV-DEMO-013` Bảo Vũ | `User@123` | `PENDING_PICKUP` |
-| GV | `demo_lecturer_002` | `GV-DEMO-002` Anh Tú Hoàng | `User@123` | Không nợ |
+Mật khẩu chung của bạn đọc mẫu: `User@123`. Tên đăng nhập của sinh viên là MSSV; của giảng viên là mã viết thường (`gv0004`).
+
+| Vai trò | Đăng nhập | Mã quầy · Họ tên | Trạng thái (28/11/2026) |
+|---------|-----------|------------------|--------------------------|
+| Admin / Thủ thư | `admin` | — | Vào `/admin/catalog` |
+| SV sạch, đang mượn | `52400001` | `52400001` Quý cô Phương Vũ | Không nợ; đang mượn *Clean Code* (`BC-001-01`); ví 280.000 ₫ |
+| SV quá hạn + nợ | `52400003` | `52400003` Bà Ngọc Lê | Nợ **65.000 ₫**, khóa; quá hạn *The Pragmatic Programmer* (`BC-002-01`) |
+| SV mất sách | `52400005` | `52400005` Bác Nhiên Bùi | Nợ **280.000 ₫**, khóa; bản `BC-003-01` **LOST** (đã lập biên bản) |
+| SV quá hạn + nợ | `52400007` | `52400007` Kim Bùi | Nợ **45.000 ₫**, khóa; quá hạn *Refactoring* (`BC-004-01`) |
+| SV quá hạn + nợ + hàng chờ | `52400009` | `52400009` Anh Tùng Mai | Nợ **55.000 ₫**, khóa; quá hạn *Introduction to Algorithms* (`BC-005-01`); đứng đầu hàng chờ sách #6 |
+| SV sạch, có phiếu chờ | `52400011` | `52400011` Cô Kim Dương | Nợ 0; phạt 50.000 ₫ **đã thu**; phiếu `REQUESTED` *Introduction to Algorithms*; đang mượn *Artificial Intelligence* |
+| SV sạch, chưa mượn | `52400013` | `52400013` Bảo Vũ | Không nợ, không phiếu |
+| GV đọc eBook | `gv0002` | `GV0002` Anh Tú Hoàng | Không nợ; đang mượn eBook *Clean Code* |
+| GV | `gv0004` | `GV0004` Dương Nguyễn | Không nợ; ví 30.000 ₫ (đã hoàn tiền phòng) |
 
 ### Gợi ý theo trang
 
 | Trang | Mã / ID thử | Việc nên làm |
 |-------|-------------|--------------|
-| Login | `admin` / `Admin@123` | Vào cổng quản trị |
-| Danh mục | `admin` | 201 đầu sách; lọc Vật lý / eBook / Cả hai; cột bản sao = sẵn sàng / tổng bản in |
-| eBook | `admin` | 131 cuốn (eBook + Cả hai); thẻ Đã có PDF / Chưa có PDF |
-| Tồn kho | ID `206`, `207`, `210`, `212`, `304` | `206` Clean Code sẵn sàng; `207` Báo mất; `210` Algorithms; `212` Đã thanh lý; `304` Hư hỏng |
-| Xuất mượn | `SV-DEMO-007` hoặc `SV-DEMO-011` | Không nợ. Quét `DEMO-BC-005-01` hoặc `DEMO-BC-005-03` (sẵn sàng). **Không** nhập mã phiếu vào ô mã vạch |
-| Xuất bị chặn | `SV-DEMO-001` / `003` / `005` / `009` | Tra được hồ sơ, không xuất vì nợ / khóa |
-| Nhận trả | `SV-DEMO-009` hoặc `DEMO-BC-005-02` | Đang quá hạn *Introduction to Algorithms* |
-| Thu phạt chưa thu | `SV-DEMO-003` **250.000** · `005` **280.000** · `009` **45.000** · `001` **89.000** | Tra mã bạn đọc → lọc Chưa thu / loại **Mất·hỏng** hoặc **Trễ hạn** → mở Thu tiền rồi **Hủy** |
-| Thu phạt đã thu | `SV-DEMO-011` · `SV-DEMO-007` | Lọc **Đã hoàn tất** → Chi tiết |
-| Báo mất | Xem `SV-DEMO-005`, `003` | Lập mới: phiếu **#15** · `SV-DEMO-009` · mã `DEMO-BC-005-02` rồi **Hủy**. Có giá bìa → bồi thường theo giá (không chỉnh tay) |
-| Người dùng | Các mã trên | Khóa+nợ: 001/003/005/009. Sạch: 007/011/`GV-DEMO-002` |
-| Phòng | `admin` | CRUD phòng; ngừng phòng còn lịch → toast nghiệp vụ |
-| Check-in phòng | Ngày đặt trên seed | Chỉ trong **15 phút đầu** slot; ngoài cửa sổ → từ chối |
-| Chưa khớp | `FT26_UNMATCHED_002`…`007` | Chưa khớp: mở Gán rồi **Hủy**. Đã khớp: `FT26_UNMATCHED_001` → `SV-DEMO-003` |
+| Login | `admin` | Vào cổng quản trị |
+| Danh mục | `admin` | **100** đầu sách; lọc Vật lý / eBook / Cả hai; cột bản sao = sẵn sàng / tổng bản in |
+| eBook | `admin` | **61** cuốn (eBook + Cả hai), tất cả **đã có PDF** (lưu trên Cloudflare R2) |
+| Tồn kho | ID `1`, `2`, `3`, `5`, `6` | `1` Clean Code; `2` Pragmatic (1 bản quá hạn); `3` Design Patterns có bản **Báo mất**; `5` Algorithms; `6` AI **hết bản** (có hàng chờ) |
+| Xuất mượn | `52400001`, `52400013` hoặc `GV0004` | Không nợ. Quét `BC-005-02` hoặc `BC-005-03` (sẵn sàng). **Không** nhập mã phiếu vào ô mã vạch |
+| Xuất bị chặn | `52400003` / `005` / `007` / `009` | Tra được hồ sơ, không xuất vì nợ / khóa |
+| Nhận trả | `52400009` hoặc `BC-005-01` | Đang quá hạn *Introduction to Algorithms* |
+| Thu phạt chưa thu | `52400003` **65.000** · `005` **280.000** · `007` **45.000** · `009` **55.000** | Tra mã bạn đọc → lọc Chưa thu / loại **Mất·hỏng** hoặc **Trễ hạn** → mở Thu tiền rồi **Hủy** |
+| Thu phạt đã thu | `52400011` | Lọc **Đã hoàn tất** → Chi tiết (50.000 ₫, trả bằng ví) |
+| Báo mất | Xem `52400005` | Lập mới: phiếu **#5** · `52400009` · mã `BC-005-01` rồi **Hủy**. Có giá bìa → bồi thường theo giá (không chỉnh tay) |
+| Người dùng | Các mã trên | Khóa+nợ: 52400003/005/007/009. Sạch: 52400001/011/013, `GV0002`, `GV0004` |
+| Phòng | `admin` | 4 phòng; CRUD phòng; ngừng phòng còn lịch → toast nghiệp vụ |
+| Check-in phòng | Lượt đặt mới hôm nay | Chỉ trong **15 phút đầu** slot; ngoài cửa sổ → từ chối |
+| Chưa khớp | `FT26_UNMATCHED_001`, `002` | Chưa khớp: mở Gán rồi **Hủy**. Đã khớp: `FT26_UNMATCHED_003` → `52400011` |
 
 ---
 
@@ -87,9 +91,9 @@ Script thuyết trình chi tiết: `docs/SCRIPT_THUYET_TRINH_ADMIN_FE.md`.
 
 | Thử | Mã | Kỳ vọng |
 |-----|-----|---------|
-| Sạch, xuất được | `SV-DEMO-007` + `DEMO-BC-005-01` hoặc `005-03` | Thêm vào phiếu → xuất OK |
-| Có phiếu chờ nhận | `SV-DEMO-011` | Thấy *Refactoring* chờ nhận |
-| Bị chặn | `SV-DEMO-003` | Toast nợ / khóa — không xuất |
+| Sạch, xuất được | `52400013` + `BC-005-02` hoặc `BC-005-03` | Thêm vào phiếu → xuất OK |
+| Có phiếu chờ nhận | `52400011` | Thấy *Introduction to Algorithms* chờ nhận (`REQUESTED`) |
+| Bị chặn | `52400003` | Toast nợ / khóa — không xuất |
 | Nhầm mã phiếu | Gõ `5` vào ô mã vạch | Báo đây là mã phiếu; gợi ý bản sẵn sàng |
 
 Bạn đọc nợ hoặc `is_borrowing_blocked` → không xuất. Bản không `AVAILABLE` → từ chối.
@@ -104,9 +108,9 @@ Bạn đọc nợ hoặc `is_borrowing_blocked` → không xuất. Bản không 
 
 | Thử | Mã | Kỳ vọng |
 |-----|-----|---------|
-| Quá hạn | `SV-DEMO-009` / `DEMO-BC-005-02` | Thẻ trả; xác nhận sẽ chốt phạt quá hạn |
-| Đã trả / không mượn | `DEMO-BC-001-01` (đang AVAILABLE) | Không còn phiếu đang mượn |
-| Báo mất seed | `DEMO-BC-002-01` | Bản **LOST**, không trả thường |
+| Quá hạn | `52400009` / `BC-005-01` | Thẻ trả; xác nhận sẽ chốt phạt quá hạn |
+| Không mượn | `BC-001-02` (đang AVAILABLE) | Không có phiếu đang mượn |
+| Đã báo mất | `BC-003-01` | Bản **LOST**, không trả thường |
 
 Trả lần 2 cùng mã → toast không còn phiếu — đúng nghiệp vụ. Mất/hỏng nặng: lập biên bản ở **Báo mất / Hỏng**, thu tiền ở **Thu phạt**.
 
@@ -119,15 +123,15 @@ Trả lần 2 cùng mã → toast không còn phiếu — đúng nghiệp vụ. 
 3. Lọc loại vi phạm (nếu cần): **Trễ hạn trả sách** · **Mất / hỏng sách** · **Phạt khác** (BE gắn loại theo biên bản sự cố, không đoán tay trên UI).  
 4. **Thu tiền** → xác nhận tiền mặt **đủ toàn bộ** nợ một lần (không thu một phần).
 
-| Mã bạn đọc | Live |
+| Mã bạn đọc | Trạng thái (28/11/2026) |
 |------|------|
-| `SV-DEMO-003` | Chưa thu **250.000 ₫** |
-| `SV-DEMO-005` | Chưa thu **280.000 ₫** |
-| `SV-DEMO-009` | Chưa thu **45.000 ₫** |
-| `SV-DEMO-001` | Chưa thu **89.000 ₫** |
-| `SV-DEMO-011` | Đã hoàn tất **50.000 ₫** |
-| `SV-DEMO-007` | Đã hoàn tất **35.000 ₫** |
-| `SV-DEMO-002` | Không tồn tại |
+| `52400003` | Chưa thu **65.000 ₫** (trễ hạn, tăng 5.000 ₫/ngày) |
+| `52400005` | Chưa thu **280.000 ₫** (bồi thường mất sách) |
+| `52400007` | Chưa thu **45.000 ₫** (trễ hạn, tăng 5.000 ₫/ngày) |
+| `52400009` | Chưa thu **55.000 ₫** (trễ hạn, tăng 5.000 ₫/ngày) |
+| `52400011` | Đã hoàn tất **50.000 ₫** |
+| `52400001` | Không có khoản phạt |
+| `52400002` | Không tồn tại |
 
 Sau thu: `total_fines = 0`, mở khóa mượn (trừ khi còn sách quá hạn chưa trả — toast cảnh báo).
 
@@ -145,15 +149,17 @@ Sau thu: `total_fines = 0`, mở khóa mượn (trừ khi còn sách quá hạn 
 
 Không dùng form **sửa tồn kho** để “báo mất” thay cho bước này.
 
-**Xem biên bản seed (đã ghi nhận):** `SV-DEMO-005` (mất `DEMO-BC-003-01`), `SV-DEMO-003` (mất `DEMO-BC-002-01`) — không lập lại trên các phiếu này.
+**Biên bản đã ghi nhận:** `52400005` (mất `BC-003-01`, *Design Patterns*) — không lập lại trên phiếu này.
 
 **Lập biên bản mới** chỉ được trên phiếu đang `BORROWED` / `OVERDUE` và còn mã vạch:
 
 | Phiếu | Bạn đọc | Mã sách (barcode) | Đầu sách | Trạng thái |
 |-------|---------|-------------------|----------|------------|
-| **#15** | `SV-DEMO-009` Anh Tùng Mai | **`DEMO-BC-005-02`** | `[DEMO-005] Introduction to Algorithms` (id `210`) | OVERDUE |
+| **#5** | `52400009` Anh Tùng Mai | **`BC-005-01`** | *Introduction to Algorithms* (id `5`) | OVERDUE |
+| **#2** | `52400003` Bà Ngọc Lê | `BC-002-01` | *The Pragmatic Programmer* (id `2`) | OVERDUE |
+| **#1** | `52400001` Quý cô Phương Vũ | `BC-001-01` | *Clean Code* (id `1`) | BORROWED |
 
-Cách làm: **Lập biên bản** → nhập `SV-DEMO-009` hoặc `15` hoặc `DEMO-BC-005-02` (nếu form hỗ trợ) → chọn Mất / Hỏng → mở form rồi **Hủy** (giữ seed). Lưu thật sẽ khóa bạn đọc và cộng phạt.
+Cách làm: **Lập biên bản** → nhập `52400009` hoặc `5` hoặc `BC-005-01` (nếu form hỗ trợ) → chọn Mất / Hỏng → mở form rồi **Hủy** (giữ dữ liệu). Lưu thật sẽ khóa bạn đọc và cộng phạt.
 
 ---
 
@@ -181,11 +187,13 @@ Cách làm: **Lập biên bản** → nhập `SV-DEMO-009` hoặc `15` hoặc `D
 
 | ID | Đầu sách | Mã mẫu | Trạng thái |
 |----|----------|--------|------------|
-| `206` | Clean Code | `DEMO-BC-001-01` | AVAILABLE |
-| `207` | The Pragmatic Programmer | `DEMO-BC-002-01` | LOST |
-| `210` | Introduction to Algorithms | `DEMO-BC-005-01` / `005-03` AVAILABLE; `005-02` BORROWED | |
-| `212` | Computer Networks | `DEMO-BC-007-01` | RETIRED |
-| `304` | English Vocabulary… | `DEMO-BC-099-01` | DAMAGED |
+| `1` | Clean Code | `BC-001-01` BORROWED · `BC-001-02` AVAILABLE | |
+| `2` | The Pragmatic Programmer | `BC-002-01` BORROWED (quá hạn) · `002-02`, `002-03` AVAILABLE | |
+| `3` | Design Patterns | `BC-003-01` | LOST |
+| `5` | Introduction to Algorithms | `BC-005-01` BORROWED (quá hạn) · `005-02`, `005-03` AVAILABLE | |
+| `6` | Artificial Intelligence | `BC-006-01`, `006-02` BORROWED | Hết bản → hàng chờ |
+
+Hiện kho có 207 bản in: 200 Sẵn sàng · 6 Đang cho mượn · 1 Báo mất; chưa có bản Đã thanh lý / Hư hỏng.
 
 ### `/admin/ebooks`
 
@@ -209,7 +217,7 @@ Nút **Check-in mã đặt** → `/admin/rooms/checkin` (không có mục riêng
 2. Check-in dòng `CONFIRMED` trong **15 phút đầu** khung giờ.  
 3. Ngoài cửa sổ / sai id → từ chối.
 
-Seed ngày **24/11/2026** (đã qua cửa sổ buổi tối): đã vào `SV-DEMO-003`, `SV-DEMO-011`, `GV-DEMO-010`; còn `CONFIRMED` các slot 14:54 / 16:00 / 18:00 / 20:00. Demo ngày mới: chọn đúng ngày còn slot trong 15 phút đầu.
+Các lượt đặt có sẵn (`RB-001`…`RB-006`, ngày 23–27/11/2026) đều đã kết thúc (COMPLETED / CANCELLED / NO_SHOW). Muốn thử check-in: đăng nhập cổng bạn đọc (vd. `52400013`), đặt một slot sắp bắt đầu, rồi check-in trong **15 phút đầu** slot.
 
 ---
 
@@ -230,8 +238,8 @@ Thêm / sửa / khóa–mở (có lý do khóa) / đặt lại mật khẩu / im
 
 1. Thẻ / lọc: **Chưa khớp** · **Đã khớp** · Tất cả.  
 2. **Gán** chọn mã bạn đọc → cộng ví thật; chỉ gán khi chưa có `assigned_user_code`.  
-3. Demo: mở Gán trên `FT26_UNMATCHED_002` rồi **Hủy**.  
-4. `FT26_UNMATCHED_001` đã gán `SV-DEMO-003`. `FT26_UNMATCHED_003` vẫn ở chưa khớp vì chưa có mã người nhận.
+3. Thử: mở Gán trên `FT26_UNMATCHED_002` (75.000 ₫) rồi **Hủy**.  
+4. `FT26_UNMATCHED_001` (100.000 ₫) và `002` đang **Chưa khớp**. `FT26_UNMATCHED_003` (50.000 ₫) đã gán cho `52400011`.
 
 ---
 
@@ -265,4 +273,4 @@ Thêm / sửa / khóa–mở (có lý do khóa) / đặt lại mật khẩu / im
 - `GET /api/admin/room-bookings?booking_date=` · `POST …/checkin`
 - `GET /api/admin/wallet/unmatched?status=unresolved|assigned|all` · `POST …/assign`
 
-Swagger: http://127.0.0.1:8010/docs (đăng nhập admin lấy JWT trước khi thử).
+Swagger: https://libmanager-api-zvuf.onrender.com/docs (cloud) hoặc http://127.0.0.1:8010/docs (Docker local) — đăng nhập admin lấy JWT trước khi thử.

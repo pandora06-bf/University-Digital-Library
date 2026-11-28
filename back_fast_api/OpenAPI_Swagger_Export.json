@@ -5176,9 +5176,9 @@
                 "description": "Input Check-out tại quầy (UC10). Hiển thị đủ các cột của bảng loans để test trên Swagger.\n\n- Đã đặt trước trên Web: gửi `loan_id` hoặc `loan_code` (+ `copy_barcode`, `condition_notes`).\n- Mượn trực tiếp tại quầy: gửi `user_code` + `copy_barcode` (+ `condition_notes`).\n\nCác trường do hệ thống tự quản lý (loan_status, borrow_date, due_date, return_date,\nrenewal_count, checkin_condition, ebook_access_token, pickup_deadline) được chấp nhận\nnhưng BỎ QUA — có thể xóa khỏi body hoặc để null.",
                 "example": {
                     "condition_notes": "Sách nguyên vẹn",
-                    "copy_barcode": "DEMO-BC-001-01",
+                    "copy_barcode": "BC-001-01",
                     "loan_type": "PHYSICAL",
-                    "user_code": "SV-DEMO-001"
+                    "user_code": "52400001"
                 }
             },
             "LoanResponse": {

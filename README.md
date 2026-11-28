@@ -38,14 +38,18 @@ npm run build
 
 ---
 
-## 2. Tài khoản Đăng nhập Demo
+## 2. Tài khoản đăng nhập
 
-Hệ thống mô phỏng cổng định danh sinh viên SSO của trường:
+Web chạy thật: **https://libmanager-ecru.vercel.app** (dữ liệu dùng chung với Docker local).
 
-| Loại tài khoản | Email đăng nhập | Mật khẩu | Quyền hạn (Role) |
+| Vai trò | Tên đăng nhập | Mật khẩu | Ghi chú |
 | :--- | :--- | :--- | :--- |
-| **Độc giả (Sinh viên)** | `sinhvien@tdtu.edu.vn` | `12345678` | User (Tra cứu, mượn sách, đọc PDF trực tuyến) |
-| **Thủ thư (Cán bộ)** | `thuthu@tdtu.edu.vn` | `12345678` | Admin (Điểm tích hợp cho Vân) |
+| **Sinh viên** | `52400011` (hoặc MSSV mẫu khác: `52400001`, `52400013`…) | `User@123` | Không nợ; có phiếu chờ nhận và ví 120.000 ₫ |
+| **Giảng viên** | `gv0004` (hoặc `gv0002`…) | `User@123` | Hạn mức 5 cuốn |
+| **Thủ thư / Admin** | `admin` | Do nhóm quản lý (không ghi trong tài liệu) | Vào cổng `/admin` |
+
+Danh sách đầy đủ tài khoản mẫu và trạng thái từng tài khoản: `docs/HUONG_DAN_THU_THU.md` (mục 1).
+Chế độ mock (`VITE_USE_MOCK=true`, chỉ dùng cho CI/E2E): nhập tên bất kỳ; tên có chữ `admin`/`thuthu` vào cổng Admin.
 
 ---
 
