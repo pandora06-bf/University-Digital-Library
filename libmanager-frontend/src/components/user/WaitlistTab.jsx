@@ -57,7 +57,7 @@ function WaitlistCard({ entry, now, onCancel }) {
           ) : (
             <p className="text-sm text-slate-500">
               {entry.position === 1
-                ? 'Bạn đứng đầu hàng chờ: khi có bản trả về, thư viện giữ sách cho bạn 48 giờ và gửi email báo.'
+                ? 'Bạn đứng đầu hàng chờ: khi có bản trả về, thư viện giữ sách cho bạn 24 giờ và gửi email báo.'
                 : `Còn ${Math.max(0, (entry.position ?? 1) - 1)} người trước bạn. Thư viện sẽ gửi email khi tới lượt.`}
             </p>
           )}
@@ -128,7 +128,7 @@ export default function WaitlistTab({ onCountChange }) {
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
         <div>
           <h2 id="waitlist-heading" className="text-lg font-semibold text-slate-900">Sách đang hẹn đặt trước</h2>
-          <p className="text-sm text-slate-500">Khi tới lượt, sách được giữ cho bạn 48 giờ. Quá hạn, chỗ chuyển cho người kế tiếp.</p>
+          <p className="text-sm text-slate-500">Khi tới lượt, sách được giữ cho bạn 24 giờ. Quá hạn, chỗ chuyển cho người kế tiếp.</p>
         </div>
       </div>
 

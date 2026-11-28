@@ -166,9 +166,9 @@ def test_promote_waitlist_promotes_first_eligible(db_session):
     assert promoted.user_code == user1.user_code
     assert promoted.status == "HELD"
     assert promoted.hold_expires_at is not None
-    # SRS BR-08 / UC07: giữ sách cho người đứng đầu hàng đợi 48 giờ
+    # Giữ sách cho người đứng đầu hàng đợi 24 giờ (nhóm chốt; SRS BR-08 ghi 48 giờ)
     held_for = promoted.hold_expires_at - svc.utc_now()
-    assert timedelta(hours=47, minutes=59) < held_for <= timedelta(hours=48)
+    assert timedelta(hours=23, minutes=59) < held_for <= timedelta(hours=24)
 
 
 def test_promote_waitlist_skips_ineligible_and_promotes_next(db_session):

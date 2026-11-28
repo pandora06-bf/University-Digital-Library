@@ -108,7 +108,7 @@ def send_hold(recipient, user_name, book_title, hold_id, expires_at):
     context = context_base(user_name)
     context.update(book_title=book_title, hold_code=f"GC-{hold_id}", pickup_deadline=local_date(expires_at),
                    pickup_location=os.getenv("PICKUP_LOCATION", "Quầy mượn trả thư viện"))
-    return send_sync(recipient, "Thư viện - Sách đã được giữ cho bạn trong 48 giờ", "hold_notice.html", context)
+    return send_sync(recipient, "Thư viện - Sách đã được giữ cho bạn trong 24 giờ", "hold_notice.html", context)
 
 
 def send_room_booking(recipient, user_name, booking_id, room_name, date, slot):

@@ -1,7 +1,7 @@
 // Logic thuần của tab Đặt trước (3-13): không gọi API, không React, để kiểm thử bằng Node.
 import { libraryTimestamp } from './ebookAccess';
 
-// Trạng thái hàng chờ (waitlist_logic.py): WAITING đang chờ, HELD đang được giữ sách 48 giờ (SRS BR-08).
+// Trạng thái hàng chờ (waitlist_logic.py): WAITING đang chờ, HELD đang được giữ sách 24 giờ.
 export function toWaitlistEntry(data) {
   const status = String(data.status ?? '').toUpperCase();
   const position = Number(data.queue_position) || null;

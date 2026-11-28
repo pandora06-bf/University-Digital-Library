@@ -8,7 +8,7 @@ ghép thêm layout.
   `books` (danh sách có `title`, `author`, `loan_code`), `my_books_url`.
 - `due_reminder.html`: nhắc tới hạn; `book_title`, `loan_code`, `due_date`, `my_books_url`.
 - `hold_notice.html`: thông báo giữ chỗ; `book_title`, `hold_code`, `pickup_deadline`,
-  `pickup_location`, `pickup_url`. Backend tính `pickup_deadline` đúng 48 giờ (SRS BR-08)
+  `pickup_location`, `pickup_url`. Backend tính `pickup_deadline` đúng 24 giờ
   sau thời điểm bắt đầu giữ chỗ; không tính mốc này trong template.
 - `top_up.html`: xác nhận nạp thành công; `transaction_id`, `pay_code`, `amount`
   (số tiền **thực nhận**), `paid_at`, `balance_after`, `wallet_url`.
