@@ -21,14 +21,14 @@ const API_BOOKS = INITIAL_BOOKS.map((book, index) => ({
   barcode: book.barcode,
   copy_barcode: book.barcode,
   cover_image_path: null,
-  ebook: index % 3 === 2 ? { file_path: 'demo/ebook-' + (index + 1) + '.pdf', is_free: false } : null,
+  ebook: index % 3 === 2 ? { file_path: 'mock/ebook-' + (index + 1) + '.pdf', is_free: false } : null,
 }));
 
 const PROFILE = {
-  user_code: 'SV-DEMO-001',
-  username: 'demo_student_001',
+  user_code: '52400001',
+  username: '52400001',
   full_name: 'Quý cô Phương Vũ',
-  email: 'demo.user.001@library.local',
+  email: '52400001@library.local',
   phone_number: '0900000001',
   department: 'Khoa Cong nghe thong tin',
   academic_title: null,
@@ -62,7 +62,7 @@ const WALLET_TRANSACTIONS = [
   { id: 2, user_code: PROFILE.user_code, txn_type: 'BOOKING_PAYMENT', amount: -50000, balance_before: 200000, balance_after: 150000, description: 'Thanh toan dat phong', created_at: '2026-10-12T14:00:00' },
 ];
 
-const DEMO_LOANS = [
+const SAMPLE_LOANS = [
   {
     id: 1,
     loan_code: 'PM-2026-0098',
@@ -100,7 +100,7 @@ export const handlers = [
       role: isAdmin ? 'ADMIN' : 'STUDENT',
     };
     return HttpResponse.json({
-      access_token: isAdmin ? 'mock-jwt-admin-token' : 'mock-jwt-demo-token',
+      access_token: isAdmin ? 'mock-jwt-admin-token' : 'mock-jwt-user-token',
       token_type: 'bearer',
       user: sessionAuthUser,
     });
@@ -109,11 +109,11 @@ export const handlers = [
   http.get('*/api/auth/test', () => HttpResponse.json({ message: 'Auth router is working' })),
   http.get('*/api/users/me', () => HttpResponse.json(PROFILE)),
   http.get('*/api/users/me/dashboard', () => HttpResponse.json({
-    total_borrowing: DEMO_LOANS.filter(l => l.loan_status === 'BORROWED').length,
+    total_borrowing: SAMPLE_LOANS.filter(l => l.loan_status === 'BORROWED').length,
     total_overdue: 0,
     total_fines: PROFILE.total_fines,
     service_balance: PROFILE.service_balance,
-    current_loans: DEMO_LOANS.filter(l => l.loan_status === 'BORROWED'),
+    current_loans: SAMPLE_LOANS.filter(l => l.loan_status === 'BORROWED'),
     recent_history: [],
   })),
   http.get('*/api/books/search', ({ request }) => {
@@ -163,15 +163,15 @@ export const handlers = [
     return HttpResponse.json({ id: Date.now(), loan_code: 'PM-2026-' + Math.floor(1000 + Math.random() * 9000), book_id: book.id, book_title: book.title, loan_type: 'PHYSICAL', loan_status: 'PENDING_PICKUP', borrow_date: now.toISOString(), due_date: due.toISOString(), pickup_deadline: new Date(now.getTime() + 86400000).toISOString() }, { status: 201 });
   }),
   http.get('*/api/loans/my-loans', () => {
-    const rows = DEMO_LOANS.filter((l) => ['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
+    const rows = SAMPLE_LOANS.filter((l) => ['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
     return HttpResponse.json({ data: rows, items: rows, total: rows.length });
   }),
   http.get('*/api/loans/my-history', () => {
-    const rows = DEMO_LOANS.filter((l) => !['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
+    const rows = SAMPLE_LOANS.filter((l) => !['BORROWED', 'PENDING_PICKUP', 'OVERDUE', 'REQUESTED'].includes(l.loan_status));
     return HttpResponse.json({ data: rows, items: rows, total: rows.length });
   }),
   http.post('*/api/loans/:loanId/renew', ({ params }) => {
-    const loan = DEMO_LOANS.find((item) => String(item.id) === String(params.loanId));
+    const loan = SAMPLE_LOANS.find((item) => String(item.id) === String(params.loanId));
     if (!loan) return HttpResponse.json({ detail: 'Không tìm thấy phiếu mượn' }, { status: 404 });
     const due = new Date(Date.now() + 17 * 86400000).toISOString();
     return HttpResponse.json({ ...loan, due_date: due, renewal_count: Number(loan.renewal_count || 0) + 1, loan_status: 'BORROWED' });
@@ -200,7 +200,7 @@ export const handlers = [
   }),
   http.get('*/api/wallet/transactions/*', () => HttpResponse.json({ total: WALLET_TRANSACTIONS.length, data: WALLET_TRANSACTIONS })),
   http.get('*/api/admin/loans/lookup', ({ request }) => {
-    const q = new URL(request.url).searchParams.get('q') || 'SV-DEMO-001';
+    const q = new URL(request.url).searchParams.get('q') || '52400001';
     return HttpResponse.json({
       total: 1,
       user_code: q,
@@ -218,7 +218,7 @@ export const handlers = [
           full_name: 'Quý cô Phương Vũ',
           book_id: 1,
           book_title: 'Lập Trình Web Hiện Đại với React 19',
-          copy_barcode: 'DEMO-BC-001-01',
+          copy_barcode: 'BC-001-01',
           loan_type: 'PHYSICAL',
           loan_status: 'PENDING_PICKUP',
           borrow_date: '2026-10-28T09:00:00Z',
@@ -228,10 +228,10 @@ export const handlers = [
     });
   }),
   http.get('*/api/admin/loans/active-return', ({ request }) => {
-    const barcode = new URL(request.url).searchParams.get('barcode') || 'DEMO-BC-001-01';
+    const barcode = new URL(request.url).searchParams.get('barcode') || 'BC-001-01';
     return HttpResponse.json({
       loan_id: 101,
-      user_code: 'SV-DEMO-001',
+      user_code: '52400001',
       full_name: 'Quý cô Phương Vũ',
       book_id: 1,
       book_title: 'Lập Trình Web Hiện Đại với React 19',
@@ -245,7 +245,7 @@ export const handlers = [
   http.post('*/api/admin/loans/checkin', () => HttpResponse.json({ message: 'Trả sách thành công' })),
   http.post('*/api/admin/loans/checkout', () => HttpResponse.json({ message: 'Da xuat phieu muon thanh cong' })),
   http.get('*/api/admin/fines/lookup', ({ request }) => {
-    const userCode = new URL(request.url).searchParams.get('user_code') || 'SV-DEMO-001';
+    const userCode = new URL(request.url).searchParams.get('user_code') || '52400001';
     return HttpResponse.json({
       user_code: userCode,
       full_name: 'Nguyen Van Dat',

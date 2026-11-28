@@ -30,7 +30,7 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
         });
       }
 
-      if (username === 'demo_student_001' && password === 'User@123') {
+      if (username === '52400001' && password === 'User@123') {
         return route.fulfill({
           status: 200,
           headers: CORS_HEADERS,
@@ -38,7 +38,7 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
           body: JSON.stringify({
             access_token: 'mock-jwt-student-token',
             token_type: 'bearer',
-            user: { id: 1, username: 'demo_student_001', role: 'STUDENT' },
+            user: { id: 1, username: '52400001', role: 'STUDENT' },
           }),
         });
       }
@@ -64,7 +64,7 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
         body: JSON.stringify(
           isAdmin
             ? { id: 101, username: 'admin', role: 'ADMIN' }
-            : { id: 1, username: 'demo_student_001', role: 'STUDENT' }
+            : { id: 1, username: '52400001', role: 'STUDENT' }
         ),
       });
     });
@@ -78,7 +78,7 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
   });
 
   test('Hiển thị thông báo lỗi khi nhập sai mật khẩu', async ({ page }) => {
-    await page.getByPlaceholder('Nhập tên đăng nhập').fill('demo_student_001');
+    await page.getByPlaceholder('Nhập tên đăng nhập').fill('52400001');
     await page.getByPlaceholder('Nhập mật khẩu').fill('WrongPassword@999');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
 
@@ -87,7 +87,7 @@ test.describe('Login Flow (Xác thực đăng nhập Độc giả và Thủ thư
   });
 
   test('Đăng nhập thành công với tài khoản sinh viên và điều hướng sang trang chủ độc giả', async ({ page }) => {
-    await page.getByPlaceholder('Nhập tên đăng nhập').fill('demo_student_001');
+    await page.getByPlaceholder('Nhập tên đăng nhập').fill('52400001');
     await page.getByPlaceholder('Nhập mật khẩu').fill('User@123');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
 

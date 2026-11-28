@@ -756,7 +756,7 @@ export default function UserManagement() {
               label="Username đăng nhập (tuỳ chọn)"
               value={form.username}
               error={formErrors.username}
-              helperText={!formErrors.username ? 'Để trống → hệ thống tạo sv{mã}. VD: demo_student_001' : undefined}
+              helperText={!formErrors.username ? 'Để trống → hệ thống tạo sv{mã}. VD: 52400001' : undefined}
               onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
             />
           )}

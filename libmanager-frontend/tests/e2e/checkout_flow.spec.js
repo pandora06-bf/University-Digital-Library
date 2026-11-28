@@ -4,7 +4,7 @@ test.describe('Checkout Flow (Tra cứu & Mượn sách trực tuyến)', () => 
   test.beforeEach(async ({ page }) => {
     // Đăng nhập tài khoản sinh viên
     await page.goto('/login');
-    await page.getByPlaceholder('Nhập tên đăng nhập').fill('demo_student_001');
+    await page.getByPlaceholder('Nhập tên đăng nhập').fill('52400001');
     await page.getByPlaceholder('Nhập mật khẩu').fill('User@123');
     await page.getByRole('button', { name: 'Đăng nhập hệ thống' }).click();
     await expect(page).not.toHaveURL(/\/login/);

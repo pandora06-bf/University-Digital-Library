@@ -46,7 +46,7 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
         headers: CORS_HEADERS,
         contentType: 'application/json',
         body: JSON.stringify({
-          user_code: 'SV-DEMO-001',
+          user_code: '52400001',
           full_name: 'Nguyễn Văn Đạt',
           total_fines: 50000,
           fines: [
@@ -92,7 +92,7 @@ test.describe('Pay Fine Flow (Quản lý và thu nợ / phí phạt tại quầy
     // 1. Tra cứu mã bạn đọc có nợ phạt (Enter hoặc nút Tra cứu)
     const searchInput = page.getByPlaceholder(/Nhập mã bạn đọc/i);
     await expect(searchInput).toBeVisible();
-    await searchInput.fill('SV-DEMO-001');
+    await searchInput.fill('52400001');
     await searchInput.press('Enter');
 
     // 2. Chờ kết quả lookup — nút Thu tiền trong bảng (không dùng getByText Chưa thu: trùng option filter)

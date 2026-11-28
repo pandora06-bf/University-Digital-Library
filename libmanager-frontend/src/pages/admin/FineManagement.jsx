@@ -204,7 +204,7 @@ export default function FineManagement() {
     }
   };
 
-  // Từ Báo mất/hỏng: /admin/fines?mssv=SV-DEMO-005 → tự điền + tra cứu
+  // Từ Báo mất/hỏng: /admin/fines?mssv=52400005 → tự điền + tra cứu
   useEffect(() => {
     const mssv = (searchParams.get('mssv') || '').trim();
     if (!mssv || autoLookupDone.current === mssv) return;

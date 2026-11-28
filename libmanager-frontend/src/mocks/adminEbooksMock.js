@@ -1,5 +1,5 @@
 /**
- * Mock FE cho /admin/ebooks (UI demo).
+ * Mock FE cho /admin/ebooks (UI mẫu).
  * Upload/preview API thật: POST /api/admin/books/{id}/upload-pdf, GET /api/ebooks/{id}/preview.
  */
 
@@ -88,7 +88,7 @@ export const INITIAL_ADMIN_EBOOKS = [
   },
 ];
 
-export const DEMO_EBOOK_BOOK_OPTIONS = INITIAL_ADMIN_EBOOKS.map((e) => ({
+export const SAMPLE_EBOOK_BOOK_OPTIONS = INITIAL_ADMIN_EBOOKS.map((e) => ({
   id: e.id,
   title: e.title,
 }));

@@ -50,7 +50,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
         body: JSON.stringify({
           total: 1,
           reader: {
-            user_code: 'SV-DEMO-001',
+            user_code: '52400001',
             full_name: 'Quý cô Phương Vũ',
             total_fines: 0,
             is_borrowing_blocked: false,
@@ -59,11 +59,11 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
             {
               id: 101,
               loan_code: 'PM-2026-0101',
-              user_code: 'SV-DEMO-001',
+              user_code: '52400001',
               full_name: 'Quý cô Phương Vũ',
               book_id: 1,
               book_title: 'Lập Trình Web Hiện Đại với React 19',
-              copy_barcode: 'DEMO-BC-001-01',
+              copy_barcode: 'BC-001-01',
               loan_type: 'PHYSICAL',
               loan_status: 'PENDING_PICKUP',
               borrow_date: '2026-10-28T09:00:00Z',
@@ -84,12 +84,12 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           loan_id: 101,
-          user_code: 'SV-DEMO-001',
+          user_code: '52400001',
           full_name: 'Quý cô Phương Vũ',
           book_id: 1,
           book_title: 'Lập Trình Web Hiện Đại với React 19',
           book_price: 150000,
-          copy_barcode: 'DEMO-BC-001-01',
+          copy_barcode: 'BC-001-01',
           loan_status: 'BORROWED',
           due_date: '2026-11-11T17:00:00Z',
           overdue: false,
@@ -119,7 +119,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
     await expect(returnInput).toBeVisible();
 
     // Thử nhập mã vạch sách trả
-    await returnInput.fill('DEMO-BC-001-01');
+    await returnInput.fill('BC-001-01');
     await returnInput.press('Enter');
     await expect(page.getByText(/Đang mượn|Quý cô Phương Vũ/i).first()).toBeVisible();
 
@@ -128,7 +128,7 @@ test.describe('Counter Flow (Quầy thủ thư: Mượn & Trả sách)', () => {
     const mssvInput = page.getByPlaceholder(/Nhập mã bạn đọc/i);
     await expect(mssvInput).toBeVisible();
 
-    await mssvInput.fill('SV-DEMO-001');
+    await mssvInput.fill('52400001');
     await mssvInput.press('Enter');
 
     // Độc giả được tra cứu thành công

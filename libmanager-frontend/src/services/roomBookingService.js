@@ -1,5 +1,5 @@
 import axiosInstance from './axios_instance';
-import { getRoomSnapshot, createRoomBooking, cancelRoomBooking, topUpDemoWallet } from '../mocks/roomBookings';
+import { getRoomSnapshot, createRoomBooking, cancelRoomBooking, topUpSampleWallet } from '../mocks/roomBookings';
 import { mapRoomApiError, toRoomSnapshot } from '../utils/roomBooking';
 
 // Phòng đọc dùng API thật (2B-21 Hiền, 2B-22 Nhất, 3-10 Đức) khi frontend chạy với backend thật
@@ -59,7 +59,7 @@ const mock = {
   async getSnapshot(date) { return getRoomSnapshot(date); },
   async book(selection) { return createRoomBooking(selection); },
   async cancel(id) { return cancelRoomBooking(id); },
-  async topUp(amount) { return topUpDemoWallet(amount); },
+  async topUp(amount) { return topUpSampleWallet(amount); },
 };
 
 export const roomBookingService = { mode: useApi ? 'api' : 'mock', ...(useApi ? api : mock) };
